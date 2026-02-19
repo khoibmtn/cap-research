@@ -1,0 +1,239 @@
+/* ════════════════════════════════════════════════════════════
+   Print Research Record — CSS
+   Applied only when printing via @media print
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Page setup (defaults, overridden by inline CSS vars) ── */
+@page {
+    size: A4;
+    margin: 1.5cm 1.5cm 1.5cm 2cm;
+}
+
+/* ── Screen: hide print container ── */
+.print-container {
+    display: none;
+}
+
+/* ── Print mode ── */
+@media print {
+
+    /* Hide everything except the print container */
+    body>*:not(.print-overlay) {
+        display: none !important;
+    }
+
+    .print-overlay {
+        display: block !important;
+        position: static !important;
+    }
+
+    .print-container {
+        display: block !important;
+    }
+
+    /* ── Typography ── */
+    .print-record,
+    .print-record * {
+        font-family: 'Times New Roman', Times, serif;
+        font-size: inherit;
+        line-height: 1.4;
+        color: #000;
+    }
+
+    .print-record {
+        font-size: 13px;
+        /* fallback, overridden by dynamic style */
+    }
+
+    .print-record h2 {
+        font-size: 1.08em;
+        font-weight: bold;
+        margin: 12px 0 6px 0;
+    }
+
+    /* ── Page breaks ── */
+    .print-section {
+        page-break-inside: avoid;
+    }
+
+    .print-table {
+        page-break-inside: avoid;
+    }
+
+    .print-record-break {
+        page-break-after: always;
+    }
+
+    .print-record-break:last-child {
+        page-break-after: avoid;
+    }
+
+    /* ── Header ── */
+    .print-header {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .print-header-line1,
+    .print-header-line2 {
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 1.08em;
+    }
+
+    .print-header-title {
+        font-weight: bold;
+        font-size: 1.2em;
+        text-transform: uppercase;
+        margin: 16px 0 8px 0;
+    }
+
+    .print-header-code {
+        font-weight: bold;
+        font-size: 1.08em;
+        text-align: right;
+        margin-bottom: 8px;
+    }
+
+    .print-header-topic {
+        font-style: italic;
+        font-weight: bold;
+        text-align: center;
+        font-size: 1em;
+        margin-bottom: 16px;
+    }
+
+    /* ── Inline fields ── */
+    .print-field {
+        display: inline;
+    }
+
+    .print-field-label {
+        font-weight: normal;
+    }
+
+    .print-field-value {
+        border-bottom: 1px dotted #000;
+        min-width: 60px;
+        display: inline-block;
+        padding: 0 4px;
+        text-align: center;
+    }
+
+    .print-field-value:empty::after {
+        content: '\00a0\00a0\00a0\00a0\00a0\00a0';
+    }
+
+    /* ── Checkbox ── */
+    .print-checkbox {
+        font-size: 1.08em;
+        margin-right: 4px;
+    }
+
+    /* ── Tables ── */
+    .print-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 8px 0;
+        font-size: inherit;
+    }
+
+    .print-table th,
+    .print-table td {
+        border: 1px solid #000;
+        padding: 4px 8px;
+        text-align: left;
+        vertical-align: top;
+    }
+
+    .print-table th {
+        font-weight: bold;
+        background: none;
+        text-align: center;
+    }
+
+    /* ── Lab table (2-column layout) ── */
+    .print-lab-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 8px 0;
+        font-size: inherit;
+    }
+
+    .print-lab-table td,
+    .print-lab-table th {
+        border: 1px solid #000;
+        padding: 3px 8px;
+    }
+
+    .print-lab-table td:nth-child(even) {
+        text-align: center;
+    }
+
+    .print-lab-table .lab-header {
+        font-weight: bold;
+    }
+
+    /* ── Signature ── */
+    .print-signature {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 40px;
+        text-align: center;
+    }
+
+    .print-signature div {
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 1.08em;
+    }
+
+    /* ── Grid helpers ── */
+    .print-row {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 4px;
+    }
+
+    .print-row>* {
+        flex: 1;
+    }
+
+    .print-flex-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 24px;
+        margin-bottom: 4px;
+    }
+
+    .print-vitals-row {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 8px;
+        margin-bottom: 4px;
+    }
+
+    .print-vitals-row>span {
+        white-space: nowrap;
+    }
+
+    .print-checkbox-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-right: 16px;
+        white-space: nowrap;
+    }
+
+    .print-hoi-chung-row {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        margin-bottom: 4px;
+    }
+
+    .print-hoi-chung-ben {
+        display: inline-flex;
+        gap: 12px;
+    }
+}
