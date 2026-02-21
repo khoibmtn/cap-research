@@ -66,6 +66,12 @@ cp .agent/context/latest_context.md ".agent/context/context_$(date +%Y%m%d_%H%M%
 ls -t .agent/context/context_*.md | tail -n +6 | xargs rm -f 2>/dev/null
 ```
 
+### Phase 2.5: Update User Manual
+
+6. **Check if `instruction.md` needs updating.** If any features were added, modified, or removed during this session, update the corresponding sections in `instruction.md` (project root). This file is the user-facing manual written in plain Vietnamese — describe what users can do, not code internals.
+
+> This is a MANDATORY step per GEMINI.md rules. Do NOT skip even if it seems minor.
+
 ### Phase 3: Commit on Current Branch
 
 6. Stage ALL changes (code + context):
