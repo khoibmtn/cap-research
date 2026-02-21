@@ -16,6 +16,12 @@ export const patientService = {
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         });
+
+        // Auto-backup (fire-and-forget — never blocks patient creation)
+        import('./backupService').then(({ backupService }) => {
+            backupService.createAutoBackup();
+        }).catch(() => { /* silent */ });
+
         return docRef.id;
     },
 

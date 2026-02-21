@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, FileDown, Trash2, Eye, Edit, Printer } from 'lucide-react';
+import { Plus, Search, FileDown, Trash2, Eye, Edit, Printer, HardDrive, Loader2 } from 'lucide-react';
 import { patientService } from '../services/patientService';
 import { exportPatientsToExcel } from '../services/exportService';
 import { usePrintRecord } from '../hooks/usePrintRecord';
+import { useEditGuardConfirm } from '../contexts/EditGuardContext';
 import type { Patient } from '../types/patient';
+import { backupService } from '../services/backupService';
 import toast from 'react-hot-toast';
 
 export default function DashboardPage() {
@@ -12,7 +14,9 @@ export default function DashboardPage() {
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [backingUp, setBackingUp] = useState(false);
     const navigate = useNavigate();
+    const showConfirm = useEditGuardConfirm();
 
     const formatMABNNC = (code: string) => {
         if (!code) return '—';
@@ -41,7 +45,13 @@ export default function DashboardPage() {
     });
 
     const handleDelete = async (id: string, name: string) => {
-        if (!confirm(`Xóa bệnh nhân "${name}"?`)) return;
+        const ok = await showConfirm(
+            `Bạn có chắc muốn xóa bệnh nhân "${name}"?\nThao tác này không thể hoàn tác.`,
+            'Xóa',
+            'Hủy',
+            { title: 'Xóa bệnh nhân', destructive: true },
+        );
+        if (!ok) return;
         try {
             await patientService.delete(id);
             toast.success('Đã xóa bệnh nhân');
@@ -57,6 +67,23 @@ export default function DashboardPage() {
         }
         exportPatientsToExcel(patients);
         toast.success('Đã xuất file Excel');
+    };
+
+    const handleBackup = async () => {
+        if (patients.length === 0) {
+            toast.error('Không có dữ liệu để backup');
+            return;
+        }
+        setBackingUp(true);
+        try {
+            await backupService.createBackup(patients);
+            toast.success(`Đã backup ${patients.length} bệnh nhân`);
+        } catch (err) {
+            console.error('[Backup] Error:', err);
+            toast.error('Lỗi khi tạo backup');
+        } finally {
+            setBackingUp(false);
+        }
     };
 
     // ─── Selection ──────────────────────────────────────────
@@ -110,6 +137,19 @@ export default function DashboardPage() {
                             <span className="hidden sm:inline">In {selectedIds.size} BN</span>
                         </button>
                     )}
+                    <button
+                        onClick={handleBackup}
+                        disabled={backingUp}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium
+              text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100
+              disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {backingUp
+                            ? <Loader2 className="w-4 h-4 animate-spin" />
+                            : <HardDrive className="w-4 h-4" />
+                        }
+                        <span className="hidden sm:inline">{backingUp ? 'Đang backup...' : 'Backup'}</span>
+                    </button>
                     <button
                         onClick={handleExport}
                         className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium

@@ -2,11 +2,20 @@ import { useState, useEffect, useCallback } from 'react';
 import { generateAddressTemplate, parseAddressExcel, type AddressEntry } from '../services/exportService';
 import { patientService } from '../services/patientService';
 import { settingsService } from '../services/settingsService';
+import { backupService, type BackupMetadata, type BackupPatient, type SearchResult } from '../services/backupService';
+import { parseExcelToPatients, detectConflicts, type ConflictPair } from '../services/importService';
+import ConflictDialog from '../components/backup/ConflictDialog';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import PatientDetailModal from '../components/backup/PatientDetailModal';
 import {
     DEFAULT_BACTERIA, DEFAULT_ANTIBIOTICS, NGHE_NGHIEP_OPTIONS,
     DEFAULT_NOI_O, DEFAULT_DIEN_BIEN_DIEU_TRI, DEFAULT_TINH_TRANG_RA_VIEN,
 } from '../data/formOptions';
-import { Upload, Download, Info, Plus, Trash2, Pencil, Check, X, ShieldAlert, MapPin, Stethoscope, Bug, Printer } from 'lucide-react';
+import {
+    Upload, Download, Info, Plus, Trash2, Pencil, Check, X,
+    ShieldAlert, MapPin, Stethoscope, Bug, Printer, HardDrive,
+    Loader2, Eye, RotateCcw, FileSpreadsheet, ChevronUp, Search,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
 // ─── Editable List Table ─────────────────────────────────────────────
@@ -174,6 +183,7 @@ const TABS = [
     { key: 'lamsang', label: 'Lâm sàng', icon: Stethoscope },
     { key: 'vikhuan', label: 'Vi khuẩn', icon: Bug },
     { key: 'inbanc', label: 'In BANC', icon: Printer },
+    { key: 'backup', label: 'Backup', icon: HardDrive },
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'];
@@ -230,6 +240,21 @@ export default function SettingsPage() {
 
     // In BANC tab
     const [printSettings, setPrintSettings] = useState<PrintSettings>(DEFAULT_PRINT_SETTINGS);
+
+    // Backup tab
+    const [backups, setBackups] = useState<BackupMetadata[]>([]);
+    const [backupsLoading, setBackupsLoading] = useState(false);
+    const [backupBusy, setBackupBusy] = useState(false);
+    const [expandedBackup, setExpandedBackup] = useState<string | null>(null);
+    const [expandedData, setExpandedData] = useState<BackupPatient[]>([]);
+    const [renameId, setRenameId] = useState<string | null>(null);
+    const [renameName, setRenameName] = useState('');
+    // Restore flow
+    const [restoreBackup, setRestoreBackup] = useState<BackupMetadata | null>(null);
+    const [restoreData, setRestoreData] = useState<BackupPatient[]>([]);
+    const [restoreSelected, setRestoreSelected] = useState<Set<number>>(new Set());
+    const [restoreStep, setRestoreStep] = useState<'select' | 'conflict' | null>(null);
+    const [conflicts, setConflicts] = useState<ConflictPair[]>([]);
 
     // Load all data on mount
     useEffect(() => {
@@ -615,6 +640,765 @@ export default function SettingsPage() {
                         </label>
                     </div>
                 </div>
+            )}
+            {/* ════════════ TAB 5: Backup ════════════ */}
+            {activeTab === 'backup' && (
+                <BackupTab
+                    backups={backups}
+                    setBackups={setBackups}
+                    backupsLoading={backupsLoading}
+                    setBackupsLoading={setBackupsLoading}
+                    backupBusy={backupBusy}
+                    setBackupBusy={setBackupBusy}
+                    expandedBackup={expandedBackup}
+                    setExpandedBackup={setExpandedBackup}
+                    expandedData={expandedData}
+                    setExpandedData={setExpandedData}
+                    renameId={renameId}
+                    setRenameId={setRenameId}
+                    renameName={renameName}
+                    setRenameName={setRenameName}
+                    restoreBackup={restoreBackup}
+                    setRestoreBackup={setRestoreBackup}
+                    restoreData={restoreData}
+                    setRestoreData={setRestoreData}
+                    restoreSelected={restoreSelected}
+                    setRestoreSelected={setRestoreSelected}
+                    restoreStep={restoreStep}
+                    setRestoreStep={setRestoreStep}
+                    conflicts={conflicts}
+                    setConflicts={setConflicts}
+                />
+            )}
+        </div>
+    );
+}
+
+// ─── Backup Tab Component ────────────────────────────────────────────────
+interface BackupTabProps {
+    backups: BackupMetadata[];
+    setBackups: (b: BackupMetadata[]) => void;
+    backupsLoading: boolean;
+    setBackupsLoading: (v: boolean) => void;
+    backupBusy: boolean;
+    setBackupBusy: (v: boolean) => void;
+    expandedBackup: string | null;
+    setExpandedBackup: (v: string | null) => void;
+    expandedData: BackupPatient[];
+    setExpandedData: (v: BackupPatient[]) => void;
+    renameId: string | null;
+    setRenameId: (v: string | null) => void;
+    renameName: string;
+    setRenameName: (v: string) => void;
+    restoreBackup: BackupMetadata | null;
+    setRestoreBackup: (v: BackupMetadata | null) => void;
+    restoreData: BackupPatient[];
+    setRestoreData: (v: BackupPatient[]) => void;
+    restoreSelected: Set<number>;
+    setRestoreSelected: (v: Set<number>) => void;
+    restoreStep: 'select' | 'conflict' | null;
+    setRestoreStep: (v: 'select' | 'conflict' | null) => void;
+    conflicts: ConflictPair[];
+    setConflicts: (v: ConflictPair[]) => void;
+}
+
+function BackupTab({
+    backups, setBackups, backupsLoading, setBackupsLoading,
+    backupBusy, setBackupBusy, expandedBackup, setExpandedBackup,
+    expandedData, setExpandedData, renameId, setRenameId,
+    renameName, setRenameName, restoreBackup, setRestoreBackup,
+    restoreData, setRestoreData, restoreSelected, setRestoreSelected,
+    restoreStep, setRestoreStep, conflicts, setConflicts,
+}: BackupTabProps) {
+    // Sub-tab state
+    const [subTab, setSubTab] = useState<'list' | 'search'>('list');
+
+    // Search state
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchScope, setSearchScope] = useState<string>('all'); // 'all' or backupId
+    const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+    const [searching, setSearching] = useState(false);
+    const [hasSearched, setHasSearched] = useState(false);
+
+    // Detail modal
+    const [detailPatient, setDetailPatient] = useState<BackupPatient | null>(null);
+
+    // Delete confirmation
+    const [deleteTarget, setDeleteTarget] = useState<BackupMetadata | null>(null);
+
+    // Restore single patient confirmation
+    const [restoreTarget, setRestoreTarget] = useState<BackupPatient | null>(null);
+
+    // Pending new patients count for ConflictDialog summary
+    const [pendingNewCount, setPendingNewCount] = useState(0);
+    const [identicalCount, setIdenticalCount] = useState(0);
+    // Store pending new patients to restore along with selected conflicts
+    const [pendingNewPatients, setPendingNewPatients] = useState<BackupPatient[]>([]);
+
+    // Load backups on mount
+    useEffect(() => {
+        loadBackups();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const loadBackups = async () => {
+        setBackupsLoading(true);
+        try {
+            const list = await backupService.listBackups();
+            setBackups(list);
+        } catch (err) {
+            console.error('[Backup] Load error:', err);
+            toast.error('Lỗi khi tải danh sách backup');
+        } finally {
+            setBackupsLoading(false);
+        }
+    };
+
+    const handleCreateBackup = async () => {
+        setBackupBusy(true);
+        try {
+            const patients = await patientService.getAll();
+            if (patients.length === 0) {
+                toast.error('Không có bệnh nhân nào để backup');
+                return;
+            }
+            await backupService.createBackup(patients);
+            toast.success(`Đã backup ${patients.length} bệnh nhân`);
+            await loadBackups();
+        } catch (err) {
+            console.error('[Backup] Create error:', err);
+            toast.error('Lỗi khi tạo backup');
+        } finally {
+            setBackupBusy(false);
+        }
+    };
+
+    const handleDelete = async (backup: BackupMetadata) => {
+        try {
+            await backupService.deleteBackup(backup);
+            toast.success('Đã xóa backup');
+            setBackups(backups.filter((b) => b.id !== backup.id));
+        } catch {
+            toast.error('Lỗi khi xóa backup');
+        } finally {
+            setDeleteTarget(null);
+        }
+    };
+
+    const handleRename = async (id: string) => {
+        if (!renameName.trim()) return;
+        try {
+            await backupService.renameBackup(id, renameName.trim());
+            setBackups(backups.map((b) => b.id === id ? { ...b, name: renameName.trim() } : b));
+            setRenameId(null);
+            toast.success('Đã đổi tên');
+        } catch {
+            toast.error('Lỗi khi đổi tên');
+        }
+    };
+
+    const handleToggleExpand = async (backup: BackupMetadata) => {
+        if (expandedBackup === backup.id) {
+            setExpandedBackup(null);
+            return;
+        }
+        try {
+            const data = await backupService.getBackupData(backup);
+            setExpandedData(data);
+            setExpandedBackup(backup.id);
+        } catch (err) {
+            console.error('[Backup] Expand error:', err);
+            toast.error('Lỗi khi tải dữ liệu backup');
+        }
+    };
+
+    // ─── Search ──────────────────────────────────────────────────
+    const handleSearch = async () => {
+        setSearching(true);
+        setHasSearched(true);
+        try {
+            const results = await backupService.searchBackups(
+                backups,
+                searchQuery.trim(),
+                searchScope === 'all' ? undefined : searchScope,
+            );
+            setSearchResults(results);
+            if (results.length === 0) {
+                toast('Không tìm thấy kết quả', { icon: '🔍' });
+            }
+        } catch (err) {
+            console.error('[Backup] Search error:', err);
+            toast.error('Lỗi khi tìm kiếm');
+        } finally {
+            setSearching(false);
+        }
+    };
+
+    // ─── Unified restore handler (single + bulk) ─────────────────
+    const handleRestorePatients = async (patients: BackupPatient[]) => {
+        setBackupBusy(true);
+        try {
+            const existingPatients = await patientService.getAll();
+            const { newPatients, conflicts: foundConflicts, identicalPatients } =
+                detectConflicts(patients, existingPatients);
+
+            if (foundConflicts.length > 0) {
+                // Has conflicts → show ConflictDialog
+                setConflicts(foundConflicts);
+                setPendingNewPatients(newPatients as BackupPatient[]);
+                setPendingNewCount(newPatients.length);
+                setIdenticalCount(identicalPatients.length);
+                setRestoreStep('conflict');
+            } else if (newPatients.length > 0) {
+                // No conflicts, only new patients → restore directly
+                const result = await backupService.restorePatients(
+                    newPatients as BackupPatient[], existingPatients,
+                );
+                const msgs: string[] = [];
+                if (result.created > 0) msgs.push(`thêm ${result.created} mới`);
+                if (identicalPatients.length > 0) msgs.push(`${identicalPatients.length} giống hệt (bỏ qua)`);
+                toast.success(`Đã ${msgs.join(', ')}`);
+                closeRestore();
+            } else {
+                // All identical
+                toast('Tất cả bản ghi đã tồn tại và giống hệt, không cần khôi phục', { icon: '✅' });
+            }
+        } catch (err) {
+            console.error('[Backup] Restore error:', err);
+            toast.error('Lỗi khi khôi phục');
+        } finally {
+            setBackupBusy(false);
+            setRestoreTarget(null);
+        }
+    };
+
+    // ─── Restore flow (bulk) ──────────────────────────────────────
+    const startRestore = async (backup: BackupMetadata) => {
+        setBackupBusy(true);
+        try {
+            const data = await backupService.getBackupData(backup);
+            setRestoreBackup(backup);
+            setRestoreData(data);
+            setRestoreSelected(new Set(data.map((_, i) => i)));
+            setRestoreStep('select');
+        } catch {
+            toast.error('Lỗi khi tải dữ liệu backup');
+        } finally {
+            setBackupBusy(false);
+        }
+    };
+
+    const proceedRestore = async () => {
+        const selectedPatients = restoreData.filter((_, i) => restoreSelected.has(i));
+        if (selectedPatients.length === 0) {
+            toast.error('Chưa chọn bệnh nhân nào');
+            return;
+        }
+        // Use unified handler
+        await handleRestorePatients(selectedPatients);
+    };
+
+    const handleConflictConfirm = async (overwriteIds: Set<string>) => {
+        setBackupBusy(true);
+        try {
+            const existingPatients = await patientService.getAll();
+
+            // Combine: pending new patients + selected conflict overwrites
+            const conflictsToOverwrite = conflicts
+                .filter((c) => overwriteIds.has(c.existing.maBenhAnNoiTru))
+                .map((c) => c.incoming as BackupPatient);
+
+            const toRestore = [...pendingNewPatients, ...conflictsToOverwrite];
+
+            if (toRestore.length === 0) {
+                toast('Không có bản ghi nào để khôi phục', { icon: 'ℹ️' });
+                closeRestore();
+                return;
+            }
+
+            const result = await backupService.restorePatients(toRestore, existingPatients);
+            const msgs: string[] = [];
+            if (result.created > 0) msgs.push(`thêm ${result.created} mới`);
+            if (result.updated > 0) msgs.push(`ghi đè ${result.updated}`);
+            toast.success(`Đã ${msgs.join(', ')}`);
+            closeRestore();
+        } catch {
+            toast.error('Lỗi khi khôi phục');
+        } finally {
+            setBackupBusy(false);
+        }
+    };
+
+    const closeRestore = () => {
+        setRestoreBackup(null);
+        setRestoreData([]);
+        setRestoreSelected(new Set());
+        setRestoreStep(null);
+        setConflicts([]);
+        setPendingNewPatients([]);
+        setPendingNewCount(0);
+        setIdenticalCount(0);
+    };
+
+    // ─── Import Excel ────────────────────────────────────────────
+    const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setBackupBusy(true);
+        try {
+            const imported = await parseExcelToPatients(file);
+            if (imported.length === 0) {
+                toast.error('File không có dữ liệu');
+                return;
+            }
+            setRestoreBackup({ id: 'excel', name: file.name, patientCount: imported.length } as BackupMetadata);
+            setRestoreData(imported.map((p) => ({ ...p, createdAt: null, updatedAt: null })) as BackupPatient[]);
+            setRestoreSelected(new Set(imported.map((_, i) => i)));
+            setRestoreStep('select');
+        } catch {
+            toast.error('Lỗi khi đọc file Excel');
+        } finally {
+            setBackupBusy(false);
+        }
+        e.target.value = '';
+    };
+
+    // ─── Helpers ─────────────────────────────────────────────────
+    const formatSize = (bytes: number) => {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
+
+    const formatTimestamp = (ts: BackupMetadata['createdAt']) => {
+        if (!ts) return '—';
+        const d = ts.toDate();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
+    const fmtIso = (iso: string | null) => {
+        if (!iso) return '—';
+        try {
+            const d = new Date(iso);
+            const pad = (n: number) => String(n).padStart(2, '0');
+            return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        } catch {
+            return iso;
+        }
+    };
+
+    return (
+        <div className="space-y-4">
+            {/* ─── Sub-tab navigation ─── */}
+            <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+                <button
+                    onClick={() => setSubTab('list')}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${subTab === 'list'
+                        ? 'bg-white text-primary-700 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                >
+                    <HardDrive className="w-4 h-4" /> Danh sách
+                </button>
+                <button
+                    onClick={() => setSubTab('search')}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${subTab === 'search'
+                        ? 'bg-white text-primary-700 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                >
+                    <Search className="w-4 h-4" /> Tìm kiếm
+                </button>
+            </div>
+
+            {/* ════════════ SUB-TAB 1: DANH SÁCH ════════════ */}
+            {subTab === 'list' && (
+                <div className="space-y-4">
+                    {/* Toolbar */}
+                    <div className="flex flex-wrap gap-3">
+                        <button
+                            onClick={handleCreateBackup}
+                            disabled={backupBusy}
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {backupBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <HardDrive className="w-4 h-4" />}
+                            Tạo backup
+                        </button>
+                        <label className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-700 bg-primary-50 rounded-xl hover:bg-primary-100 cursor-pointer transition-colors">
+                            <FileSpreadsheet className="w-4 h-4" /> Import Excel
+                            <input type="file" accept=".xlsx,.xls" onChange={handleImportExcel} className="hidden" />
+                        </label>
+                        <span className="text-sm text-gray-500 self-center ml-auto">
+                            {backups.length} bản backup
+                        </span>
+                    </div>
+
+                    {/* Backup list */}
+                    {backupsLoading ? (
+                        <div className="flex items-center justify-center py-12 text-gray-400">
+                            <Loader2 className="w-6 h-6 animate-spin mr-2" /> Đang tải...
+                        </div>
+                    ) : backups.length === 0 ? (
+                        <div className="text-center py-12 text-gray-400">
+                            <HardDrive className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                            Chưa có bản backup nào
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {backups.map((backup) => (
+                                <div key={backup.id} className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                                    <div className="flex items-center gap-3 px-4 py-3">
+                                        {/* Name */}
+                                        <div className="flex-1 min-w-0">
+                                            {renameId === backup.id ? (
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        autoFocus
+                                                        value={renameName}
+                                                        onChange={(e) => setRenameName(e.target.value)}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') handleRename(backup.id); if (e.key === 'Escape') setRenameId(null); }}
+                                                        className="flex-1 px-2 py-1 rounded border border-primary-300 text-sm focus:ring-2 focus:ring-primary-500"
+                                                    />
+                                                    <button onClick={() => handleRename(backup.id)} className="p-1 text-green-600 hover:bg-green-50 rounded"><Check className="w-4 h-4" /></button>
+                                                    <button onClick={() => setRenameId(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><X className="w-4 h-4" /></button>
+                                                </div>
+                                            ) : (
+                                                <div>
+                                                    <span className="font-medium text-gray-900 text-sm">{backup.name}</span>
+                                                    <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
+                                                        <span>{formatTimestamp(backup.createdAt)}</span>
+                                                        <span>·</span>
+                                                        <span>{backup.patientCount} BN</span>
+                                                        <span>·</span>
+                                                        <span>{formatSize(backup.fileSize)}</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Badge */}
+                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${backup.triggerType === 'auto'
+                                            ? 'bg-blue-50 text-blue-700'
+                                            : 'bg-green-50 text-green-700'
+                                            }`}>
+                                            {backup.triggerType === 'auto' ? 'Tự động' : 'Thủ công'}
+                                        </span>
+
+                                        {/* Actions */}
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <button onClick={() => handleToggleExpand(backup)} title="Xem nội dung"
+                                                className="p-1.5 rounded-lg text-gray-500 hover:text-primary-600 hover:bg-primary-50 transition-colors">
+                                                {expandedBackup === backup.id ? <ChevronUp className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            </button>
+                                            <button onClick={() => startRestore(backup)} title="Khôi phục" disabled={backupBusy}
+                                                className="p-1.5 rounded-lg text-gray-500 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-40">
+                                                <RotateCcw className="w-4 h-4" />
+                                            </button>
+                                            <button onClick={() => { setRenameId(backup.id); setRenameName(backup.name); }} title="Đổi tên"
+                                                className="p-1.5 rounded-lg text-gray-500 hover:text-primary-600 hover:bg-primary-50 transition-colors">
+                                                <Pencil className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button onClick={() => setDeleteTarget(backup)} title="Xóa"
+                                                className="p-1.5 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors">
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Expanded: enhanced patient table */}
+                                    {expandedBackup === backup.id && (
+                                        <div className="border-t border-gray-100 bg-gray-50/50 px-4 py-3">
+                                            <div className="max-h-64 overflow-auto rounded-lg border border-gray-200">
+                                                <table className="w-full text-xs border-collapse" style={{ minWidth: 1100 }}>
+                                                    <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
+                                                        <tr className="text-gray-500">
+                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap w-8">#</th>
+                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Mã BNNC</th>
+                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Mã BA</th>
+                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Họ tên</th>
+                                                            <th className="text-center px-3 py-2 font-semibold whitespace-nowrap">Tuổi</th>
+                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Giới</th>
+                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Nơi ở</th>
+                                                            <th className="text-center px-3 py-2 font-semibold whitespace-nowrap">PSI</th>
+                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Ra viện</th>
+                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Ngày tạo</th>
+                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Sửa cuối</th>
+                                                            <th className="text-center px-3 py-2 font-semibold whitespace-nowrap sticky right-0 bg-gray-50 shadow-[-2px_0_4px_rgba(0,0,0,0.06)]"></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {expandedData.map((p, i) => {
+                                                            const hc = p.hanhChinh;
+                                                            const noiO = hc.noiO || '—';
+                                                            const gioiTinh = hc.gioiTinh === 'nam' ? 'Nam' : hc.gioiTinh === 'nu' ? 'Nữ' : '—';
+                                                            return (
+                                                                <tr key={i}
+                                                                    className={`text-gray-700 hover:bg-primary-50/40 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                                                                >
+                                                                    <td className="px-3 py-2 text-gray-400">{i + 1}</td>
+                                                                    <td className="px-3 py-2 font-medium text-primary-700 whitespace-nowrap">{p.maBenhNhanNghienCuu || '—'}</td>
+                                                                    <td className="px-3 py-2 whitespace-nowrap">{p.maBenhAnNoiTru || '—'}</td>
+                                                                    <td className="px-3 py-2 whitespace-nowrap font-medium">{hc.hoTen || '—'}</td>
+                                                                    <td className="px-3 py-2 text-center">{hc.tuoi ?? '—'}</td>
+                                                                    <td className="px-3 py-2 whitespace-nowrap">{gioiTinh}</td>
+                                                                    <td className="px-3 py-2 whitespace-nowrap">{noiO}</td>
+                                                                    <td className="px-3 py-2 text-center font-medium">{p.psi.tongDiem > 0 ? p.psi.tongDiem : '—'}</td>
+                                                                    <td className="px-3 py-2 whitespace-nowrap">{p.ketCuc?.tinhTrangRaVien || '—'}</td>
+                                                                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{fmtIso(p.createdAt)}</td>
+                                                                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{fmtIso(p.updatedAt)}</td>
+                                                                    <td className={`px-3 py-2 text-center sticky right-0 shadow-[-2px_0_4px_rgba(0,0,0,0.06)] ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                                                                        <div className="flex items-center justify-center gap-1">
+                                                                            <button onClick={() => setDetailPatient(p)} title="Xem chi tiết"
+                                                                                className="p-1.5 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50">
+                                                                                <Eye className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                            <button onClick={() => setRestoreTarget(p)} title="Khôi phục"
+                                                                                disabled={backupBusy}
+                                                                                className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 disabled:opacity-40">
+                                                                                <RotateCcw className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ════════════ SUB-TAB 2: TÌM KIẾM ════════════ */}
+            {subTab === 'search' && (
+                <div className="space-y-4">
+                    {/* Search controls */}
+                    <div className="flex flex-wrap gap-3 items-end">
+                        <div className="flex-1 min-w-[200px]">
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Tìm theo Mã BNNC, Mã BA, Họ tên</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                                    placeholder="Nhập từ khóa..."
+                                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                />
+                            </div>
+                        </div>
+                        <div className="w-48">
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Phạm vi</label>
+                            <select
+                                value={searchScope}
+                                onChange={(e) => setSearchScope(e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white"
+                            >
+                                <option value="all">Tất cả backup</option>
+                                {backups.map((b) => (
+                                    <option key={b.id} value={b.id}>{b.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <button
+                            onClick={handleSearch}
+                            disabled={searching}
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                            Tìm
+                        </button>
+                    </div>
+
+                    {/* Search results */}
+                    {searching ? (
+                        <div className="flex items-center justify-center py-12 text-gray-400">
+                            <Loader2 className="w-6 h-6 animate-spin mr-2" /> Đang tìm kiếm...
+                        </div>
+                    ) : hasSearched && searchResults.length === 0 ? (
+                        <div className="text-center py-12 text-gray-400">
+                            <Search className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                            Không tìm thấy kết quả
+                        </div>
+                    ) : searchResults.length > 0 ? (
+                        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                            <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs text-gray-500 font-medium">
+                                Tìm thấy {searchResults.length} kết quả
+                            </div>
+                            <div className="max-h-[60vh] overflow-auto">
+                                <table className="w-full text-xs border-collapse" style={{ minWidth: 1100 }}>
+                                    <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
+                                        <tr className="text-gray-500">
+                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Mã BNNC</th>
+                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Mã BA</th>
+                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Họ tên</th>
+                                            <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap">Tuổi</th>
+                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Giới</th>
+                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Nơi ở</th>
+                                            <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap">PSI</th>
+                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Ra viện</th>
+                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Ngày tạo</th>
+                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Sửa cuối</th>
+                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Backup nguồn</th>
+                                            <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap sticky right-0 bg-gray-50 shadow-[-2px_0_4px_rgba(0,0,0,0.06)]">Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {searchResults.map((r, i) => {
+                                            const hc = r.patient.hanhChinh;
+                                            const noiO = hc.noiO || '—';
+                                            const gioiTinh = hc.gioiTinh === 'nam' ? 'Nam' : hc.gioiTinh === 'nu' ? 'Nữ' : '—';
+                                            return (
+                                                <tr key={`${r.backupId}-${i}`}
+                                                    className={`text-gray-700 hover:bg-primary-50/40 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                                                >
+                                                    <td className="px-3 py-2 font-medium text-primary-700 whitespace-nowrap">{r.patient.maBenhNhanNghienCuu || '—'}</td>
+                                                    <td className="px-3 py-2 whitespace-nowrap">{r.patient.maBenhAnNoiTru || '—'}</td>
+                                                    <td className="px-3 py-2 whitespace-nowrap font-medium">{hc.hoTen || '—'}</td>
+                                                    <td className="px-3 py-2 text-center">{hc.tuoi ?? '—'}</td>
+                                                    <td className="px-3 py-2 whitespace-nowrap">{gioiTinh}</td>
+                                                    <td className="px-3 py-2 whitespace-nowrap">{noiO}</td>
+                                                    <td className="px-3 py-2 text-center font-medium">{r.patient.psi.tongDiem > 0 ? r.patient.psi.tongDiem : '—'}</td>
+                                                    <td className="px-3 py-2 whitespace-nowrap">{r.patient.ketCuc?.tinhTrangRaVien || '—'}</td>
+                                                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{fmtIso(r.patient.createdAt)}</td>
+                                                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{fmtIso(r.patient.updatedAt)}</td>
+                                                    <td className="px-3 py-2 whitespace-nowrap">
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-medium max-w-[140px] truncate" title={r.backupName}>
+                                                            🏷 {r.backupName}
+                                                        </span>
+                                                    </td>
+                                                    <td className={`px-3 py-2 text-center sticky right-0 shadow-[-2px_0_4px_rgba(0,0,0,0.06)] ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            <button onClick={() => setDetailPatient(r.patient)} title="Xem chi tiết"
+                                                                className="p-1.5 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50">
+                                                                <Eye className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button onClick={() => setRestoreTarget(r.patient)} title="Khôi phục"
+                                                                disabled={backupBusy}
+                                                                className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 disabled:opacity-40">
+                                                                <RotateCcw className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ) : !hasSearched ? (
+                        <div className="text-center py-12 text-gray-400">
+                            <Search className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                            <p className="text-sm">Bấm "Tìm" để xem toàn bộ hoặc nhập từ khóa để lọc bệnh nhân</p>
+                        </div>
+                    ) : null}
+                </div>
+            )}
+
+            {/* ─── Patient Detail Modal ─── */}
+            {detailPatient && (
+                <PatientDetailModal patient={detailPatient} onClose={() => setDetailPatient(null)} />
+            )}
+
+            {/* ─── Restore: Step 1 — Select patients ─── */}
+            {restoreStep === 'select' && restoreBackup && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/40" onClick={closeRestore} />
+                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                            <div>
+                                <h2 className="font-heading font-semibold text-gray-900">Khôi phục từ: {restoreBackup.name}</h2>
+                                <p className="text-sm text-gray-500">{restoreData.length} bệnh nhân — chọn những BN muốn khôi phục</p>
+                            </div>
+                            <button onClick={closeRestore} className="p-2 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto px-6 py-3">
+                            <div className="flex gap-2 mb-3">
+                                <button onClick={() => setRestoreSelected(new Set(restoreData.map((_, i) => i)))}
+                                    className="text-sm text-primary-600 font-medium">Chọn tất cả</button>
+                                <span className="text-gray-300">|</span>
+                                <button onClick={() => setRestoreSelected(new Set())}
+                                    className="text-sm text-gray-500 font-medium">Bỏ chọn</button>
+                                <span className="ml-auto text-sm text-gray-500">Đã chọn {restoreSelected.size}/{restoreData.length}</span>
+                            </div>
+                            <div className="space-y-1">
+                                {restoreData.map((p, i) => (
+                                    <label key={i} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${restoreSelected.has(i) ? 'bg-primary-50' : 'hover:bg-gray-50'
+                                        }`}>
+                                        <input type="checkbox" checked={restoreSelected.has(i)}
+                                            onChange={() => {
+                                                const next = new Set(restoreSelected);
+                                                if (next.has(i)) next.delete(i); else next.add(i);
+                                                setRestoreSelected(next);
+                                            }}
+                                            className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                                        <span className="text-sm text-gray-800 flex-1">{p.hanhChinh.hoTen || '(Không tên)'}</span>
+                                        <span className="text-xs text-gray-500">{p.maBenhAnNoiTru || '—'}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
+                            <button onClick={closeRestore}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+                                Hủy
+                            </button>
+                            <button onClick={proceedRestore} disabled={restoreSelected.size === 0 || backupBusy}
+                                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                {backupBusy ? <Loader2 className="w-4 h-4 animate-spin inline mr-1" /> : null}
+                                Khôi phục {restoreSelected.size} BN
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ─── Restore: Step 2 — Conflict resolution ─── */}
+            {restoreStep === 'conflict' && conflicts.length > 0 && (
+                <ConflictDialog
+                    conflicts={conflicts}
+                    newCount={pendingNewCount}
+                    identicalCount={identicalCount}
+                    onConfirm={handleConflictConfirm}
+                    onCancel={closeRestore}
+                />
+            )}
+
+            {/* ─── Delete confirmation dialog ─── */}
+            {deleteTarget && (
+                <ConfirmDialog
+                    open={!!deleteTarget}
+                    title="Xóa backup"
+                    message={`Bạn có chắc chắn muốn xóa backup "${deleteTarget.name}"?\nHành động này không thể hoàn tác.`}
+                    confirmLabel="Xóa"
+                    cancelLabel="Hủy"
+                    destructive
+                    onConfirm={() => handleDelete(deleteTarget)}
+                    onCancel={() => setDeleteTarget(null)}
+                />
+            )}
+
+            {/* ─── Restore single patient confirmation dialog ─── */}
+            {restoreTarget && (
+                <ConfirmDialog
+                    open={!!restoreTarget}
+                    title="Khôi phục bệnh nhân"
+                    message={`Khôi phục bệnh nhân "${restoreTarget.hanhChinh.hoTen || restoreTarget.maBenhAnNoiTru}"?\nNếu trùng mã BA sẽ hiện so sánh chi tiết.`}
+                    confirmLabel="Khôi phục"
+                    cancelLabel="Hủy"
+                    onConfirm={() => handleRestorePatients([restoreTarget])}
+                    onCancel={() => setRestoreTarget(null)}
+                />
             )}
         </div>
     );
