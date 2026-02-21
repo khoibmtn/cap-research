@@ -90,18 +90,38 @@ Nhập diễn biến điều trị (thở máy, sốc nhiễm khuẩn, lọc má
 
 ## Thống kê — Xem tổng quan nghiên cứu
 
-Trang này cho bạn cái nhìn nhanh về tình trạng nghiên cứu:
+Trang Thống kê được chia thành **3 tab**, dữ liệu cập nhật tự động khi bạn thêm hoặc sửa bệnh nhân. Mỗi biểu đồ cột đều hiển thị số lượng (n) và tỷ lệ phần trăm (%) trên đỉnh cột.
 
-- **Tổng số bệnh nhân** đã nhập
-- **Tỷ lệ tử vong** (%)
-- **Điểm PSI trung bình**
-- **Số bệnh nhân thở máy**
+### Tab "Tổng quan"
 
-Bên dưới có 2 biểu đồ:
-- **Biểu đồ phân bố vi khuẩn**: cột ngang hiển thị top 10 vi khuẩn hay gặp nhất
-- **Biểu đồ phân bố PSI**: hình tròn hiển thị tỷ lệ bệnh nhân ở mỗi mức PSI (Class I đến V)
+Hiển thị **20 thẻ chỉ số (KPI)** chia thành 5 nhóm:
 
-Dữ liệu cập nhật tự động khi bạn thêm hoặc sửa bệnh nhân.
+- **Tổng quan mẫu:** Tổng BN, tuổi trung bình ± SD, tỷ lệ nam/nữ, phân bố nơi ở, tỷ lệ tử vong, số ngày điều trị trung bình
+- **Phân tầng & Kết cục:** Điểm PSI trung bình, tỷ lệ PSI III–V, thở máy, sốc nhiễm khuẩn
+- **Dấu ấn sinh học (tóm tắt):** Giá trị median của sTREM-1, TIMP-1, IL-6, IL-10, IL-17
+- **Chỉ số viêm & Vi sinh:** NLR trung bình, CRP median, PCT median, tỷ lệ cấy VK dương tính
+
+Bên dưới có 3 biểu đồ:
+- **Phân bổ PSI:** Biểu đồ tròn hiển thị số BN ở mỗi mức PSI (I → V)
+- **Kết cục lâm sàng:** Biểu đồ donut hiển thị tỷ lệ Xuất viện / Tử vong / Xin về
+- **Tiền sử bệnh:** Biểu đồ cột hiển thị các bệnh nền phổ biến (ĐTĐ, THA, thận mạn, suy tim, hút thuốc)
+
+### Tab "Vi sinh (MT1)"
+
+Dành cho **Mục tiêu 1** — đặc điểm căn nguyên vi sinh:
+
+- **4 thẻ KPI:** Tỷ lệ cấy dương tính, tổng chủng VK, tỷ lệ đồng nhiễm (≥2 VK), tỷ lệ có kháng sinh đồ
+- **Biểu đồ phân bổ vi khuẩn:** Cột ngang hiển thị Top 10 vi khuẩn hay gặp nhất
+- **Bảng kháng sinh đồ (S/I/R):** Heatmap hiển thị mức độ nhạy cảm (S) / trung gian (I) / kháng thuốc (R) của từng vi khuẩn với từng kháng sinh. Ô xanh = nhạy, ô vàng = trung gian, ô đỏ = kháng
+
+### Tab "Biomarker (MT2)"
+
+Dành cho **Mục tiêu 2** — dấu ấn sinh học:
+
+- **Bảng tổng hợp:** Thống kê Mean ± SD và Median (Q1–Q3) cho 5 biomarker: sTREM-1, TIMP-1, IL-6, IL-10, IL-17
+- **Biểu đồ Biomarker theo phân tầng PSI:** 5 biểu đồ cột (1 cho mỗi biomarker), hiển thị giá trị median tăng dần theo PSI Class I → V, kèm đường Q1/Q3
+- **Biểu đồ NLR/PLR/CAR vs PSI:** 3 biểu đồ phân tán (scatter) thể hiện mối liên quan giữa chỉ số viêm và điểm PSI
+- **Biểu đồ tử vong theo PSI:** Biểu đồ cột xếp chồng (stacked) hiển thị số BN sống và tử vong ở mỗi nhóm PSI
 
 ---
 
