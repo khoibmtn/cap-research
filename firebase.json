@@ -19,6 +19,9 @@
       }
     ]
   },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "auth": {
     "providers": {
       "emailPassword": true

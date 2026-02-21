@@ -271,3 +271,19 @@ When user's prompt is NOT in English:
 - **Test**: `playwright_runner.py`, `test_runner.py`
 
 ---
+
+## 📝 User Manual Sync (Mandatory)
+
+> 🔴 **MANDATORY:** Whenever a feature is **added, modified, or removed**, you MUST also update `instruction.md` (project root) to reflect the change.
+
+**Rules:**
+
+1. `instruction.md` is the user-facing manual. It is written in **plain Vietnamese** for non-technical users.
+2. After completing any feature work, check if `instruction.md` needs updating.
+3. Write in the same friendly, descriptive tone — explain **what users can do**, not code internals.
+4. If a new menu, tab, button, or workflow is added → add a corresponding section.
+5. If an existing feature is changed → update the relevant section.
+6. If a feature is removed → remove or mark it accordingly.
+
+---
+

@@ -3,7 +3,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
 
 interface EditGuardContextType {
     guardRef: React.MutableRefObject<(() => Promise<boolean>) | null>;
-    showConfirm: (msg: string, confirmLabel?: string, cancelLabel?: string) => Promise<boolean>;
+    showConfirm: (msg: string, confirmLabel?: string, cancelLabel?: string, opts?: { title?: string; destructive?: boolean }) => Promise<boolean>;
 }
 
 const EditGuardContext = createContext<EditGuardContextType>({
@@ -20,23 +20,29 @@ export function EditGuardProvider({ children }: { children: React.ReactNode }) {
         message: string;
         confirmLabel: string;
         cancelLabel: string;
+        title: string;
+        destructive: boolean;
         resolve: ((value: boolean) => void) | null;
     }>({
         open: false,
         message: '',
         confirmLabel: 'OK',
         cancelLabel: 'Hủy bỏ',
+        title: 'Xác nhận',
+        destructive: false,
         resolve: null,
     });
 
     const showConfirm = useCallback(
-        (msg: string, confirmLabel = 'Lưu', cancelLabel = 'Bỏ thay đổi'): Promise<boolean> => {
+        (msg: string, confirmLabel = 'Lưu', cancelLabel = 'Bỏ thay đổi', opts?: { title?: string; destructive?: boolean }): Promise<boolean> => {
             return new Promise<boolean>((resolve) => {
                 setDialogState({
                     open: true,
                     message: msg,
                     confirmLabel,
                     cancelLabel,
+                    title: opts?.title ?? 'Xác nhận',
+                    destructive: opts?.destructive ?? false,
                     resolve,
                 });
             });
@@ -59,10 +65,11 @@ export function EditGuardProvider({ children }: { children: React.ReactNode }) {
             {children}
             <ConfirmDialog
                 open={dialogState.open}
-                title="Thay đổi chưa lưu"
+                title={dialogState.title}
                 message={dialogState.message}
                 confirmLabel={dialogState.confirmLabel}
                 cancelLabel={dialogState.cancelLabel}
+                destructive={dialogState.destructive}
                 onConfirm={handleConfirm}
                 onCancel={handleCancel}
             />

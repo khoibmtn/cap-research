@@ -316,7 +316,13 @@ export default function PatientFormPage() {
     const handleDeletePatient = async () => {
         if (!id) return;
         const name = formData.hanhChinh.hoTen || formData.maBenhNhanNghienCuu;
-        if (!confirm(`Xóa bệnh nhân "${name}"?`)) return;
+        const ok = await showConfirm(
+            `Bạn có chắc muốn xóa bệnh nhân "${name}"?\nThao tác này không thể hoàn tác.`,
+            'Xóa',
+            'Hủy',
+            { title: 'Xóa bệnh nhân', destructive: true },
+        );
+        if (!ok) return;
         try {
             await patientService.delete(id);
             toast.success('Đã xóa bệnh nhân');
@@ -333,7 +339,12 @@ export default function PatientFormPage() {
 
     const navigateToPatient = async (targetId: string) => {
         if (isDirty) {
-            const answer = window.confirm('Bạn có thay đổi chưa lưu. Bạn có muốn lưu trước khi chuyển sang bệnh nhân khác không?');
+            const answer = await showConfirm(
+                'Bạn có thay đổi chưa lưu. Bạn có muốn lưu trước khi chuyển sang bệnh nhân khác không?',
+                'Lưu',
+                'Bỏ thay đổi',
+                { title: 'Thay đổi chưa lưu' },
+            );
             if (answer) {
                 const ok = await handleSave();
                 if (!ok) return; // Save failed, stay on current

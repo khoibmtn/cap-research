@@ -18,15 +18,14 @@ function toISO(display: string): string {
     return display; // already yyyy-mm-dd
 }
 
-// yyyy-mm-dd → dd/mm/yyyy (for display)
-function toDisplay(iso: string): string {
-    if (!iso) return '';
-    if (iso.includes('/')) return iso; // already dd/mm/yyyy
-    const parts = iso.split('-');
-    if (parts.length !== 3) return iso;
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-}
-
+/**
+ * DateInput — works on both desktop and mobile.
+ *
+ * ⚠️  RULE: This component MUST remain functional on both desktop (click opens
+ *     native date picker) and mobile (tap opens native date picker).
+ *     Do NOT use opacity-0 overlays or WebkitAppearance:none hacks.
+ *     Always test on both device types after any change.
+ */
 export default function DateInput({ value, onChange, onBlur, label, className = '' }: DateInputProps) {
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -39,11 +38,10 @@ export default function DateInput({ value, onChange, onBlur, label, className = 
             return;
         }
         // Convert to dd/mm/yyyy for storage
-        let displayValue = v;
         const parts = v.split('-');
-        if (parts.length === 3) {
-            displayValue = `${parts[2]}/${parts[1]}/${parts[0]}`;
-        }
+        const displayValue = parts.length === 3
+            ? `${parts[2]}/${parts[1]}/${parts[0]}`
+            : v;
         onChange(displayValue);
         // Trigger validation with the NEW value (avoids stale closure)
         if (onBlur) {
@@ -54,26 +52,15 @@ export default function DateInput({ value, onChange, onBlur, label, className = 
     return (
         <div>
             {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
-            <div className="relative">
-                {/* Visible text showing dd/mm/yyyy */}
-                <div
-                    className={`px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white
-                        focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-transparent ${className}`}
-                >
-                    <span className={value ? 'text-gray-900' : 'text-gray-400'}>
-                        {value ? toDisplay(value) : 'dd/mm/yyyy'}
-                    </span>
-                </div>
-                {/* Native date input — transparent overlay, receives all touch/click events directly */}
-                <input
-                    ref={inputRef}
-                    type="date"
-                    value={isoValue}
-                    onChange={handleChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    style={{ WebkitAppearance: 'none' }}
-                />
-            </div>
+            <input
+                ref={inputRef}
+                type="date"
+                value={isoValue}
+                onChange={handleChange}
+                className={`w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white
+                    focus:ring-2 focus:ring-primary-500 focus:border-transparent
+                    cursor-pointer ${className}`}
+            />
         </div>
     );
 }

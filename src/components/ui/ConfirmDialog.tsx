@@ -6,6 +6,7 @@ interface ConfirmDialogProps {
     message: string;
     confirmLabel?: string;
     cancelLabel?: string;
+    destructive?: boolean;
     onConfirm: () => void;
     onCancel: () => void;
 }
@@ -16,6 +17,7 @@ export default function ConfirmDialog({
     message,
     confirmLabel = 'OK',
     cancelLabel = 'Hủy bỏ',
+    destructive = false,
     onConfirm,
     onCancel,
 }: ConfirmDialogProps) {
@@ -58,7 +60,10 @@ export default function ConfirmDialog({
                     </button>
                     <button
                         onClick={onConfirm}
-                        className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 transition-colors"
+                        className={`px-4 py-2 text-sm font-medium text-white rounded-xl transition-colors ${destructive
+                                ? 'bg-red-600 hover:bg-red-700'
+                                : 'bg-primary-600 hover:bg-primary-700'
+                            }`}
                     >
                         {confirmLabel}
                     </button>
