@@ -49,4 +49,32 @@ export const settingsService = {
     async saveList(key: string, items: string[]): Promise<void> {
         await setDoc(doc(db, `app_settings/lists_${key}`), { items });
     },
+
+    async getColumnConfig(): Promise<string[] | null> {
+        try {
+            const snap = await getDoc(doc(db, 'app_settings/dashboard_columns'));
+            if (snap.exists()) return snap.data().columns ?? null;
+        } catch (e) {
+            console.warn('Failed to load column config from Firestore', e);
+        }
+        return null;
+    },
+
+    async saveColumnConfig(columns: string[]): Promise<void> {
+        await setDoc(doc(db, 'app_settings/dashboard_columns'), { columns });
+    },
+
+    async getBackupColumnConfig(uid: string): Promise<string[] | null> {
+        try {
+            const snap = await getDoc(doc(db, `user_settings/${uid}/preferences/backup_columns`));
+            if (snap.exists()) return snap.data().columns ?? null;
+        } catch (e) {
+            console.warn('Failed to load backup column config from Firestore', e);
+        }
+        return null;
+    },
+
+    async saveBackupColumnConfig(uid: string, columns: string[]): Promise<void> {
+        await setDoc(doc(db, `user_settings/${uid}/preferences/backup_columns`), { columns });
+    },
 };

@@ -18,8 +18,10 @@ export const patientService = {
         });
 
         // Auto-backup (fire-and-forget — never blocks patient creation)
+        const patientLabel = [data.maBenhNhanNghienCuu, data.hanhChinh?.hoTen].filter(Boolean).join(' - ');
+        const note = patientLabel ? `thêm ${patientLabel}` : undefined;
         import('./backupService').then(({ backupService }) => {
-            backupService.createAutoBackup();
+            backupService.createAutoBackup(note);
         }).catch(() => { /* silent */ });
 
         return docRef.id;
@@ -34,6 +36,16 @@ export const patientService = {
     },
 
     async delete(id: string): Promise<void> {
+        // Auto-backup before delete (await to ensure backup completes before deletion)
+        try {
+            const patient = await this.getById(id);
+            const patientLabel = patient
+                ? [patient.maBenhNhanNghienCuu, patient.hanhChinh?.hoTen].filter(Boolean).join(' - ')
+                : id;
+            const { backupService } = await import('./backupService');
+            await backupService.createAutoBackup(`xóa ${patientLabel}`);
+        } catch { /* silent — don't block deletion */ }
+
         await deleteDoc(doc(db, COLLECTION, id));
     },
 

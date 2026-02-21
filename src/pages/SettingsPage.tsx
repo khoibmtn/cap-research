@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useEditGuardConfirm } from '../contexts/EditGuardContext';
 import { generateAddressTemplate, parseAddressExcel, type AddressEntry } from '../services/exportService';
 import { patientService } from '../services/patientService';
 import { settingsService } from '../services/settingsService';
@@ -14,7 +16,7 @@ import {
 import {
     Upload, Download, Info, Plus, Trash2, Pencil, Check, X,
     ShieldAlert, MapPin, Stethoscope, Bug, Printer, HardDrive,
-    Loader2, Eye, RotateCcw, FileSpreadsheet, ChevronUp, Search,
+    Loader2, Eye, RotateCcw, FileSpreadsheet, ChevronUp, Search, Settings2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -217,6 +219,7 @@ export default function SettingsPage() {
 
     // Hành chính tab
     const [addresses, setAddresses] = useState<AddressEntry[]>([]);
+    const [showAddrTable, setShowAddrTable] = useState(false);
     const [ngheNghiep, setNgheNghiep] = useState<string[]>([]);
     const [noiO, setNoiO] = useState<string[]>([]);
 
@@ -377,11 +380,40 @@ export default function SettingsPage() {
         }).catch(() => { });
     }, []);
 
+    const showConfirm = useEditGuardConfirm();
+
     const handleAddressUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         try {
             const entries = await parseAddressExcel(file);
+            if (entries.length === 0) {
+                toast.error('File không chứa dữ liệu địa chỉ');
+                return;
+            }
+
+            // Calculate add vs replace
+            const existingKeys = new Set(addresses.map((a) => `${a.xaPhuong}|${a.tinhThanh}`));
+            const newCount = entries.filter((a) => !existingKeys.has(`${a.xaPhuong}|${a.tinhThanh}`)).length;
+            const replaceCount = entries.length - newCount;
+
+            const lines: string[] = [`Tổng cộng: ${entries.length} địa chỉ`];
+            if (newCount > 0) lines.push(`• Bổ sung mới: ${newCount} địa chỉ`);
+            if (replaceCount > 0) lines.push(`• Thay thế: ${replaceCount} địa chỉ`);
+            if (addresses.length > 0) lines.push(`\nDữ liệu cũ (${addresses.length} địa chỉ) sẽ bị ghi đè.`);
+
+            const ok = await showConfirm(
+                lines.join('\n'),
+                'Import',
+                'Hủy',
+                { title: 'Xác nhận import địa chỉ' },
+            );
+            if (!ok) {
+                // Reset file input
+                e.target.value = '';
+                return;
+            }
+
             setAddresses(entries);
             localStorage.setItem('cap_addresses', JSON.stringify(entries));
             await settingsService.saveAddresses(entries);
@@ -389,6 +421,7 @@ export default function SettingsPage() {
         } catch {
             toast.error('Lỗi khi đọc file Excel');
         }
+        e.target.value = '';
     };
 
     const updatePrint = (patch: Partial<PrintSettings>) => {
@@ -446,9 +479,43 @@ export default function SettingsPage() {
                             </label>
                         </div>
                         {addresses.length > 0 && (
-                            <div className="mt-4 p-3 bg-green-50 rounded-lg text-sm text-green-700">
-                                <Info className="w-4 h-4 inline mr-1" />
-                                Đã có {addresses.length} địa chỉ trong hệ thống.
+                            <div className="mt-4">
+                                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                                    <span className="text-sm text-green-700">
+                                        <Info className="w-4 h-4 inline mr-1" />
+                                        Đã có {addresses.length} địa chỉ trong hệ thống.
+                                    </span>
+                                    <button
+                                        onClick={() => setShowAddrTable(!showAddrTable)}
+                                        className="text-xs font-medium text-green-700 hover:text-green-900 underline underline-offset-2"
+                                    >
+                                        {showAddrTable ? 'Ẩn bảng' : 'Xem bảng'}
+                                    </button>
+                                </div>
+                                {showAddrTable && (
+                                    <div className="mt-3 border border-gray-200 rounded-xl overflow-hidden">
+                                        <div className="max-h-64 overflow-y-auto">
+                                            <table className="w-full text-sm">
+                                                <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                                                    <tr>
+                                                        <th className="px-4 py-2.5 text-left font-medium text-gray-600">#</th>
+                                                        <th className="px-4 py-2.5 text-left font-medium text-gray-600">Tỉnh/TP</th>
+                                                        <th className="px-4 py-2.5 text-left font-medium text-gray-600">Xã/Phường</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    {addresses.map((a, i) => (
+                                                        <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
+                                                            <td className="px-4 py-2 text-gray-400 tabular-nums">{i + 1}</td>
+                                                            <td className="px-4 py-2 text-gray-700">{a.tinhThanh}</td>
+                                                            <td className="px-4 py-2 text-gray-700">{a.xaPhuong}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -710,8 +777,214 @@ function BackupTab({
     restoreData, setRestoreData, restoreSelected, setRestoreSelected,
     restoreStep, setRestoreStep, conflicts, setConflicts,
 }: BackupTabProps) {
+    const { user } = useAuth();
+    const uid = user?.uid ?? '';
     // Sub-tab state
-    const [subTab, setSubTab] = useState<'list' | 'search'>('list');
+    const [subTab, setSubTab] = useState<'list' | 'search' | 'config'>('list');
+
+    // ─── Backup column config ───
+    type BkCol = { key: string; label: string; align?: 'center' | 'left' };
+    type BkGroup = { group: string; columns: BkCol[] };
+    const BK_COLUMN_GROUPS: BkGroup[] = [
+        {
+            group: 'Hành chính',
+            columns: [
+                { key: 'maBNNC', label: 'Mã BNNC' },
+                { key: 'maBA', label: 'Mã BA' },
+                { key: 'hoTen', label: 'Họ tên' },
+                { key: 'tuoi', label: 'Tuổi', align: 'center' },
+                { key: 'gioiTinh', label: 'Giới' },
+                { key: 'ngheNghiep', label: 'Nghề nghiệp' },
+                { key: 'diaChiXaPhuong', label: 'Xã/Phường' },
+                { key: 'diaChiTinhThanh', label: 'Tỉnh/TP' },
+                { key: 'noiO', label: 'Nơi ở' },
+                { key: 'ngayVaoVien', label: 'Ngày VV' },
+                { key: 'ngayRaVien', label: 'Ngày RV' },
+            ],
+        },
+        {
+            group: 'Tiền sử',
+            columns: [
+                { key: 'daiThaoDuong', label: 'ĐTĐ' },
+                { key: 'tangHuyetAp', label: 'THA' },
+                { key: 'benhThanMan', label: 'Thận mạn' },
+                { key: 'ungThuTS', label: 'Ung thư' },
+                { key: 'suyTimTS', label: 'Suy tim' },
+                { key: 'benhMMN', label: 'B. mạch máu não' },
+                { key: 'hutThuocLa', label: 'Hút thuốc' },
+            ],
+        },
+        {
+            group: 'Lâm sàng',
+            columns: [
+                { key: 'mach', label: 'Mạch' },
+                { key: 'huyetAp', label: 'HA' },
+                { key: 'nhietDo', label: 'Nhiệt độ' },
+                { key: 'nhipTho', label: 'Nhịp thở' },
+                { key: 'spO2', label: 'SpO2' },
+                { key: 'glasgow', label: 'Glasgow' },
+            ],
+        },
+        {
+            group: 'Xét nghiệm',
+            columns: [
+                { key: 'wbc', label: 'WBC' },
+                { key: 'neutrophil', label: 'Neutro%' },
+                { key: 'lymphocyte', label: 'Lympho%' },
+                { key: 'hemoglobin', label: 'Hb' },
+                { key: 'plt', label: 'PLT' },
+                { key: 'crp', label: 'CRP' },
+                { key: 'procalcitonin', label: 'PCT' },
+                { key: 'ure', label: 'Ure' },
+                { key: 'creatinin', label: 'Creatinin' },
+                { key: 'albumin', label: 'Albumin' },
+                { key: 'na', label: 'Na' },
+                { key: 'k', label: 'K' },
+                { key: 'nlr', label: 'NLR' },
+                { key: 'plr', label: 'PLR' },
+                { key: 'car', label: 'CAR' },
+            ],
+        },
+        {
+            group: 'Marker NC',
+            columns: [
+                { key: 'sTREM1', label: 'sTREM-1' },
+                { key: 'tIMP1', label: 'TIMP-1' },
+                { key: 'il6', label: 'IL-6' },
+                { key: 'il10', label: 'IL-10' },
+                { key: 'il17', label: 'IL-17' },
+            ],
+        },
+        {
+            group: 'PSI & Kết cục',
+            columns: [
+                { key: 'psiDiem', label: 'PSI', align: 'center' },
+                { key: 'psiPhanTang', label: 'PSI Class' },
+                { key: 'ketCuc', label: 'Kết cục' },
+                { key: 'tongNgayDT', label: 'Ngày ĐT' },
+            ],
+        },
+        {
+            group: 'Backup',
+            columns: [
+                { key: 'ngayTao', label: 'Ngày tạo' },
+                { key: 'suaCuoi', label: 'Sửa cuối' },
+                { key: 'backupNguon', label: 'Backup nguồn' },
+            ],
+        },
+    ];
+    const ALL_BK_COLS = BK_COLUMN_GROUPS.flatMap(g => g.columns);
+    const BK_DEFAULT_VISIBLE = new Set([
+        'maBNNC', 'maBA', 'hoTen', 'tuoi', 'gioiTinh', 'noiO',
+        'psiDiem', 'ketCuc', 'ngayTao', 'suaCuoi', 'backupNguon',
+    ]);
+    const BK_LS_KEY = `cap_backup_columns_${uid}`;
+
+    const loadBkCols = (): Set<string> => {
+        try {
+            const s = localStorage.getItem(BK_LS_KEY);
+            if (s) { const a = JSON.parse(s); if (Array.isArray(a) && a.length > 0) return new Set(a); }
+        } catch { /* */ }
+        return new Set(BK_DEFAULT_VISIBLE);
+    };
+    const [bkVisibleCols, setBkVisibleCols] = useState<Set<string>>(loadBkCols);
+
+    // Sync from Firestore on mount
+    useEffect(() => {
+        if (!uid) return;
+        settingsService.getBackupColumnConfig(uid).then((cols) => {
+            if (cols && cols.length > 0) {
+                const s = new Set(cols);
+                setBkVisibleCols(s);
+                localStorage.setItem(BK_LS_KEY, JSON.stringify(cols));
+            }
+        }).catch(() => { /* silent */ });
+    }, [uid, BK_LS_KEY]);
+
+    const saveBkCols = (next: Set<string>) => {
+        setBkVisibleCols(next);
+        const arr = [...next];
+        localStorage.setItem(BK_LS_KEY, JSON.stringify(arr));
+        if (uid) settingsService.saveBackupColumnConfig(uid, arr).catch(() => { });
+    };
+    const toggleBkCol = (key: string) => {
+        const next = new Set(bkVisibleCols);
+        if (next.has(key)) next.delete(key); else next.add(key);
+        saveBkCols(next);
+    };
+    const activeBkCols = ALL_BK_COLS.filter(c => bkVisibleCols.has(c.key));
+
+    const _boolLabel = (v: boolean) => (v ? 'Có' : '');
+    const _numLabel = (v: number | null | undefined) => (v !== null && v !== undefined ? String(v) : '');
+
+    const getBkCellValue = (p: BackupPatient, key: string, backupName?: string): string => {
+        const hc = p.hanhChinh;
+        const ts = p.tienSu;
+        const ls = p.lamSang;
+        const xn = p.xetNghiem;
+        const cs = p.chiSoTinhToan;
+        switch (key) {
+            // Hành chính
+            case 'maBNNC': return p.maBenhNhanNghienCuu || '—';
+            case 'maBA': return p.maBenhAnNoiTru || '—';
+            case 'hoTen': return hc.hoTen || '—';
+            case 'tuoi': return hc.tuoi != null ? String(hc.tuoi) : '—';
+            case 'gioiTinh': return hc.gioiTinh === 'nam' ? 'Nam' : hc.gioiTinh === 'nu' ? 'Nữ' : '—';
+            case 'ngheNghiep': return hc.ngheNghiep || '';
+            case 'diaChiXaPhuong': return hc.diaChiXaPhuong || '';
+            case 'diaChiTinhThanh': return hc.diaChiTinhThanh || '';
+            case 'noiO': return hc.noiO === 'nong_thon' ? 'Nông thôn' : hc.noiO === 'thanh_thi' ? 'Thành thị' : hc.noiO === 'hai_dao' ? 'Hải đảo' : '';
+            case 'ngayVaoVien': return hc.ngayVaoVien || '';
+            case 'ngayRaVien': return hc.ngayRaVien || '';
+            // Tiền sử
+            case 'daiThaoDuong': return _boolLabel(ts.daiThaoDuong);
+            case 'tangHuyetAp': return _boolLabel(ts.tangHuyetAp);
+            case 'benhThanMan': return _boolLabel(ts.benhThanMan);
+            case 'ungThuTS': return _boolLabel(ts.ungThu);
+            case 'suyTimTS': return _boolLabel(ts.suyTimUHuyet);
+            case 'benhMMN': return _boolLabel(ts.benhMachMauNao);
+            case 'hutThuocLa': return ts.hutThuocLa ? `Có (${_numLabel(ts.soBaoNam)} bao-năm)` : '';
+            // Lâm sàng
+            case 'mach': return _numLabel(ls.mach);
+            case 'huyetAp': return ls.huyetAp || '';
+            case 'nhietDo': return _numLabel(ls.nhietDo);
+            case 'nhipTho': return _numLabel(ls.nhipTho);
+            case 'spO2': return _numLabel(ls.spO2);
+            case 'glasgow': return _numLabel(ls.diemGlasgow);
+            // Xét nghiệm
+            case 'wbc': return _numLabel(xn.wbc);
+            case 'neutrophil': return _numLabel(xn.neutrophil);
+            case 'lymphocyte': return _numLabel(xn.lymphocyte);
+            case 'hemoglobin': return _numLabel(xn.hemoglobin);
+            case 'plt': return _numLabel(xn.plt);
+            case 'crp': return _numLabel(xn.crp);
+            case 'procalcitonin': return _numLabel(xn.procalcitonin);
+            case 'ure': return _numLabel(xn.ure);
+            case 'creatinin': return _numLabel(xn.creatinin);
+            case 'albumin': return _numLabel(xn.albumin);
+            case 'na': return _numLabel(xn.na);
+            case 'k': return _numLabel(xn.k);
+            case 'nlr': return _numLabel(cs.nlr);
+            case 'plr': return _numLabel(cs.plr);
+            case 'car': return _numLabel(cs.car);
+            // Marker NC
+            case 'sTREM1': return _numLabel(xn.sTREM1);
+            case 'tIMP1': return _numLabel(xn.tIMP1);
+            case 'il6': return _numLabel(xn.il6);
+            case 'il10': return _numLabel(xn.il10);
+            case 'il17': return _numLabel(xn.il17);
+            // PSI & Kết cục
+            case 'psiDiem': return p.psi.tongDiem > 0 ? String(p.psi.tongDiem) : '—';
+            case 'psiPhanTang': return p.psi.phanTang || '';
+            case 'ketCuc': return p.ketCuc?.tuVong ? 'Tử vong' : p.ketCuc?.tienTrienTotXuatVien ? 'Xuất viện' : p.ketCuc?.xinVe ? 'Xin về' : p.ketCuc?.tinhTrangRaVien || '';
+            case 'tongNgayDT': return _numLabel(p.ketCuc?.tongSoNgayDieuTri);
+            // Backup
+            case 'backupNguon': return backupName || '';
+            case 'ngayTao': return fmtIso(p.createdAt);
+            case 'suaCuoi': return fmtIso(p.updatedAt);
+            default: return '—';
+        }
+    };
 
     // Search state
     const [searchQuery, setSearchQuery] = useState('');
@@ -1010,6 +1283,15 @@ function BackupTab({
                 >
                     <Search className="w-4 h-4" /> Tìm kiếm
                 </button>
+                <button
+                    onClick={() => setSubTab('config')}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${subTab === 'config'
+                        ? 'bg-white text-primary-700 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                >
+                    <Settings2 className="w-4 h-4" /> Cấu hình
+                </button>
             </div>
 
             {/* ════════════ SUB-TAB 1: DANH SÁCH ════════════ */}
@@ -1114,39 +1396,24 @@ function BackupTab({
                                                     <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
                                                         <tr className="text-gray-500">
                                                             <th className="text-left px-3 py-2 font-semibold whitespace-nowrap w-8">#</th>
-                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Mã BNNC</th>
-                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Mã BA</th>
-                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Họ tên</th>
-                                                            <th className="text-center px-3 py-2 font-semibold whitespace-nowrap">Tuổi</th>
-                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Giới</th>
-                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Nơi ở</th>
-                                                            <th className="text-center px-3 py-2 font-semibold whitespace-nowrap">PSI</th>
-                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Ra viện</th>
-                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Ngày tạo</th>
-                                                            <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Sửa cuối</th>
+                                                            {activeBkCols.filter(c => c.key !== 'backupNguon').map(c => (
+                                                                <th key={c.key} className={`${c.align === 'center' ? 'text-center' : 'text-left'} px-3 py-2 font-semibold whitespace-nowrap`}>{c.label}</th>
+                                                            ))}
                                                             <th className="text-center px-3 py-2 font-semibold whitespace-nowrap sticky right-0 bg-gray-50 shadow-[-2px_0_4px_rgba(0,0,0,0.06)]"></th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         {expandedData.map((p, i) => {
-                                                            const hc = p.hanhChinh;
-                                                            const noiO = hc.noiO || '—';
-                                                            const gioiTinh = hc.gioiTinh === 'nam' ? 'Nam' : hc.gioiTinh === 'nu' ? 'Nữ' : '—';
                                                             return (
                                                                 <tr key={i}
-                                                                    className={`text-gray-700 hover:bg-primary-50/40 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                                                                    className={`text-gray-700 hover:bg-primary-50/40 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-100/70'}`}
                                                                 >
                                                                     <td className="px-3 py-2 text-gray-400">{i + 1}</td>
-                                                                    <td className="px-3 py-2 font-medium text-primary-700 whitespace-nowrap">{p.maBenhNhanNghienCuu || '—'}</td>
-                                                                    <td className="px-3 py-2 whitespace-nowrap">{p.maBenhAnNoiTru || '—'}</td>
-                                                                    <td className="px-3 py-2 whitespace-nowrap font-medium">{hc.hoTen || '—'}</td>
-                                                                    <td className="px-3 py-2 text-center">{hc.tuoi ?? '—'}</td>
-                                                                    <td className="px-3 py-2 whitespace-nowrap">{gioiTinh}</td>
-                                                                    <td className="px-3 py-2 whitespace-nowrap">{noiO}</td>
-                                                                    <td className="px-3 py-2 text-center font-medium">{p.psi.tongDiem > 0 ? p.psi.tongDiem : '—'}</td>
-                                                                    <td className="px-3 py-2 whitespace-nowrap">{p.ketCuc?.tinhTrangRaVien || '—'}</td>
-                                                                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{fmtIso(p.createdAt)}</td>
-                                                                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{fmtIso(p.updatedAt)}</td>
+                                                                    {activeBkCols.filter(c => c.key !== 'backupNguon').map(c => (
+                                                                        <td key={c.key} className={`px-3 py-2 whitespace-nowrap ${c.align === 'center' ? 'text-center' : ''} ${c.key === 'maBNNC' ? 'font-medium text-primary-700' : c.key === 'hoTen' ? 'font-medium' : c.key === 'psi' ? 'font-medium' : c.key === 'ngayTao' || c.key === 'suaCuoi' ? 'text-gray-500' : ''}`}>
+                                                                            {getBkCellValue(p, c.key)}
+                                                                        </td>
+                                                                    ))}
                                                                     <td className={`px-3 py-2 text-center sticky right-0 shadow-[-2px_0_4px_rgba(0,0,0,0.06)] ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                                                                         <div className="flex items-center justify-center gap-1">
                                                                             <button onClick={() => setDetailPatient(p)} title="Xem chi tiết"
@@ -1236,44 +1503,27 @@ function BackupTab({
                                 <table className="w-full text-xs border-collapse" style={{ minWidth: 1100 }}>
                                     <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
                                         <tr className="text-gray-500">
-                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Mã BNNC</th>
-                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Mã BA</th>
-                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Họ tên</th>
-                                            <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap">Tuổi</th>
-                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Giới</th>
-                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Nơi ở</th>
-                                            <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap">PSI</th>
-                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Ra viện</th>
-                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Ngày tạo</th>
-                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Sửa cuối</th>
-                                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Backup nguồn</th>
+                                            {activeBkCols.map(c => (
+                                                <th key={c.key} className={`${c.align === 'center' ? 'text-center' : 'text-left'} px-3 py-2.5 font-semibold whitespace-nowrap`}>{c.label}</th>
+                                            ))}
                                             <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap sticky right-0 bg-gray-50 shadow-[-2px_0_4px_rgba(0,0,0,0.06)]">Thao tác</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {searchResults.map((r, i) => {
-                                            const hc = r.patient.hanhChinh;
-                                            const noiO = hc.noiO || '—';
-                                            const gioiTinh = hc.gioiTinh === 'nam' ? 'Nam' : hc.gioiTinh === 'nu' ? 'Nữ' : '—';
                                             return (
                                                 <tr key={`${r.backupId}-${i}`}
-                                                    className={`text-gray-700 hover:bg-primary-50/40 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                                                    className={`text-gray-700 hover:bg-primary-50/40 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-100/70'}`}
                                                 >
-                                                    <td className="px-3 py-2 font-medium text-primary-700 whitespace-nowrap">{r.patient.maBenhNhanNghienCuu || '—'}</td>
-                                                    <td className="px-3 py-2 whitespace-nowrap">{r.patient.maBenhAnNoiTru || '—'}</td>
-                                                    <td className="px-3 py-2 whitespace-nowrap font-medium">{hc.hoTen || '—'}</td>
-                                                    <td className="px-3 py-2 text-center">{hc.tuoi ?? '—'}</td>
-                                                    <td className="px-3 py-2 whitespace-nowrap">{gioiTinh}</td>
-                                                    <td className="px-3 py-2 whitespace-nowrap">{noiO}</td>
-                                                    <td className="px-3 py-2 text-center font-medium">{r.patient.psi.tongDiem > 0 ? r.patient.psi.tongDiem : '—'}</td>
-                                                    <td className="px-3 py-2 whitespace-nowrap">{r.patient.ketCuc?.tinhTrangRaVien || '—'}</td>
-                                                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{fmtIso(r.patient.createdAt)}</td>
-                                                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{fmtIso(r.patient.updatedAt)}</td>
-                                                    <td className="px-3 py-2 whitespace-nowrap">
-                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-medium max-w-[140px] truncate" title={r.backupName}>
-                                                            🏷 {r.backupName}
-                                                        </span>
-                                                    </td>
+                                                    {activeBkCols.map(c => (
+                                                        <td key={c.key} className={`px-3 py-2 whitespace-nowrap ${c.align === 'center' ? 'text-center' : ''} ${c.key === 'maBNNC' ? 'font-medium text-primary-700' : c.key === 'hoTen' ? 'font-medium' : c.key === 'psi' ? 'font-medium' : c.key === 'ngayTao' || c.key === 'suaCuoi' ? 'text-gray-500' : ''}`}>
+                                                            {c.key === 'backupNguon' ? (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-medium max-w-[140px] truncate" title={r.backupName}>
+                                                                    🏷 {r.backupName}
+                                                                </span>
+                                                            ) : getBkCellValue(r.patient, c.key)}
+                                                        </td>
+                                                    ))}
                                                     <td className={`px-3 py-2 text-center sticky right-0 shadow-[-2px_0_4px_rgba(0,0,0,0.06)] ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                                                         <div className="flex items-center justify-center gap-1">
                                                             <button onClick={() => setDetailPatient(r.patient)} title="Xem chi tiết"
@@ -1300,6 +1550,67 @@ function BackupTab({
                             <p className="text-sm">Bấm "Tìm" để xem toàn bộ hoặc nhập từ khóa để lọc bệnh nhân</p>
                         </div>
                     ) : null}
+                </div>
+            )}
+
+            {/* ════════════ SUB-TAB 3: CẤU HÌNH ════════════ */}
+            {subTab === 'config' && (
+                <div className="space-y-4">
+                    <div className="rounded-xl border border-gray-200 bg-white p-5">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 className="font-medium text-gray-900 text-sm">Cấu hình cột hiển thị</h3>
+                                <p className="text-xs text-gray-500 mt-0.5">Chọn các cột sẽ xuất hiện trong bảng backup và tìm kiếm</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => saveBkCols(new Set(ALL_BK_COLS.map(c => c.key)))}
+                                    className="text-xs text-primary-600 hover:text-primary-800 font-medium"
+                                >
+                                    Chọn hết
+                                </button>
+                                <span className="text-gray-300">|</span>
+                                <button
+                                    onClick={() => { saveBkCols(bkVisibleCols); toast.success('Đã lưu cấu hình mặc định'); }}
+                                    className="text-xs text-gray-500 hover:text-gray-700 font-medium"
+                                >
+                                    Mặc định
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            {BK_COLUMN_GROUPS.map((group) => {
+                                const gKeys = group.columns.map(c => c.key);
+                                const checkedCount = gKeys.filter(k => bkVisibleCols.has(k)).length;
+                                return (
+                                    <div key={group.group}>
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                            <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">{group.group}</span>
+                                            <span className="text-[10px] text-gray-400">{checkedCount}/{gKeys.length}</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1">
+                                            {group.columns.map(c => (
+                                                <label key={c.key} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={bkVisibleCols.has(c.key)}
+                                                        onChange={() => toggleBkCol(c.key)}
+                                                        className="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                                    />
+                                                    <span className="text-sm text-gray-700">{c.label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <p className="text-xs text-gray-400 mt-4">
+                            Đang hiển thị {activeBkCols.length}/{ALL_BK_COLS.length} cột · Cài đặt được lưu tự động và áp dụng trên mọi thiết bị
+                        </p>
+                    </div>
                 </div>
             )}
 

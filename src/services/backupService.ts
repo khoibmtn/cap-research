@@ -198,12 +198,15 @@ export const backupService = {
 
     /**
      * Auto-backup: fetch all patients and create an auto backup.
+     * @param note Optional note (e.g. patient code + name) appended to backup name
      */
-    async createAutoBackup(): Promise<void> {
+    async createAutoBackup(note?: string): Promise<void> {
         try {
             const patients = await patientService.getAll();
             if (patients.length === 0) return;
-            await this.createBackup(patients, undefined, 'auto');
+            const now = new Date();
+            const backupName = `Auto - ${formatDate(now)}${note ? ` (${note})` : ''}`;
+            await this.createBackup(patients, backupName, 'auto');
         } catch (err) {
             console.warn('[Backup] Auto-backup failed:', err);
         }
