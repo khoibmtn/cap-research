@@ -99,7 +99,10 @@ export default function PatientFormPage() {
                         }
                     });
                     const nextCode = `CAP${String(maxNum + 1).padStart(3, '0')}`;
-                    setFormData((prev) => ({ ...prev, maBenhNhanNghienCuu: nextCode }));
+                    const newData = { ...createDefaultPatient(), maBenhNhanNghienCuu: nextCode };
+                    setFormData(newData);
+                    // Save initial snapshot for dirty detection on new patient
+                    savedDataRef.current = JSON.stringify(newData);
                 }
             } catch (err) {
                 console.error('Failed to init form:', err);
@@ -110,24 +113,21 @@ export default function PatientFormPage() {
         init();
     }, [id, isEdit]);
 
-    // Track dirty state (only in edit mode, not readOnly)
+    // Track dirty state (for both new and edit modes)
     const isDirtyRef = useRef(false);
     useEffect(() => {
-        if (!isEdit || readOnly) return;
+        if (readOnly) return;
         const currentSnapshot = JSON.stringify(formData);
         const dirty = savedDataRef.current !== '' && currentSnapshot !== savedDataRef.current;
         setIsDirty(dirty);
         isDirtyRef.current = dirty;
-    }, [formData, isEdit, readOnly]);
+    }, [formData, readOnly]);
 
     // Keep a ref to handleSave so the guard always calls the latest version
     const handleSaveRef = useRef<() => Promise<boolean>>(async () => false);
 
-    // Block browser close/refresh when editing with unsaved changes
-    const isEditing = isEdit && !readOnly;
-
+    // Block browser close/refresh when there are unsaved changes
     useEffect(() => {
-        if (!isEditing) return;
         const handler = (e: BeforeUnloadEvent) => {
             if (!isDirtyRef.current) return;
             e.preventDefault();
@@ -135,7 +135,7 @@ export default function PatientFormPage() {
         };
         window.addEventListener('beforeunload', handler);
         return () => window.removeEventListener('beforeunload', handler);
-    }, [isEditing]);
+    }, []);
 
     // Register guard for sidebar/back navigation interception
     const registerGuard = useEditGuardRegister();
@@ -144,7 +144,7 @@ export default function PatientFormPage() {
     showConfirmRef.current = showConfirm;
 
     useEffect(() => {
-        if (!isEditing) {
+        if (readOnly) {
             registerGuard(null);
             return;
         }
@@ -160,17 +160,31 @@ export default function PatientFormPage() {
             return true; // discard changes
         });
         return () => registerGuard(null);
-    }, [isEditing, registerGuard]);
+    }, [readOnly, registerGuard]);
 
-    // Cancel editing: revert to saved data and go back to view mode immediately
-    const handleCancelEdit = () => {
-        // Revert formData to the saved snapshot
-        if (savedDataRef.current) {
-            setFormData(JSON.parse(savedDataRef.current));
+    // Cancel handler for both edit and new mode
+    const handleCancel = async () => {
+        if (isDirtyRef.current) {
+            const answer = await showConfirm(
+                'Bạn có thay đổi chưa lưu. Bạn có muốn lưu trước khi rời trang không?'
+            );
+            if (answer) {
+                const ok = await handleSave();
+                if (!ok) return; // Save failed, stay on page
+                return;
+            }
         }
+        // Discard and navigate away
         setIsDirty(false);
         isDirtyRef.current = false;
-        navigate(`/patient/${id}`, { replace: true });
+        if (isEdit) {
+            if (savedDataRef.current) {
+                setFormData(JSON.parse(savedDataRef.current));
+            }
+            navigate(`/patient/${id}`, { replace: true });
+        } else {
+            navigate('/', { replace: true });
+        }
     };
 
     const updateField = useCallback(<K extends keyof FormData>(section: K, value: FormData[K]) => {
@@ -209,13 +223,46 @@ export default function PatientFormPage() {
             return false;
         }
 
-        // ── Date validations (only keep ngayRa >= ngayVao; others handled onBlur) ──
+        // ── Date validations ──
+        const dateErrors: string[] = [];
         const ngayVao = parseDate(hc.ngayVaoVien);
         const ngayRa = parseDate(hc.ngayRaVien);
+        const thoiDiemTC = parseDate(formData.lamSang.thoiDiemTrieuChung);
+        const ngayBDKS = parseDate(formData.ketCuc.ngayBatDauKhangSinh);
+        const ngayKTKS = parseDate(formData.ketCuc.ngayKetThucKhangSinh);
 
+        // Ngày ra viện >= ngày vào viện
         if (ngayVao && ngayRa && ngayRa < ngayVao) {
-            toast.error('Ngày ra viện phải bằng hoặc sau ngày nhập viện', { duration: 5000 });
-            setCurrentStep(0);
+            dateErrors.push('Ngày ra viện phải bằng hoặc sau ngày nhập viện');
+        }
+
+        // Thời điểm triệu chứng <= ngày vào viện
+        if (thoiDiemTC && ngayVao && thoiDiemTC > ngayVao) {
+            dateErrors.push('Thời điểm triệu chứng phải trước hoặc bằng ngày nhập viện');
+        }
+
+        // Ngày bắt đầu kháng sinh >= ngày vào viện
+        if (ngayBDKS && ngayVao && ngayBDKS < ngayVao) {
+            dateErrors.push('Ngày bắt đầu kháng sinh phải bằng hoặc sau ngày nhập viện');
+        }
+
+        // Ngày bắt đầu kháng sinh <= ngày ra viện (nếu có)
+        if (ngayBDKS && ngayRa && ngayBDKS > ngayRa) {
+            dateErrors.push('Ngày bắt đầu kháng sinh phải trước hoặc bằng ngày ra viện');
+        }
+
+        // Ngày kết thúc kháng sinh >= ngày bắt đầu kháng sinh
+        if (ngayKTKS && ngayBDKS && ngayKTKS < ngayBDKS) {
+            dateErrors.push('Ngày kết thúc kháng sinh phải bằng hoặc sau ngày bắt đầu kháng sinh');
+        }
+
+        // Ngày kết thúc kháng sinh <= ngày ra viện (nếu có)
+        if (ngayKTKS && ngayRa && ngayKTKS > ngayRa) {
+            dateErrors.push('Ngày kết thúc kháng sinh phải trước hoặc bằng ngày ra viện');
+        }
+
+        if (dateErrors.length > 0) {
+            toast.error(dateErrors.join('\n'), { duration: 6000, style: { whiteSpace: 'pre-line' } });
             return false;
         }
 
@@ -285,8 +332,7 @@ export default function PatientFormPage() {
     const nextPatient = currentIndex >= 0 && currentIndex < allPatients.length - 1 ? allPatients[currentIndex + 1] : null;
 
     const navigateToPatient = async (targetId: string) => {
-        const isEditing = isEdit && !readOnly;
-        if (isEditing && isDirty) {
+        if (isDirty) {
             const answer = window.confirm('Bạn có thay đổi chưa lưu. Bạn có muốn lưu trước khi chuyển sang bệnh nhân khác không?');
             if (answer) {
                 const ok = await handleSave();
@@ -336,7 +382,7 @@ export default function PatientFormPage() {
                 <div className="flex items-center gap-3">
                     <button
                         onClick={async () => {
-                            if (isEditing && isDirty) {
+                            if (isDirty) {
                                 const answer = await showConfirm(
                                     'Bạn có thay đổi chưa lưu. Bạn có muốn lưu trước khi rời trang không?'
                                 );
@@ -383,10 +429,10 @@ export default function PatientFormPage() {
                             </button>
                         </div>
                     )}
-                    {!readOnly && isEdit && (
+                    {(!readOnly && isEdit || !isEdit) && (
                         <div className="flex items-center gap-2">
                             <button
-                                onClick={handleCancelEdit}
+                                onClick={handleCancel}
                                 disabled={saving}
                                 className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors"
                             >

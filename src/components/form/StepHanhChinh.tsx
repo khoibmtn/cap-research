@@ -120,11 +120,23 @@ export default function StepHanhChinh({ data, onChange, existingCodes, currentPa
         onChange('maBenhNhanNghienCuu' as keyof FormData, '' as never);
     };
 
-    const validateNgayRaVien = () => {
-        if (!hc.ngayRaVien || !hc.ngayVaoVien) return;
-        const vao = new Date(hc.ngayVaoVien);
-        const ra = new Date(hc.ngayRaVien);
-        if (!isNaN(vao.getTime()) && !isNaN(ra.getTime()) && ra < vao) {
+    const parseDateStr = (s: string): Date | null => {
+        if (!s) return null;
+        // yyyy-mm-dd
+        if (s.includes('-')) { const d = new Date(s); return isNaN(d.getTime()) ? null : d; }
+        // dd/mm/yyyy
+        const parts = s.split('/');
+        if (parts.length !== 3) return null;
+        const [d, m, y] = parts.map(Number);
+        if (!d || !m || !y) return null;
+        return new Date(y, m - 1, d);
+    };
+
+    const validateNgayRaVien = (newRaVien: string) => {
+        if (!newRaVien || !hc.ngayVaoVien) return;
+        const vao = parseDateStr(hc.ngayVaoVien);
+        const ra = parseDateStr(newRaVien);
+        if (vao && ra && ra < vao) {
             toast.error('Ngày ra viện phải ≥ ngày nhập viện. Đã xóa giá trị.', { duration: 4000 });
             onChange('hanhChinh', { ...hc, ngayRaVien: '' });
         }

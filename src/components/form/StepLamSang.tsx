@@ -35,18 +35,21 @@ export default function StepLamSang({ data, ngayVaoVien, onChange }: Props) {
         onChange({ ...data, [field]: value });
     };
 
-    const validateTrieuChung = () => {
-        if (!data.thoiDiemTrieuChung || !ngayVaoVien) return;
-        const tc = new Date(data.thoiDiemTrieuChung);
-        // Parse ngayVaoVien (dd/mm/yyyy or yyyy-mm-dd)
-        let vao: Date | null = null;
-        if (ngayVaoVien.includes('/')) {
-            const [d, m, y] = ngayVaoVien.split('/').map(Number);
-            if (d && m && y) vao = new Date(y, m - 1, d);
-        } else {
-            vao = new Date(ngayVaoVien);
-        }
-        if (vao && !isNaN(vao.getTime()) && tc > vao) {
+    const parseDateStr = (s: string): Date | null => {
+        if (!s) return null;
+        if (s.includes('-')) { const d = new Date(s); return isNaN(d.getTime()) ? null : d; }
+        const parts = s.split('/');
+        if (parts.length !== 3) return null;
+        const [d, m, y] = parts.map(Number);
+        if (!d || !m || !y) return null;
+        return new Date(y, m - 1, d);
+    };
+
+    const validateTrieuChung = (newTrieuChung: string) => {
+        if (!newTrieuChung || !ngayVaoVien) return;
+        const tc = parseDateStr(newTrieuChung);
+        const vao = parseDateStr(ngayVaoVien);
+        if (tc && vao && tc > vao) {
             toast.error('Thời điểm triệu chứng phải ≤ ngày nhập viện. Đã xóa giá trị.', { duration: 4000 });
             onChange({ ...data, thoiDiemTrieuChung: '' });
         }

@@ -72,9 +72,9 @@ export default function StepKetCuc({ data, ngayVaoVien, ngayRaVien, onChange }: 
     })();
 
     // onBlur validation for antibiotic dates
-    const validateNgayBatDauKS = () => {
-        if (!data.ngayBatDauKhangSinh) return;
-        const batDau = parseDate(data.ngayBatDauKhangSinh);
+    const validateNgayBatDauKS = (newBatDau: string) => {
+        if (!newBatDau) return;
+        const batDau = parseDate(newBatDau);
         if (!batDau) return;
         const vao = parseDate(ngayVaoVien);
         const ra = parseDate(ngayRaVien);
@@ -89,9 +89,9 @@ export default function StepKetCuc({ data, ngayVaoVien, ngayRaVien, onChange }: 
         }
     };
 
-    const validateNgayKetThucKS = () => {
-        if (!data.ngayKetThucKhangSinh) return;
-        const ketThuc = parseDate(data.ngayKetThucKhangSinh);
+    const validateNgayKetThucKS = (newKetThuc: string) => {
+        if (!newKetThuc) return;
+        const ketThuc = parseDate(newKetThuc);
         if (!ketThuc) return;
         const batDau = parseDate(data.ngayBatDauKhangSinh);
         const ra = parseDate(ngayRaVien);

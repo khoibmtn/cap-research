@@ -3,7 +3,7 @@ import { useRef } from 'react';
 interface DateInputProps {
     value: string; // stored as dd/mm/yyyy or yyyy-mm-dd
     onChange: (value: string) => void;
-    onBlur?: () => void;
+    onBlur?: (newValue: string) => void;
     label?: string;
     className?: string;
 }
@@ -39,24 +39,22 @@ export default function DateInput({ value, onChange, onBlur, label, className = 
             return;
         }
         // Convert to dd/mm/yyyy for storage
+        let displayValue = v;
         const parts = v.split('-');
         if (parts.length === 3) {
-            onChange(`${parts[2]}/${parts[1]}/${parts[0]}`);
-        } else {
-            onChange(v);
+            displayValue = `${parts[2]}/${parts[1]}/${parts[0]}`;
         }
-    };
-
-    const openPicker = () => {
-        const el = inputRef.current;
-        if (!el) return;
-        try { el.showPicker(); } catch { el.focus(); }
+        onChange(displayValue);
+        // Trigger validation with the NEW value (avoids stale closure)
+        if (onBlur) {
+            setTimeout(() => onBlur(displayValue), 0);
+        }
     };
 
     return (
         <div>
             {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
-            <div className="relative cursor-pointer" onClick={openPicker}>
+            <div className="relative">
                 {/* Visible text showing dd/mm/yyyy */}
                 <div
                     className={`px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white
@@ -66,14 +64,13 @@ export default function DateInput({ value, onChange, onBlur, label, className = 
                         {value ? toDisplay(value) : 'dd/mm/yyyy'}
                     </span>
                 </div>
-                {/* Native date picker — pointer-events:none so clicks pass through to the parent onClick */}
+                {/* Native date input — transparent overlay, receives all touch/click events directly */}
                 <input
                     ref={inputRef}
                     type="date"
                     value={isoValue}
                     onChange={handleChange}
-                    onBlur={onBlur}
-                    className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     style={{ WebkitAppearance: 'none' }}
                 />
             </div>
