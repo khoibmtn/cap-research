@@ -50,13 +50,13 @@ const p1: MockPatient = {
         glucose: 5.4, protein: 70, albumin: 38, crp: 48, procalcitonin: 0.8,
         na: 139, k: 4.0, cl: 102,
         ph: 7.42, saO2: 95, paCO2: 38, hcO3: 24, be: 0.5,
-        sTREM1: 180, tIMP1: 220, il6: 35, il10: 8, il17: 12,
+        biomarkerBarcode: '', sTREM1: 180, tIMP1: 220, il6: 35, il10: 8, il17: 12,
     },
     chiSoTinhToan: { nlr: 5.2, plr: 16.7, car: 1.26 },
     hinhAnh: {
         xquangTonThuong: [{
             id: lid(), viTri: '1/2 dưới', ben: 'phải',
-            hinhThai: 'Đám mờ', dien: 'Hẹp',
+            hinhThai: 'Đám mờ', dien: 'Hẹp', thoiDiem: '',
         }],
         ctTonThuong: [],
         xquangTranDichMangPhoi: false, xquangTranKhiMangPhoi: false,
@@ -137,13 +137,13 @@ const p2: MockPatient = {
         glucose: 5.0, protein: 68, albumin: 40, crp: 22, procalcitonin: 0.15,
         na: 140, k: 3.9, cl: 103,
         ph: 7.44, saO2: 97, paCO2: 36, hcO3: 25, be: 1.0,
-        sTREM1: 95, tIMP1: 150, il6: 18, il10: 12, il17: 25,
+        biomarkerBarcode: '', sTREM1: 95, tIMP1: 150, il6: 18, il10: 12, il17: 25,
     },
     chiSoTinhToan: { nlr: 2.6, plr: 8.8, car: 0.55 },
     hinhAnh: {
         xquangTonThuong: [{
             id: lid(), viTri: '1/2 dưới', ben: 'hai bên',
-            hinhThai: 'Nốt', dien: 'Hẹp',
+            hinhThai: 'Nốt', dien: 'Hẹp', thoiDiem: '',
         }],
         ctTonThuong: [],
         xquangTranDichMangPhoi: false, xquangTranKhiMangPhoi: false,
@@ -223,17 +223,17 @@ const p3: MockPatient = {
         glucose: 5.8, protein: 66, albumin: 35, crp: 85, procalcitonin: 2.1,
         na: 137, k: 4.2, cl: 100,
         ph: 7.40, saO2: 93, paCO2: 42, hcO3: 23, be: -1.0,
-        sTREM1: 320, tIMP1: 340, il6: 65, il10: 15, il17: 18,
+        biomarkerBarcode: '', sTREM1: 320, tIMP1: 340, il6: 65, il10: 15, il17: 18,
     },
     chiSoTinhToan: { nlr: 6.83, plr: 23.33, car: 2.43 },
     hinhAnh: {
         xquangTonThuong: [{
             id: lid(), viTri: '1/2 dưới', ben: 'trái',
-            hinhThai: 'Đám mờ', dien: 'Vừa',
+            hinhThai: 'Đám mờ', dien: 'Vừa', thoiDiem: '',
         }],
         ctTonThuong: [{
             id: lid(), thuy: 'thuỳ dưới', ben: 'trái',
-            hinhThai: 'đông đặc', dien: 'vừa',
+            hinhThai: 'đông đặc', dien: 'vừa', thoiDiem: '',
         }],
         xquangTranDichMangPhoi: false, xquangTranKhiMangPhoi: false,
         ctTranDichMangPhoi: false, ctTranKhiMangPhoi: false,
@@ -313,20 +313,20 @@ const p4: MockPatient = {
         glucose: 12.5, protein: 62, albumin: 30, crp: 145, procalcitonin: 5.8,
         na: 134, k: 4.5, cl: 98,
         ph: 7.38, saO2: 91, paCO2: 44, hcO3: 22, be: -2.5,
-        sTREM1: 520, tIMP1: 480, il6: 125, il10: 22, il17: 30,
+        biomarkerBarcode: '', sTREM1: 520, tIMP1: 480, il6: 125, il10: 22, il17: 30,
     },
     chiSoTinhToan: { nlr: 8.5, plr: 31.0, car: 4.83 },
     hinhAnh: {
         xquangTonThuong: [{
             id: lid(), viTri: 'cả 1/2 trên-dưới', ben: 'phải',
-            hinhThai: 'Đám mờ', dien: 'Rộng',
+            hinhThai: 'Đám mờ', dien: 'Rộng', thoiDiem: '',
         }],
         ctTonThuong: [{
             id: lid(), thuy: 'thuỳ giữa', ben: 'phải',
-            hinhThai: 'đông đặc', dien: 'rộng',
+            hinhThai: 'đông đặc', dien: 'rộng', thoiDiem: '',
         }, {
             id: lid(), thuy: 'thuỳ dưới', ben: 'phải',
-            hinhThai: 'đông đặc', dien: 'vừa',
+            hinhThai: 'đông đặc', dien: 'vừa', thoiDiem: '',
         }],
         xquangTranDichMangPhoi: true, xquangTranKhiMangPhoi: false,
         ctTranDichMangPhoi: true, ctTranKhiMangPhoi: false,
@@ -407,17 +407,17 @@ const p5: MockPatient = {
         glucose: 6.2, protein: 58, albumin: 28, crp: 195, procalcitonin: 8.5,
         na: 131, k: 4.8, cl: 96,
         ph: 7.36, saO2: 88, paCO2: 48, hcO3: 21, be: -3.5,
-        sTREM1: 680, tIMP1: 560, il6: 200, il10: 35, il17: 40,
+        biomarkerBarcode: '', sTREM1: 680, tIMP1: 560, il6: 200, il10: 35, il17: 40,
     },
     chiSoTinhToan: { nlr: 11.0, plr: 24.38, car: 6.96 },
     hinhAnh: {
         xquangTonThuong: [{
             id: lid(), viTri: 'cả 1/2 trên-dưới', ben: 'hai bên',
-            hinhThai: 'Đám mờ', dien: 'Rộng',
+            hinhThai: 'Đám mờ', dien: 'Rộng', thoiDiem: '',
         }],
         ctTonThuong: [{
             id: lid(), thuy: 'thuỳ dưới', ben: 'hai bên',
-            hinhThai: 'kính mờ', dien: 'rộng',
+            hinhThai: 'kính mờ', dien: 'rộng', thoiDiem: '',
         }],
         xquangTranDichMangPhoi: true, xquangTranKhiMangPhoi: false,
         ctTranDichMangPhoi: true, ctTranKhiMangPhoi: false,
@@ -498,17 +498,17 @@ const p6: MockPatient = {
         glucose: 10.8, protein: 64, albumin: 32, crp: 110, procalcitonin: 3.2,
         na: 136, k: 4.1, cl: 99,
         ph: 7.39, saO2: 92, paCO2: 40, hcO3: 23, be: -1.5,
-        sTREM1: 420, tIMP1: 400, il6: 90, il10: 20, il17: 28,
+        biomarkerBarcode: '', sTREM1: 420, tIMP1: 400, il6: 90, il10: 20, il17: 28,
     },
     chiSoTinhToan: { nlr: 6.15, plr: 20.38, car: 3.44 },
     hinhAnh: {
         xquangTonThuong: [{
             id: lid(), viTri: '1/2 dưới', ben: 'phải',
-            hinhThai: 'Đám mờ', dien: 'Vừa',
+            hinhThai: 'Đám mờ', dien: 'Vừa', thoiDiem: '',
         }],
         ctTonThuong: [{
             id: lid(), thuy: 'thuỳ dưới', ben: 'phải',
-            hinhThai: 'đông đặc', dien: 'vừa',
+            hinhThai: 'đông đặc', dien: 'vừa', thoiDiem: '',
         }],
         xquangTranDichMangPhoi: false, xquangTranKhiMangPhoi: false,
         ctTranDichMangPhoi: false, ctTranKhiMangPhoi: false,
@@ -593,23 +593,23 @@ const p7: MockPatient = {
         glucose: 14.5, protein: 52, albumin: 22, crp: 280, procalcitonin: 25.0,
         na: 128, k: 5.2, cl: 92,
         ph: 7.30, saO2: 82, paCO2: 55, hcO3: 18, be: -6.0,
-        sTREM1: 1200, tIMP1: 850, il6: 450, il10: 55, il17: 65,
+        biomarkerBarcode: '', sTREM1: 1200, tIMP1: 850, il6: 450, il10: 55, il17: 65,
     },
     chiSoTinhToan: { nlr: 18.4, plr: 29.0, car: 12.73 },
     hinhAnh: {
         xquangTonThuong: [{
             id: lid(), viTri: 'cả 1/2 trên-dưới', ben: 'hai bên',
-            hinhThai: 'Đám mờ', dien: 'Rộng',
+            hinhThai: 'Đám mờ', dien: 'Rộng', thoiDiem: '',
         }],
         ctTonThuong: [{
             id: lid(), thuy: 'thuỳ trên', ben: 'phải',
-            hinhThai: 'hang', dien: 'hẹp',
+            hinhThai: 'hang', dien: 'hẹp', thoiDiem: '',
         }, {
             id: lid(), thuy: 'thuỳ giữa', ben: 'phải',
-            hinhThai: 'đông đặc', dien: 'rộng',
+            hinhThai: 'đông đặc', dien: 'rộng', thoiDiem: '',
         }, {
             id: lid(), thuy: 'thuỳ dưới', ben: 'hai bên',
-            hinhThai: 'đông đặc', dien: 'rộng',
+            hinhThai: 'đông đặc', dien: 'rộng', thoiDiem: '',
         }],
         xquangTranDichMangPhoi: true, xquangTranKhiMangPhoi: false,
         ctTranDichMangPhoi: true, ctTranKhiMangPhoi: false,
@@ -690,20 +690,20 @@ const p8: MockPatient = {
         glucose: 16.0, protein: 48, albumin: 18, crp: 350, procalcitonin: 50.0,
         na: 125, k: 5.8, cl: 88,
         ph: 7.22, saO2: 75, paCO2: 62, hcO3: 15, be: -10.0,
-        sTREM1: 1800, tIMP1: 1200, il6: 800, il10: 85, il17: 90,
+        biomarkerBarcode: '', sTREM1: 1800, tIMP1: 1200, il6: 800, il10: 85, il17: 90,
     },
     chiSoTinhToan: { nlr: 31.33, plr: 28.33, car: 19.44 },
     hinhAnh: {
         xquangTonThuong: [{
             id: lid(), viTri: 'cả 1/2 trên-dưới', ben: 'hai bên',
-            hinhThai: 'Đám mờ', dien: 'Rộng',
+            hinhThai: 'Đám mờ', dien: 'Rộng', thoiDiem: '',
         }],
         ctTonThuong: [{
             id: lid(), thuy: 'thuỳ trên', ben: 'hai bên',
-            hinhThai: 'hang', dien: 'rộng',
+            hinhThai: 'hang', dien: 'rộng', thoiDiem: '',
         }, {
             id: lid(), thuy: 'thuỳ dưới', ben: 'hai bên',
-            hinhThai: 'đông đặc', dien: 'rộng',
+            hinhThai: 'đông đặc', dien: 'rộng', thoiDiem: '',
         }],
         xquangTranDichMangPhoi: true, xquangTranKhiMangPhoi: false,
         ctTranDichMangPhoi: true, ctTranKhiMangPhoi: false,
@@ -784,20 +784,20 @@ const p9: MockPatient = {
         glucose: 13.5, protein: 54, albumin: 24, crp: 240, procalcitonin: 18.0,
         na: 129, k: 5.0, cl: 94,
         ph: 7.28, saO2: 84, paCO2: 52, hcO3: 19, be: -5.5,
-        sTREM1: 950, tIMP1: 720, il6: 350, il10: 48, il17: 55,
+        biomarkerBarcode: '', sTREM1: 950, tIMP1: 720, il6: 350, il10: 48, il17: 55,
     },
     chiSoTinhToan: { nlr: 15.0, plr: 20.0, car: 10.0 },
     hinhAnh: {
         xquangTonThuong: [{
             id: lid(), viTri: 'cả 1/2 trên-dưới', ben: 'phải',
-            hinhThai: 'Đám mờ', dien: 'Rộng',
+            hinhThai: 'Đám mờ', dien: 'Rộng', thoiDiem: '',
         }],
         ctTonThuong: [{
             id: lid(), thuy: 'thuỳ giữa', ben: 'phải',
-            hinhThai: 'đông đặc', dien: 'rộng',
+            hinhThai: 'đông đặc', dien: 'rộng', thoiDiem: '',
         }, {
             id: lid(), thuy: 'thuỳ dưới', ben: 'phải',
-            hinhThai: 'đông đặc', dien: 'rộng',
+            hinhThai: 'đông đặc', dien: 'rộng', thoiDiem: '',
         }],
         xquangTranDichMangPhoi: true, xquangTranKhiMangPhoi: false,
         ctTranDichMangPhoi: true, ctTranKhiMangPhoi: false,
