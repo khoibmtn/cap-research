@@ -13,13 +13,14 @@ import {
     Clock, Pill,
 } from 'lucide-react';
 import { mean, sd, median, q1, q3, meanSd, frac, psiClass } from '../utils/statsHelpers';
+import ExpectedResultsTab from '../components/analytics/ExpectedResultsTab';
 
 const COLORS = ['#0d9488', '#0ea5e9', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#10b981', '#f97316'];
 const PSI_COLORS: Record<string, string> = {
     I: '#22c55e', II: '#84cc16', III: '#f59e0b', IV: '#f97316', V: '#ef4444',
 };
 
-type Tab = 'overview' | 'micro' | 'biomarker';
+type Tab = 'overview' | 'micro' | 'biomarker' | 'expected';
 
 export default function AnalyticsPage() {
     const [patients, setPatients] = useState<Patient[]>([]);
@@ -42,6 +43,7 @@ export default function AnalyticsPage() {
         { key: 'overview', label: 'Tổng quan' },
         { key: 'micro', label: 'Vi sinh (MT1)' },
         { key: 'biomarker', label: 'Biomarker (MT2)' },
+        { key: 'expected', label: 'Dự kiến kết quả NC' },
     ];
 
     return (
@@ -70,6 +72,7 @@ export default function AnalyticsPage() {
             {tab === 'overview' && <OverviewTab patients={patients} />}
             {tab === 'micro' && <MicroTab patients={patients} />}
             {tab === 'biomarker' && <BiomarkerTab patients={patients} />}
+            {tab === 'expected' && <ExpectedResultsTab patients={patients} />}
         </div>
     );
 }
