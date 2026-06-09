@@ -48,6 +48,7 @@ export const CT_THUY = ['Thuỳ trên', 'Thuỳ giữa', 'Thuỳ dưới'];
 export const CT_HINH_THAI = ['Kính mờ', 'Đông đặc', 'Nốt mờ', 'Hang', 'Tràn dịch màng phổi', 'Tràn khí màng phổi'];
 export const CT_DIEN = ['Hẹp', 'Vừa', 'Rộng'];
 export const BEN_OPTIONS = ['Phải', 'Trái', 'Hai bên'];
+export const THOI_DIEM_DIEU_TRI = ['Trước điều trị', 'Trong điều trị', 'Kết thúc điều trị'];
 export const MUC_DO_KHANG_SINH = [
     { value: 'S', label: 'S (Nhạy cảm)' },
     { value: 'I', label: 'I (Trung gian)' },

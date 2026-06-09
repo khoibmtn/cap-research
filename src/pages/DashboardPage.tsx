@@ -113,7 +113,8 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                     const items = (p.hinhAnh.xquangTonThuong || []).map((t) => {
                         const tt = [t.hinhThai, t.dien].filter(Boolean).map(s => s.toLowerCase()).join(' ');
                         const vt = [t.viTri, t.ben].filter(Boolean).map(s => s.toLowerCase()).join(' ');
-                        return `TT ${tt} ở ${vt || '—'}`;
+                        const td = (t as { thoiDiem?: string }).thoiDiem;
+                        return `TT ${tt} ở ${vt || '—'}${td ? ` [${td}]` : ''}`;
                     });
                     const extras: string[] = [];
                     if (p.hinhAnh.xquangTranDichMangPhoi) extras.push('TDMP');
@@ -127,7 +128,8 @@ const COLUMN_GROUPS: ColumnGroup[] = [
                     const items = (p.hinhAnh.ctTonThuong || []).map((t) => {
                         const tt = [t.hinhThai, t.dien].filter(Boolean).map(s => s.toLowerCase()).join(' ');
                         const vt = [t.thuy, t.ben].filter(Boolean).map(s => s.toLowerCase()).join(' ');
-                        return `TT ${tt} ở ${vt || '—'}`;
+                        const td = (t as { thoiDiem?: string }).thoiDiem;
+                        return `TT ${tt} ở ${vt || '—'}${td ? ` [${td}]` : ''}`;
                     });
                     const extras: string[] = [];
                     if (p.hinhAnh.ctTranDichMangPhoi) extras.push('TDMP');

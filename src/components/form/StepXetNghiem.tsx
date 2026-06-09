@@ -1,4 +1,5 @@
 import type { XetNghiem, ChiSoTinhToan } from '../../types/patient';
+import { Barcode } from 'lucide-react';
 
 interface Props {
     data: XetNghiem;
@@ -94,6 +95,18 @@ export default function StepXetNghiem({ data, indices, onChange }: Props) {
             {/* Dấu ấn sinh học */}
             <div>
                 <h3 className="text-sm font-semibold text-gray-800 mb-3 pb-2 border-b border-gray-100">5. Dấu ấn sinh học</h3>
+                <div className="mb-3">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                        <span className="inline-flex items-center gap-1"><Barcode className="w-3.5 h-3.5" /> Barcode ống máu</span>
+                    </label>
+                    <input
+                        type="text"
+                        value={data.biomarkerBarcode || ''}
+                        onChange={(e) => onChange({ ...data, biomarkerBarcode: e.target.value })}
+                        placeholder="Nhập mã barcode ống máu..."
+                        className="w-full sm:w-72 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent font-mono tracking-wider"
+                    />
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                     <NumField label="sTREM-1" value={data.sTREM1} onChange={(v) => update('sTREM1', v)} />
                     <NumField label="TIMP-1" value={data.tIMP1} onChange={(v) => update('tIMP1', v)} />

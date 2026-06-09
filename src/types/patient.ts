@@ -88,6 +88,7 @@ export interface XetNghiem {
     hcO3: number | null;
     be: number | null;
     // Dấu ấn sinh học
+    biomarkerBarcode: string;
     sTREM1: number | null;
     tIMP1: number | null;
     il6: number | null;
@@ -103,12 +104,15 @@ export interface ChiSoTinhToan {
 }
 
 // ==================== HÌNH ẢNH ====================
+export type ThoiDiemDieuTri = 'Trước điều trị' | 'Trong điều trị' | 'Kết thúc điều trị' | '';
+
 export interface XquangTonThuong {
     id: string;
     viTri: '1/2 trên' | '1/2 dưới' | 'cả 1/2 trên-dưới' | '';
     ben: 'phải' | 'trái' | 'hai bên' | '';
     hinhThai: string;
     dien: string;
+    thoiDiem: ThoiDiemDieuTri;
 }
 
 export interface CTTonThuong {
@@ -117,6 +121,7 @@ export interface CTTonThuong {
     ben: 'phải' | 'trái' | 'hai bên' | '';
     hinhThai: string; // kính mờ, đông đặc, nốt mờ, hang
     dien: 'hẹp' | 'vừa' | 'rộng' | '';
+    thoiDiem: ThoiDiemDieuTri;
 }
 
 export interface HinhAnh {
@@ -245,6 +250,7 @@ export const createDefaultXetNghiem = (): XetNghiem => ({
     glucose: null, protein: null, albumin: null, crp: null, procalcitonin: null,
     na: null, k: null, cl: null,
     ph: null, saO2: null, paCO2: null, hcO3: null, be: null,
+    biomarkerBarcode: '',
     sTREM1: null, tIMP1: null, il6: null, il10: null, il17: null,
 });
 

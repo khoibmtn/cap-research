@@ -138,6 +138,7 @@ export default function PatientDetailModal({ patient, onClose }: Props) {
                             <Row label="K⁺" value={xn.k} />
                             <Row label="pH" value={xn.ph} />
                             <Row label="PaCO₂" value={xn.paCO2} />
+                            <Row label="Biomarker BC" value={(xn as { biomarkerBarcode?: string }).biomarkerBarcode} />
                         </div>
                     </Section>
 
@@ -159,6 +160,7 @@ export default function PatientDetailModal({ patient, onClose }: Props) {
                                 {p.hinhAnh.xquangTonThuong.map((t, i) => (
                                     <div key={t.id || i} className="text-sm text-gray-800 pl-3 py-0.5">
                                         Tổn thương {[t.hinhThai, t.dien].filter(Boolean).map(s => s.toLowerCase()).join(' ')} ở {[t.viTri, t.ben].filter(Boolean).map(s => s.toLowerCase()).join(' ') || '—'}
+                                        {(t as { thoiDiem?: string }).thoiDiem && <span className="ml-1 text-xs text-amber-600 font-medium">({(t as { thoiDiem?: string }).thoiDiem})</span>}
                                     </div>
                                 ))}
                             </div>
@@ -170,6 +172,7 @@ export default function PatientDetailModal({ patient, onClose }: Props) {
                                 {p.hinhAnh.ctTonThuong.map((t, i) => (
                                     <div key={t.id || i} className="text-sm text-gray-800 pl-3 py-0.5">
                                         Tổn thương {[t.hinhThai, t.dien].filter(Boolean).map(s => s.toLowerCase()).join(' ')} ở {[t.thuy, t.ben].filter(Boolean).map(s => s.toLowerCase()).join(' ') || '—'}
+                                        {(t as { thoiDiem?: string }).thoiDiem && <span className="ml-1 text-xs text-amber-600 font-medium">({(t as { thoiDiem?: string }).thoiDiem})</span>}
                                     </div>
                                 ))}
                             </div>

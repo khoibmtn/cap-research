@@ -1,5 +1,5 @@
 import type { HinhAnh, XquangTonThuong, CTTonThuong } from '../../types/patient';
-import { XQUANG_VI_TRI, XQUANG_HINH_THAI, CT_THUY, CT_HINH_THAI, CT_DIEN, BEN_OPTIONS } from '../../data/formOptions';
+import { XQUANG_VI_TRI, XQUANG_HINH_THAI, CT_THUY, CT_HINH_THAI, CT_DIEN, BEN_OPTIONS, THOI_DIEM_DIEU_TRI } from '../../data/formOptions';
 import { Plus, Trash2 } from 'lucide-react';
 
 interface Props {
@@ -11,7 +11,7 @@ export default function StepHinhAnh({ data, onChange }: Props) {
     const addXquang = () => {
         onChange({
             ...data,
-            xquangTonThuong: [...data.xquangTonThuong, { id: crypto.randomUUID(), viTri: '', ben: '', hinhThai: '', dien: '' }],
+            xquangTonThuong: [...data.xquangTonThuong, { id: crypto.randomUUID(), viTri: '', ben: '', hinhThai: '', dien: '', thoiDiem: '' }],
         });
     };
 
@@ -32,7 +32,7 @@ export default function StepHinhAnh({ data, onChange }: Props) {
     const addCT = () => {
         onChange({
             ...data,
-            ctTonThuong: [...data.ctTonThuong, { id: crypto.randomUUID(), thuy: '', ben: '', hinhThai: '', dien: '' }],
+            ctTonThuong: [...data.ctTonThuong, { id: crypto.randomUUID(), thuy: '', ben: '', hinhThai: '', dien: '', thoiDiem: '' }],
         });
     };
 
@@ -69,7 +69,7 @@ export default function StepHinhAnh({ data, onChange }: Props) {
                 ) : (
                     <div className="space-y-3">
                         {data.xquangTonThuong.map((x, i) => (
-                            <div key={x.id} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                            <div key={x.id} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg flex-wrap sm:flex-nowrap">
                                 <span className="text-xs text-gray-400 font-mono w-5">{i + 1}.</span>
                                 <select value={x.viTri} onChange={(e) => updateXquang(x.id, 'viTri', e.target.value)}
                                     className="w-32 px-2 py-1.5 rounded border border-gray-200 text-sm">
@@ -90,6 +90,11 @@ export default function StepHinhAnh({ data, onChange }: Props) {
                                     className="w-20 px-2 py-1.5 rounded border border-gray-200 text-sm">
                                     <option value="">Diện</option>
                                     {CT_DIEN.map((d) => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                                <select value={x.thoiDiem || ''} onChange={(e) => updateXquang(x.id, 'thoiDiem', e.target.value)}
+                                    className="w-36 px-2 py-1.5 rounded border border-amber-300 bg-amber-50 text-sm">
+                                    <option value="">Thời điểm</option>
+                                    {THOI_DIEM_DIEU_TRI.map((t) => <option key={t} value={t}>{t}</option>)}
                                 </select>
                                 <button onClick={() => removeXquang(x.id)}
                                     className="p-1.5 text-gray-400 hover:text-red-500 rounded transition-colors">
@@ -137,6 +142,11 @@ export default function StepHinhAnh({ data, onChange }: Props) {
                                     className="w-20 px-2 py-1.5 rounded border border-gray-200 text-sm">
                                     <option value="">Diện</option>
                                     {CT_DIEN.map((d) => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                                <select value={c.thoiDiem || ''} onChange={(e) => updateCT(c.id, 'thoiDiem', e.target.value)}
+                                    className="w-36 px-2 py-1.5 rounded border border-amber-300 bg-amber-50 text-sm">
+                                    <option value="">Thời điểm</option>
+                                    {THOI_DIEM_DIEU_TRI.map((t) => <option key={t} value={t}>{t}</option>)}
                                 </select>
                                 <button onClick={() => removeCT(c.id)}
                                     className="p-1.5 text-gray-400 hover:text-red-500 rounded transition-colors">

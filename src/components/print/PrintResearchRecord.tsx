@@ -272,7 +272,7 @@ function PatientRecord({ patient: p, settings }: { patient: Patient; settings: P
                         <tr><td>PLT (G/l)</td><td>{val(xn.plt)}</td><td>PaCO2</td><td>{val(xn.paCO2)}</td></tr>
                         <tr><td className="lab-header">2. Sinh hóa máu</td><td></td><td>HCO3</td><td>{val(xn.hcO3)}</td></tr>
                         <tr><td>Ure máu (mmol/l)</td><td>{val(xn.ure)}</td><td>BE</td><td>{val(xn.be)}</td></tr>
-                        <tr><td>Creatinin (µmol/l)</td><td>{val(xn.creatinin)}</td><td className="lab-header">Dấu ấn sinh học</td><td></td></tr>
+                        <tr><td>Creatinin (µmol/l)</td><td>{val(xn.creatinin)}</td><td className="lab-header">Dấu ấn sinh học</td><td>BC: {val(xn.biomarkerBarcode)}</td></tr>
                         <tr><td>AST (U/l)</td><td>{val(xn.ast)}</td><td>sTREM-1</td><td>{val(xn.sTREM1)}</td></tr>
                         <tr><td>ALT (U/l)</td><td>{val(xn.alt)}</td><td>TIMP-1</td><td>{val(xn.tIMP1)}</td></tr>
                         <tr><td>GGT (U/l)</td><td>{val(xn.ggt)}</td><td>IL6</td><td>{val(xn.il6)}</td></tr>
@@ -295,7 +295,7 @@ function PatientRecord({ patient: p, settings }: { patient: Patient; settings: P
                     {ha.xquangTonThuong.length > 0 ? (
                         <table className="print-table">
                             <thead>
-                                <tr><th>Vị trí</th><th>Tổn thương</th><th>Diện</th></tr>
+                                <tr><th>Vị trí</th><th>Tổn thương</th><th>Diện</th><th>Thời điểm</th></tr>
                             </thead>
                             <tbody>
                                 {ha.xquangTonThuong.map((t) => (
@@ -303,6 +303,7 @@ function PatientRecord({ patient: p, settings }: { patient: Patient; settings: P
                                         <td>{[t.viTri, t.ben].filter(Boolean).join(', ')}</td>
                                         <td>{t.hinhThai}</td>
                                         <td>{t.dien}</td>
+                                        <td>{(t as { thoiDiem?: string }).thoiDiem || ''}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -315,7 +316,7 @@ function PatientRecord({ patient: p, settings }: { patient: Patient; settings: P
                     {ha.ctTonThuong.length > 0 ? (
                         <table className="print-table">
                             <thead>
-                                <tr><th>Vị trí</th><th>Tổn thương</th><th>Mức độ</th></tr>
+                                <tr><th>Vị trí</th><th>Tổn thương</th><th>Mức độ</th><th>Thời điểm</th></tr>
                             </thead>
                             <tbody>
                                 {ha.ctTonThuong.map((t) => (
@@ -323,6 +324,7 @@ function PatientRecord({ patient: p, settings }: { patient: Patient; settings: P
                                         <td>{[t.thuy, t.ben].filter(Boolean).join(', ')}</td>
                                         <td>{t.hinhThai}</td>
                                         <td>{t.dien}</td>
+                                        <td>{(t as { thoiDiem?: string }).thoiDiem || ''}</td>
                                     </tr>
                                 ))}
                             </tbody>

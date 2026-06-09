@@ -72,6 +72,7 @@ export function exportPatientsToExcel(patients: Patient[]) {
             'PaCO2': p.xetNghiem.paCO2,
             'HCO3': p.xetNghiem.hcO3,
             'BE': p.xetNghiem.be,
+            'Biomarker Barcode': p.xetNghiem.biomarkerBarcode || '',
             'sTREM-1': p.xetNghiem.sTREM1,
             'TIMP-1': p.xetNghiem.tIMP1,
             'IL6': p.xetNghiem.il6,
@@ -100,6 +101,7 @@ export function exportPatientsToExcel(patients: Patient[]) {
             base[`XQ_TonThuong_${i + 1}_ViTri`] = x?.viTri || '';
             base[`XQ_TonThuong_${i + 1}_Ben`] = x?.ben || '';
             base[`XQ_TonThuong_${i + 1}_HinhThai`] = x?.hinhThai || '';
+            base[`XQ_TonThuong_${i + 1}_ThoiDiem`] = (x as { thoiDiem?: string })?.thoiDiem || '';
         }
 
         // Flatten CT tổn thương (max 5)
@@ -109,6 +111,7 @@ export function exportPatientsToExcel(patients: Patient[]) {
             base[`CT_TonThuong_${i + 1}_Ben`] = c?.ben || '';
             base[`CT_TonThuong_${i + 1}_HinhThai`] = c?.hinhThai || '';
             base[`CT_TonThuong_${i + 1}_Dien`] = c?.dien || '';
+            base[`CT_TonThuong_${i + 1}_ThoiDiem`] = (c as { thoiDiem?: string })?.thoiDiem || '';
         }
 
         // Flatten vi khuẩn
