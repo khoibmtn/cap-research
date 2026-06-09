@@ -62,15 +62,8 @@ function spearmanCorrelation(x: number[], y: number[]): number | null {
 }
 
 // ─── Helpers ────────────────────────────────────────────────
-const num = (v: number | null): boolean => v !== null && v !== undefined;
+const num = (v: number | null | undefined): v is number => v !== null && v !== undefined;
 const minMax = (vals: number[]) => vals.length > 0 ? `${Math.min(...vals)} – ${Math.max(...vals)}` : '—';
-
-interface StatRow {
-    label: string;
-    n: number;
-    value: string;
-    subValue?: string;
-}
 
 // ════════════════════════════════════════════════════════════
 // MAIN COMPONENT
