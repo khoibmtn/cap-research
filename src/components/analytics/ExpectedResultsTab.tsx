@@ -1051,7 +1051,7 @@ function Table322({ patients }: { patients: Patient[] }) {
 // 3.2.3: BIOMARKER THEO KẾT CỤC
 // ════════════════════════════════════════════════════════════
 function Table323({ patients }: { patients: Patient[] }) {
-    const [computed, computeVer, triggerCompute] = useComputeP();
+    const [computed, , triggerCompute] = useComputeP();
 
     const data = useMemo(() => {
         const tuVong = patients.filter(p => p.ketCuc?.tuVong);
@@ -1149,7 +1149,7 @@ function Table323({ patients }: { patients: Patient[] }) {
 // 3.2.4: TƯƠNG QUAN BIOMARKER vs PSI / NGÀY ĐT
 // ════════════════════════════════════════════════════════════
 function Table324({ patients }: { patients: Patient[] }) {
-    const [computed, computeVer, triggerCompute] = useComputeP();
+    const [computed, , triggerCompute] = useComputeP();
 
     const data = useMemo(() => {
         const withPSI = patients.filter(p => p.psi.tongDiem > 0);
@@ -1528,7 +1528,6 @@ function computeKaplanMeier(patients: Patient[]): { time: number; survival: numb
 }
 
 function KaplanMeierChart({ patients }: { patients: Patient[] }) {
-    const N = patients.length;
     const kmData = useMemo(() => computeKaplanMeier(patients), [patients]);
 
     const totalEvents = patients.filter(p => p.ketCuc?.tuVong && num(p.ketCuc?.tongSoNgayDieuTri)).length;

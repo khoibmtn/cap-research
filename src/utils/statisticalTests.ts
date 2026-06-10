@@ -41,7 +41,7 @@ function logGamma(x: number): number {
     return -tmp + Math.log(2.5066282746310005 * ser / x);
 }
 
-function chiSquarePValue(chiSq: number, df: number): number {
+export function chiSquarePValue(chiSq: number, df: number): number {
     if (df <= 0 || chiSq <= 0) return 1;
     return 1 - gammaCDF(chiSq, df);
 }
