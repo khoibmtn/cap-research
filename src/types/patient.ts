@@ -15,6 +15,15 @@ export interface HanhChinh {
 }
 
 // ==================== TIỀN SỬ ====================
+export interface ThuocDaDung {
+    id: string;
+    tenThuoc: string;
+    lieuLuong: string;
+    tongLieu: string;
+    duongDung: string;
+    thoiGianDung: number | null; // ngày
+}
+
 export interface TienSu {
     daiThaoDuong: boolean;
     tangHuyetAp: boolean;
@@ -28,6 +37,7 @@ export interface TienSu {
     khac: string;
     hutThuocLa: boolean;
     soBaoNam: number | null;
+    thuocDaDung: ThuocDaDung[];
 }
 
 // ==================== LÂM SÀNG ====================
@@ -230,6 +240,7 @@ export const createDefaultTienSu = (): TienSu => ({
     viemGanMan: false, benhThanMan: false, gut: false,
     ungThu: false, suyTimUHuyet: false, benhMachMauNao: false,
     khac: '', hutThuocLa: false, soBaoNam: null,
+    thuocDaDung: [],
 });
 
 export const createDefaultLamSang = (): LamSang => ({

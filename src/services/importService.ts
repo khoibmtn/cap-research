@@ -73,6 +73,7 @@ function rowToPatient(row: Record<string, unknown>): Omit<Patient, 'id' | 'creat
         khac: str(row['Tiền sử khác']),
         hutThuocLa: bool(row['Hút thuốc lá']),
         soBaoNam: num(row['Số bao-năm']),
+        thuocDaDung: [],
     };
 
     const lamSang = {
@@ -270,6 +271,7 @@ function computeDiffs(
     addDiff(diffs, 'Tiền sử khác', tsOld.khac, tsNew.khac);
     addDiff(diffs, 'Hút thuốc lá', tsOld.hutThuocLa, tsNew.hutThuocLa);
     addDiff(diffs, 'Số bao-năm', tsOld.soBaoNam, tsNew.soBaoNam);
+    addDiff(diffs, 'Thuốc đã dùng', stableStringify(tsOld.thuocDaDung), stableStringify(tsNew.thuocDaDung));
 
     // Lâm sàng
     const lsOld = existing.lamSang, lsNew = incoming.lamSang;

@@ -273,9 +273,13 @@ export default function PatientFormPage() {
         if (!validate()) return false;
 
         // Inject calculated values at save time (not in useEffect to avoid focus loss)
+        // Filter out medication entries without a drug name
+        const cleanedThuocDaDung = (formData.tienSu.thuocDaDung || []).filter(t => t.tenThuoc.trim());
+
         const dataToSave: FormData = {
             ...formData,
             hanhChinh: { ...formData.hanhChinh, hoTen: formData.hanhChinh.hoTen.toUpperCase() },
+            tienSu: { ...formData.tienSu, thuocDaDung: cleanedThuocDaDung },
             chiSoTinhToan: { nlr: indices.nlr, plr: indices.plr, car: indices.car },
             psi: { ...formData.psi, tongDiem: psiResult.tongDiem, phanTang: psiResult.phanTang },
         };

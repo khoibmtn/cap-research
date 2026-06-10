@@ -57,6 +57,8 @@ export const MUC_DO_KHANG_SINH = [
 
 export const DOM_TINH_OPTIONS = ['Trong', 'Nhầy', 'Đục'];
 
+export const DUONG_DUNG_THUOC = ['Uống', 'Tiêm tĩnh mạch', 'Tiêm bắp', 'Tiêm dưới da', 'Truyền tĩnh mạch', 'Khí dung', 'Khác'];
+
 export const DEFAULT_NOI_O = ['Nông thôn', 'Thành thị', 'Hải đảo'];
 
 export const DEFAULT_DIEN_BIEN_DIEU_TRI = ['Thở máy', 'Sốc nhiễm khuẩn', 'Lọc máu'];

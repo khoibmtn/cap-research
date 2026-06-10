@@ -108,6 +108,20 @@ export default function PatientDetailModal({ patient, onClose }: Props) {
                     {/* Tiền sử */}
                     <Section title="Tiền sử">
                         <Row label="Bệnh nền" value={tienSuList.length ? tienSuList.join(', ') : 'Không'} />
+                        {ts.thuocDaDung?.length > 0 && (
+                            <div className="mt-2">
+                                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Thuốc đã dùng trước nhập viện</span>
+                                {ts.thuocDaDung.map((t, i) => (
+                                    <div key={t.id || i} className="text-sm text-gray-800 pl-3 py-0.5">
+                                        {i + 1}. {t.tenThuoc || '—'}
+                                        {t.lieuLuong && `, liều ${t.lieuLuong}`}
+                                        {t.tongLieu && `, tổng ${t.tongLieu}`}
+                                        {t.duongDung && ` (${t.duongDung})`}
+                                        {t.thoiGianDung != null && `, ${t.thoiGianDung} ngày`}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </Section>
 
                     {/* Lâm sàng */}

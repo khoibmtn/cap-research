@@ -180,6 +180,28 @@ function PatientRecord({ patient: p, settings }: { patient: Patient; settings: P
                     <span>Hút thuốc lá: {CB(ts.hutThuocLa)} có {CB(!ts.hutThuocLa)} không</span>
                     {ts.hutThuocLa && <span>Số bao-năm: {dotFill(ts.soBaoNam)}</span>}
                 </div>
+                {/* Thuốc đã dùng trước nhập viện */}
+                <div style={{ marginTop: 8 }}>
+                    <strong>* Thuốc đã dùng trước nhập viện:</strong>
+                    {ts.thuocDaDung?.length > 0 ? (
+                        <table className="print-table" style={{ marginTop: 4 }}>
+                            <thead>
+                                <tr><th>Tên thuốc</th><th>Liều lượng</th><th>Tổng liều</th><th>Đường dùng</th><th>Thời gian (ngày)</th></tr>
+                            </thead>
+                            <tbody>
+                                {ts.thuocDaDung.map((t) => (
+                                    <tr key={t.id}>
+                                        <td>{t.tenThuoc}</td>
+                                        <td>{t.lieuLuong}</td>
+                                        <td>{t.tongLieu}</td>
+                                        <td>{t.duongDung}</td>
+                                        <td>{val(t.thoiGianDung)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : <span> Không</span>}
+                </div>
             </div>
 
             {/* ══════ C. TRIỆU CHỨNG LÂM SÀNG ══════ */}

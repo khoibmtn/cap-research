@@ -114,6 +114,16 @@ export function exportPatientsToExcel(patients: Patient[]) {
             base[`CT_TonThuong_${i + 1}_ThoiDiem`] = (c as { thoiDiem?: string })?.thoiDiem || '';
         }
 
+        // Flatten thuốc đã dùng trước nhập viện (max 10)
+        for (let i = 0; i < 10; i++) {
+            const t = p.tienSu?.thuocDaDung?.[i];
+            base[`Thuoc_${i + 1}_Ten`] = t?.tenThuoc || '';
+            base[`Thuoc_${i + 1}_LieuLuong`] = t?.lieuLuong || '';
+            base[`Thuoc_${i + 1}_TongLieu`] = t?.tongLieu || '';
+            base[`Thuoc_${i + 1}_DuongDung`] = t?.duongDung || '';
+            base[`Thuoc_${i + 1}_ThoiGian`] = t?.thoiGianDung ?? '';
+        }
+
         // Flatten vi khuẩn
         p.viKhuan?.forEach((vk) => {
             base[`VK_${vk.tenViKhuan}`] = vk.coKhong ? 'Có' : 'Không';

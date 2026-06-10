@@ -29,7 +29,7 @@ const p1: MockPatient = {
         daiThaoDuong: false, tangHuyetAp: false, viemDaDay: false,
         viemGanMan: false, benhThanMan: false, gut: false,
         ungThu: false, suyTimUHuyet: false, benhMachMauNao: false,
-        khac: '', hutThuocLa: true, soBaoNam: 8,
+        khac: '', hutThuocLa: true, soBaoNam: 8, thuocDaDung: [],
     },
     lamSang: {
         thoiDiemTrieuChung: '02/02/2026',
@@ -116,7 +116,7 @@ const p2: MockPatient = {
         daiThaoDuong: false, tangHuyetAp: false, viemDaDay: true,
         viemGanMan: false, benhThanMan: false, gut: false,
         ungThu: false, suyTimUHuyet: false, benhMachMauNao: false,
-        khac: '', hutThuocLa: false, soBaoNam: null,
+        khac: '', hutThuocLa: false, soBaoNam: null, thuocDaDung: [],
     },
     lamSang: {
         thoiDiemTrieuChung: '06/02/2026',
@@ -202,7 +202,7 @@ const p3: MockPatient = {
         daiThaoDuong: false, tangHuyetAp: true, viemDaDay: false,
         viemGanMan: false, benhThanMan: false, gut: false,
         ungThu: false, suyTimUHuyet: false, benhMachMauNao: false,
-        khac: 'COPD nhẹ', hutThuocLa: true, soBaoNam: 25,
+        khac: 'COPD nhẹ', hutThuocLa: true, soBaoNam: 25, thuocDaDung: [],
     },
     lamSang: {
         thoiDiemTrieuChung: '12/03/2026',
@@ -292,7 +292,7 @@ const p4: MockPatient = {
         daiThaoDuong: true, tangHuyetAp: true, viemDaDay: false,
         viemGanMan: false, benhThanMan: false, gut: false,
         ungThu: false, suyTimUHuyet: false, benhMachMauNao: false,
-        khac: '', hutThuocLa: false, soBaoNam: null,
+        khac: '', hutThuocLa: false, soBaoNam: null, thuocDaDung: [],
     },
     lamSang: {
         thoiDiemTrieuChung: '17/04/2026',
@@ -386,7 +386,7 @@ const p5: MockPatient = {
         daiThaoDuong: false, tangHuyetAp: true, viemDaDay: false,
         viemGanMan: false, benhThanMan: false, gut: true,
         ungThu: false, suyTimUHuyet: true, benhMachMauNao: false,
-        khac: '', hutThuocLa: true, soBaoNam: 30,
+        khac: '', hutThuocLa: true, soBaoNam: 30, thuocDaDung: [],
     },
     lamSang: {
         thoiDiemTrieuChung: '28/04/2026',
@@ -477,7 +477,7 @@ const p6: MockPatient = {
         daiThaoDuong: true, tangHuyetAp: false, viemDaDay: true,
         viemGanMan: false, benhThanMan: false, gut: false,
         ungThu: false, suyTimUHuyet: false, benhMachMauNao: false,
-        khac: '', hutThuocLa: false, soBaoNam: null,
+        khac: '', hutThuocLa: false, soBaoNam: null, thuocDaDung: [],
     },
     lamSang: {
         thoiDiemTrieuChung: '07/06/2026',
@@ -572,7 +572,7 @@ const p7: MockPatient = {
         daiThaoDuong: true, tangHuyetAp: true, viemDaDay: false,
         viemGanMan: true, benhThanMan: false, gut: false,
         ungThu: false, suyTimUHuyet: false, benhMachMauNao: true,
-        khac: '', hutThuocLa: true, soBaoNam: 40,
+        khac: '', hutThuocLa: true, soBaoNam: 40, thuocDaDung: [],
     },
     lamSang: {
         thoiDiemTrieuChung: '02/07/2026',
@@ -669,7 +669,7 @@ const p8: MockPatient = {
         daiThaoDuong: true, tangHuyetAp: true, viemDaDay: false,
         viemGanMan: false, benhThanMan: true, gut: false,
         ungThu: false, suyTimUHuyet: true, benhMachMauNao: true,
-        khac: 'COPD nặng', hutThuocLa: true, soBaoNam: 50,
+        khac: 'COPD nặng', hutThuocLa: true, soBaoNam: 50, thuocDaDung: [],
     },
     lamSang: {
         thoiDiemTrieuChung: '12/08/2026',
@@ -763,7 +763,7 @@ const p9: MockPatient = {
         daiThaoDuong: true, tangHuyetAp: true, viemDaDay: true,
         viemGanMan: false, benhThanMan: true, gut: false,
         ungThu: false, suyTimUHuyet: true, benhMachMauNao: false,
-        khac: 'Hen phế quản', hutThuocLa: false, soBaoNam: null,
+        khac: 'Hen phế quản', hutThuocLa: false, soBaoNam: null, thuocDaDung: [],
     },
     lamSang: {
         thoiDiemTrieuChung: '17/09/2026',
