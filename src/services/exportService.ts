@@ -117,6 +117,7 @@ export function exportPatientsToExcel(patients: Patient[]) {
         // Flatten thuốc đã dùng trước nhập viện (max 10)
         for (let i = 0; i < 10; i++) {
             const t = p.tienSu?.thuocDaDung?.[i];
+            base[`Thuoc_${i + 1}_TenGoc`] = t?.tenGoc || '';
             base[`Thuoc_${i + 1}_Ten`] = t?.tenThuoc || '';
             base[`Thuoc_${i + 1}_LieuLuong`] = t?.lieuLuong || '';
             base[`Thuoc_${i + 1}_TongLieu`] = t?.tongLieu || '';

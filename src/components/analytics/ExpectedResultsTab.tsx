@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
-import type { Patient } from '../../types/patient';
+import { useMemo, useState } from 'react';
+import type { Patient, DrugGenericName } from '../../types/patient';
 import { mean, sd, median, q1, q3, meanSd, frac, pct, psiClass } from '../../utils/statsHelpers';
-import { AlertTriangle, Info, BookOpen } from 'lucide-react';
+import { mannWhitneyU, spearmanPValue, formatPValue, pSignificance } from '../../utils/statisticalTests';
+import { AlertTriangle, Info, BookOpen, Calculator } from 'lucide-react';
 
 // ─── VK classification mapping ──────────────────────────────
 const VK_DIEN_HINH = new Set([
@@ -68,7 +69,13 @@ const minMax = (vals: number[]) => vals.length > 0 ? `${Math.min(...vals)} – $
 // ════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ════════════════════════════════════════════════════════════
-export default function ExpectedResultsTab({ patients }: { patients: Patient[] }) {
+interface ExpectedResultsProps {
+    patients: Patient[];
+    drugGroup1?: string[];
+    drugGroup2?: DrugGenericName[];
+}
+
+export default function ExpectedResultsTab({ patients, drugGroup1 = [], drugGroup2 = [] }: ExpectedResultsProps) {
     const N = patients.length;
 
     return (
@@ -119,6 +126,18 @@ export default function ExpectedResultsTab({ patients }: { patients: Patient[] }
 
             {/* ── 3.2.4: Tương quan ── */}
             <Table324 patients={patients} />
+
+            {/* ── 3.3: Thuốc đã dùng trước nhập viện ── */}
+            <Table33Drug patients={patients} drugGroup1={drugGroup1.length > 0 ? drugGroup1 : ['Kháng sinh', 'Corticoid']} drugGroup2={drugGroup2} />
+
+            {/* ── 3.4: Diễn biến điều trị & kết cục ── */}
+            <Table34Outcome patients={patients} />
+
+            {/* ── 3.5: Thời gian sử dụng kháng sinh ── */}
+            <Table35KS patients={patients} />
+
+            {/* ── Kaplan-Meier Survival Curve ── */}
+            <KaplanMeierChart patients={patients} />
 
             {/* ── Ghi chú ── */}
             <NotesSection />
@@ -237,6 +256,29 @@ function Table311({ patients }: { patients: Patient[] }) {
         return { ages, males, females, bmis, ngheNghiep, noiO, tienSuItems, hutThuoc, soBaoNam, ngayDT, tuVong, xuatVien, xinVe };
     }, [patients]);
 
+    // Tiền sử dùng kháng sinh trước nhập viện
+    const dungKS = patients.filter(p => (p.tienSu?.thuocDaDung || []).length > 0).length;
+
+    // Thời gian khởi bệnh đến nhập viện (ngày)
+    const parseDate = (s: string): Date | null => {
+        if (!s) return null;
+        if (s.includes('-')) { const d = new Date(s); return isNaN(d.getTime()) ? null : d; }
+        const parts = s.split('/');
+        if (parts.length !== 3) return null;
+        const [d, m, y] = parts.map(Number);
+        if (!d || !m || !y) return null;
+        return new Date(y, m - 1, d);
+    };
+    const thoiGianKhoiBenh = patients
+        .map(p => {
+            const ngayKhoi = parseDate(p.lamSang.thoiDiemTrieuChung);
+            const ngayVao = parseDate(p.hanhChinh.ngayVaoVien);
+            if (!ngayKhoi || !ngayVao) return null;
+            const diff = Math.round((ngayVao.getTime() - ngayKhoi.getTime()) / (1000 * 60 * 60 * 24));
+            return diff >= 0 ? diff : null;
+        })
+        .filter(num);
+
     const rows: (string | React.ReactNode)[][] = [
         ['Tổng số bệnh nhân', String(N), '100%'],
         ['Tuổi (Mean ± SD)', data.ages.length > 0 ? meanSd(data.ages) : '—', data.ages.length > 0 ? minMax(data.ages) : '—'],
@@ -267,6 +309,12 @@ function Table311({ patients }: { patients: Patient[] }) {
         rows.push(['  Số bao-năm (Mean ± SD)', meanSd(data.soBaoNam), `n = ${data.soBaoNam.length}`]);
     }
 
+    // Tiền sử dùng thuốc
+    rows.push(['Dùng thuốc trước nhập viện', String(dungKS), pct(dungKS, N)]);
+
+    // Thời gian khởi bệnh đến nhập viện
+    rows.push(['Thời gian khởi bệnh → nhập viện (ngày)', thoiGianKhoiBenh.length > 0 ? meanSd(thoiGianKhoiBenh) : '—', thoiGianKhoiBenh.length > 0 ? `Median: ${median(thoiGianKhoiBenh).toFixed(0)}, n = ${thoiGianKhoiBenh.length}` : '—']);
+
     rows.push(['Số ngày điều trị (Mean ± SD)', data.ngayDT.length > 0 ? meanSd(data.ngayDT) : '—', data.ngayDT.length > 0 ? minMax(data.ngayDT) : '—']);
     rows.push(['Kết cục', '', '']);
     rows.push(['  Xuất viện', String(data.xuatVien), pct(data.xuatVien, N)]);
@@ -278,7 +326,6 @@ function Table311({ patients }: { patients: Patient[] }) {
             id="table-311"
             title="Bảng 3.1 — Đặc điểm chung của đối tượng nghiên cứu"
             subtitle="Mục 3.1.1: Phân bố tuổi, giới, nghề nghiệp, nơi cư trú, yếu tố nguy cơ"
-            note="Thiếu biến: Tiền sử dùng kháng sinh trước nhập viện (chưa có trong hệ thống). Thời gian khởi bệnh đến nhập viện chỉ tính được khi có ngày khởi bệnh rõ ràng."
         >
             <DataTable
                 headers={['Đặc điểm', 'n / Giá trị', '% / Ghi chú']}
@@ -314,12 +361,36 @@ function Table312({ patients }: { patients: Patient[] }) {
         const spO2 = patients.map(p => p.lamSang.spO2).filter(num);
         const glasgow = patients.map(p => p.lamSang.diemGlasgow).filter(num);
 
-        return { sot, hoKhan, hoMau, hoKhacDom, khoTho, dauNguc, ranAm, ranNo, ranRit, ranNgay, hcTDMP, hcDongDac, hcTKMP, mach, nhietDo, nhipTho, spO2, glasgow };
+        // Parse huyết áp: "120/80" → systolic + diastolic
+        const systolic: number[] = [];
+        const diastolic: number[] = [];
+        patients.forEach(p => {
+            const ha = p.lamSang.huyetAp;
+            if (ha && ha.includes('/')) {
+                const [s, d] = ha.split('/').map(Number);
+                if (s > 0) systolic.push(s);
+                if (d > 0) diastolic.push(d);
+            }
+        });
+
+        // Đờm
+        const domTinhCounts: Record<string, number> = {};
+        const domMauSacCounts: Record<string, number> = {};
+        patients.forEach(p => {
+            p.lamSang.domTinh?.forEach(dt => {
+                if (dt) domTinhCounts[dt] = (domTinhCounts[dt] || 0) + 1;
+            });
+            if (p.lamSang.domMauSac) domMauSacCounts[p.lamSang.domMauSac] = (domMauSacCounts[p.lamSang.domMauSac] || 0) + 1;
+        });
+
+        return { sot, hoKhan, hoMau, hoKhacDom, khoTho, dauNguc, ranAm, ranNo, ranRit, ranNgay, hcTDMP, hcDongDac, hcTKMP, mach, nhietDo, nhipTho, spO2, glasgow, systolic, diastolic, domTinhCounts, domMauSacCounts };
     }, [patients]);
 
     const rows: (string | React.ReactNode)[][] = [
         ['Sinh hiệu lúc nhập viện', '', ''],
         ['  Mạch (lần/phút)', data.mach.length > 0 ? meanSd(data.mach) : '—', `n = ${data.mach.length}`],
+        ['  HA tâm thu (mmHg)', data.systolic.length > 0 ? meanSd(data.systolic) : '—', `n = ${data.systolic.length}`],
+        ['  HA tâm trương (mmHg)', data.diastolic.length > 0 ? meanSd(data.diastolic) : '—', `n = ${data.diastolic.length}`],
         ['  Nhiệt độ (°C)', data.nhietDo.length > 0 ? meanSd(data.nhietDo) : '—', `n = ${data.nhietDo.length}`],
         ['  Nhịp thở (lần/phút)', data.nhipTho.length > 0 ? meanSd(data.nhipTho) : '—', `n = ${data.nhipTho.length}`],
         ['  SpO₂ (%)', data.spO2.length > 0 ? meanSd(data.spO2) : '—', `n = ${data.spO2.length}`],
@@ -331,6 +402,21 @@ function Table312({ patients }: { patients: Patient[] }) {
         ['  Ho máu', String(data.hoMau), pct(data.hoMau, N)],
         ['  Khó thở', String(data.khoTho), pct(data.khoTho, N)],
         ['  Đau ngực', String(data.dauNguc), pct(data.dauNguc, N)],
+    ];
+    // Đờm
+    if (Object.keys(data.domTinhCounts).length > 0 || Object.keys(data.domMauSacCounts).length > 0) {
+        rows.push(['Tính chất đờm', '', '']);
+        Object.entries(data.domTinhCounts).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => {
+            rows.push([`  ${k}`, String(v), pct(v, N)]);
+        });
+        if (Object.keys(data.domMauSacCounts).length > 0) {
+            rows.push(['Màu sắc đờm', '', '']);
+            Object.entries(data.domMauSacCounts).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => {
+                rows.push([`  ${k}`, String(v), pct(v, N)]);
+            });
+        }
+    }
+    rows.push(
         ['Triệu chứng thực thể', '', ''],
         ['  Ran ẩm', String(data.ranAm), pct(data.ranAm, N)],
         ['  Ran nổ', String(data.ranNo), pct(data.ranNo, N)],
@@ -340,7 +426,7 @@ function Table312({ patients }: { patients: Patient[] }) {
         ['  Hội chứng TDMP', String(data.hcTDMP), pct(data.hcTDMP, N)],
         ['  Hội chứng đông đặc', String(data.hcDongDac), pct(data.hcDongDac, N)],
         ['  Hội chứng TKMP', String(data.hcTKMP), pct(data.hcTKMP, N)],
-    ];
+    );
 
     return (
         <SectionCard
@@ -376,6 +462,7 @@ function Table313({ patients }: { patients: Patient[] }) {
             creatinin: extract(p => p.xetNghiem.creatinin),
             ast: extract(p => p.xetNghiem.ast),
             alt: extract(p => p.xetNghiem.alt),
+            ggt: extract(p => p.xetNghiem.ggt),
             glucose: extract(p => p.xetNghiem.glucose),
             protein: extract(p => p.xetNghiem.protein),
             albumin: extract(p => p.xetNghiem.albumin),
@@ -420,6 +507,7 @@ function Table313({ patients }: { patients: Patient[] }) {
         makeRow('  Creatinin', data.creatinin, 'µmol/L'),
         makeRow('  AST', data.ast, 'U/L'),
         makeRow('  ALT', data.alt, 'U/L'),
+        makeRow('  GGT', data.ggt, 'U/L'),
         makeRow('  Glucose', data.glucose, 'mmol/L'),
         makeRow('  Protein', data.protein, 'g/L'),
         makeRow('  Albumin', data.albumin, 'g/L'),
@@ -501,73 +589,159 @@ function Table314({ patients }: { patients: Patient[] }) {
 // ════════════════════════════════════════════════════════════
 // 3.1.5: HÌNH ẢNH HỌC
 // ════════════════════════════════════════════════════════════
+const THOI_DIEM_COLS = ['Trước điều trị', 'Trong điều trị', 'Kết thúc điều trị'] as const;
+
 function Table315({ patients }: { patients: Patient[] }) {
     const N = patients.length;
+
     const data = useMemo(() => {
-        // X-quang
-        const hasXQ = patients.filter(p => p.hinhAnh.xquangTonThuong?.length > 0).length;
-        const xqViTri: Record<string, number> = {};
-        const xqBen: Record<string, number> = {};
-        const xqHinhThai: Record<string, number> = {};
-        patients.forEach(p => {
-            p.hinhAnh.xquangTonThuong?.forEach(t => {
-                if (t.viTri) xqViTri[t.viTri] = (xqViTri[t.viTri] || 0) + 1;
-                if (t.ben) xqBen[t.ben] = (xqBen[t.ben] || 0) + 1;
-                if (t.hinhThai) xqHinhThai[t.hinhThai] = (xqHinhThai[t.hinhThai] || 0) + 1;
-            });
+        // Helper: count by thoiDiem for a set of lesion records
+        type CountByTD = Record<string, number>;
+        const countByTD = (): Record<string, CountByTD> => ({
+            'Trước điều trị': {},
+            'Trong điều trị': {},
+            'Kết thúc điều trị': {},
         });
-        const xqTDMP = patients.filter(p => p.hinhAnh.xquangTranDichMangPhoi).length;
-        const xqTKMP = patients.filter(p => p.hinhAnh.xquangTranKhiMangPhoi).length;
+
+        // X-quang
+        const hasXQ: Record<string, number> = { 'Trước điều trị': 0, 'Trong điều trị': 0, 'Kết thúc điều trị': 0 };
+        const xqViTri = countByTD();
+        const xqBen = countByTD();
+        const xqHinhThai = countByTD();
+
+        patients.forEach(p => {
+            const byTD: Record<string, boolean> = {};
+            p.hinhAnh.xquangTonThuong?.forEach(t => {
+                const td = t.thoiDiem || '';
+                if (!td) return;
+                byTD[td] = true;
+                if (t.viTri) xqViTri[td][t.viTri] = (xqViTri[td][t.viTri] || 0) + 1;
+                if (t.ben) xqBen[td][t.ben] = (xqBen[td][t.ben] || 0) + 1;
+                if (t.hinhThai) xqHinhThai[td][t.hinhThai] = (xqHinhThai[td][t.hinhThai] || 0) + 1;
+            });
+            THOI_DIEM_COLS.forEach(td => { if (byTD[td]) hasXQ[td]++; });
+        });
+
+
 
         // CT
-        const hasCT = patients.filter(p => p.hinhAnh.ctTonThuong?.length > 0).length;
-        const ctThuy: Record<string, number> = {};
-        const ctBen: Record<string, number> = {};
-        const ctHinhThai: Record<string, number> = {};
-        const ctDien: Record<string, number> = {};
-        patients.forEach(p => {
-            p.hinhAnh.ctTonThuong?.forEach(t => {
-                if (t.thuy) ctThuy[t.thuy] = (ctThuy[t.thuy] || 0) + 1;
-                if (t.ben) ctBen[t.ben] = (ctBen[t.ben] || 0) + 1;
-                if (t.hinhThai) ctHinhThai[t.hinhThai] = (ctHinhThai[t.hinhThai] || 0) + 1;
-                if (t.dien) ctDien[t.dien] = (ctDien[t.dien] || 0) + 1;
-            });
-        });
-        const ctTDMP = patients.filter(p => p.hinhAnh.ctTranDichMangPhoi).length;
-        const ctTKMP = patients.filter(p => p.hinhAnh.ctTranKhiMangPhoi).length;
+        const hasCT: Record<string, number> = { 'Trước điều trị': 0, 'Trong điều trị': 0, 'Kết thúc điều trị': 0 };
+        const ctThuy = countByTD();
+        const ctBen = countByTD();
+        const ctHinhThai = countByTD();
+        const ctDien = countByTD();
 
-        return { hasXQ, xqViTri, xqBen, xqHinhThai, xqTDMP, xqTKMP, hasCT, ctThuy, ctBen, ctHinhThai, ctDien, ctTDMP, ctTKMP };
+        patients.forEach(p => {
+            const byTD: Record<string, boolean> = {};
+            p.hinhAnh.ctTonThuong?.forEach(t => {
+                const td = t.thoiDiem || '';
+                if (!td) return;
+                byTD[td] = true;
+                if (t.thuy) ctThuy[td][t.thuy] = (ctThuy[td][t.thuy] || 0) + 1;
+                if (t.ben) ctBen[td][t.ben] = (ctBen[td][t.ben] || 0) + 1;
+                if (t.hinhThai) ctHinhThai[td][t.hinhThai] = (ctHinhThai[td][t.hinhThai] || 0) + 1;
+                if (t.dien) ctDien[td][t.dien] = (ctDien[td][t.dien] || 0) + 1;
+            });
+            THOI_DIEM_COLS.forEach(td => { if (byTD[td]) hasCT[td]++; });
+        });
+
+
+
+        return { hasXQ, xqViTri, xqBen, xqHinhThai, hasCT, ctThuy, ctBen, ctHinhThai, ctDien };
     }, [patients]);
 
-    const rows: (string | React.ReactNode)[][] = [
-        ['X-QUANG NGỰC', '', ''],
-        ['  Có tổn thương trên Xquang', String(data.hasXQ), pct(data.hasXQ, N)],
-    ];
-    Object.entries(data.xqViTri).forEach(([k, v]) => rows.push([`  Vị trí: ${k}`, String(v), pct(v, N)]));
-    Object.entries(data.xqBen).forEach(([k, v]) => rows.push([`  Bên: ${k}`, String(v), pct(v, N)]));
-    Object.entries(data.xqHinhThai).forEach(([k, v]) => rows.push([`  Hình thái: ${k}`, String(v), pct(v, N)]));
-    rows.push(['  TDMP', String(data.xqTDMP), pct(data.xqTDMP, N)]);
-    rows.push(['  TKMP', String(data.xqTKMP), pct(data.xqTKMP, N)]);
+    // Helper: build row with 3 time-point columns [label, truoc_n, truoc_%, trong_n, trong_%, sau_n, sau_%]
+    const tdRow = (label: string, byTD: Record<string, Record<string, number>>, key: string): (string | React.ReactNode)[] => {
+        return [
+            label,
+            ...THOI_DIEM_COLS.flatMap(td => {
+                const v = byTD[td]?.[key] || 0;
+                return [String(v), v > 0 ? pct(v, N) : '—'];
+            }),
+        ];
+    };
 
-    rows.push(['CT SCANNER NGỰC', '', '']);
-    rows.push(['  Có tổn thương trên CT', String(data.hasCT), pct(data.hasCT, N)]);
-    Object.entries(data.ctThuy).forEach(([k, v]) => rows.push([`  Thuỳ: ${k}`, String(v), pct(v, N)]));
-    Object.entries(data.ctBen).forEach(([k, v]) => rows.push([`  Bên: ${k}`, String(v), pct(v, N)]));
-    Object.entries(data.ctHinhThai).forEach(([k, v]) => rows.push([`  Hình thái: ${k}`, String(v), pct(v, N)]));
-    Object.entries(data.ctDien).forEach(([k, v]) => rows.push([`  Diện: ${k}`, String(v), pct(v, N)]));
-    rows.push(['  TDMP', String(data.ctTDMP), pct(data.ctTDMP, N)]);
-    rows.push(['  TKMP', String(data.ctTKMP), pct(data.ctTKMP, N)]);
+    const tdRowSimple = (label: string, vals: Record<string, number>): (string | React.ReactNode)[] => {
+        return [
+            label,
+            ...THOI_DIEM_COLS.flatMap(td => {
+                const v = vals[td] || 0;
+                return [String(v), v > 0 ? pct(v, N) : '—'];
+            }),
+        ];
+    };
+
+    // Collect all unique keys across time points
+    const allKeys = (byTD: Record<string, Record<string, number>>) => {
+        const keys = new Set<string>();
+        THOI_DIEM_COLS.forEach(td => Object.keys(byTD[td]).forEach(k => keys.add(k)));
+        return Array.from(keys);
+    };
+
+    const emptyTDRow = (label: string): (string | React.ReactNode)[] => [label, '', '', '', '', '', ''];
+
+    const rows: (string | React.ReactNode)[][] = [
+        emptyTDRow('X-QUANG NGỰC'),
+        tdRowSimple('  Có tổn thương trên Xquang', data.hasXQ),
+    ];
+    allKeys(data.xqViTri).forEach(k => rows.push(tdRow(`  Vị trí: ${k}`, data.xqViTri, k)));
+    allKeys(data.xqBen).forEach(k => rows.push(tdRow(`  Bên: ${k}`, data.xqBen, k)));
+    allKeys(data.xqHinhThai).forEach(k => rows.push(tdRow(`  Hình thái: ${k}`, data.xqHinhThai, k)));
+
+
+    rows.push(emptyTDRow('CT SCANNER NGỰC'));
+    rows.push(tdRowSimple('  Có tổn thương trên CT', data.hasCT));
+    allKeys(data.ctThuy).forEach(k => rows.push(tdRow(`  Thuỳ: ${k}`, data.ctThuy, k)));
+    allKeys(data.ctBen).forEach(k => rows.push(tdRow(`  Bên: ${k}`, data.ctBen, k)));
+    allKeys(data.ctHinhThai).forEach(k => rows.push(tdRow(`  Hình thái: ${k}`, data.ctHinhThai, k)));
+    allKeys(data.ctDien).forEach(k => rows.push(tdRow(`  Diện: ${k}`, data.ctDien, k)));
+
 
     return (
         <SectionCard
             id="table-315"
             title="Bảng 3.5 — Đặc điểm hình ảnh học"
-            subtitle="Mục 3.1.2: Kết quả X-quang/CT ngực — vị trí, hình thái, mức độ tổn thương"
+            subtitle="Mục 3.1.2: Kết quả X-quang/CT ngực — vị trí, hình thái, mức độ tổn thương theo thời điểm điều trị"
         >
-            <DataTable
-                headers={['Đặc điểm hình ảnh', 'n', '%']}
-                rows={rows}
-            />
+            <div className="overflow-x-auto">
+                <table className="min-w-full text-sm border-collapse">
+                    <thead>
+                        <tr className="bg-gray-50">
+                            <th rowSpan={2} className="p-2.5 border border-gray-200 font-semibold text-gray-700 text-left whitespace-nowrap align-bottom">
+                                Đặc điểm hình ảnh
+                            </th>
+                            <th colSpan={2} className="p-2 border border-gray-200 font-semibold text-gray-700 text-center bg-blue-50">
+                                Trước ĐT
+                            </th>
+                            <th colSpan={2} className="p-2 border border-gray-200 font-semibold text-gray-700 text-center bg-amber-50">
+                                Trong ĐT
+                            </th>
+                            <th colSpan={2} className="p-2 border border-gray-200 font-semibold text-gray-700 text-center bg-green-50">
+                                Kết thúc ĐT
+                            </th>
+                        </tr>
+                        <tr className="bg-gray-50">
+                            <th className="p-2 border border-gray-200 font-medium text-gray-600 text-center text-xs bg-blue-50/60">n</th>
+                            <th className="p-2 border border-gray-200 font-medium text-gray-600 text-center text-xs bg-blue-50/60">%</th>
+                            <th className="p-2 border border-gray-200 font-medium text-gray-600 text-center text-xs bg-amber-50/60">n</th>
+                            <th className="p-2 border border-gray-200 font-medium text-gray-600 text-center text-xs bg-amber-50/60">%</th>
+                            <th className="p-2 border border-gray-200 font-medium text-gray-600 text-center text-xs bg-green-50/60">n</th>
+                            <th className="p-2 border border-gray-200 font-medium text-gray-600 text-center text-xs bg-green-50/60">%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows.map((row, ri) => (
+                            <tr key={ri} className="hover:bg-gray-50/80">
+                                {row.map((cell, ci) => (
+                                    <td key={ci} className={`p-2.5 border border-gray-200 ${ci === 0 ? 'font-medium text-gray-800' : 'text-center text-gray-600'}`}>
+                                        {cell}
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </SectionCard>
     );
 }
@@ -710,9 +884,52 @@ function Table317({ patients }: { patients: Patient[] }) {
 }
 
 // ════════════════════════════════════════════════════════════
+// SHARED: P-value cell renderer
+// ════════════════════════════════════════════════════════════
+function PCell({ p }: { p: number | null | undefined }) {
+    if (p === null || p === undefined) return <span className="text-gray-400 italic text-xs">n/a</span>;
+    const sig = pSignificance(p);
+    const cls = sig === 'significant' ? 'text-red-600 font-bold' : sig === 'trend' ? 'text-amber-600 font-medium' : 'text-gray-600';
+    return <span className={`text-xs ${cls}`}>{formatPValue(p)}{sig === 'significant' ? ' *' : ''}</span>;
+}
+
+function PValueDisclaimer() {
+    return (
+        <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <span>
+                <strong>Kết quả tham khảo:</strong> Giá trị p được tính bằng xấp xỉ (normal approximation). 
+                Để có kết quả chính xác cho nghiên cứu, cần xử lý trên phần mềm chuyên dụng (SPSS, R, Stata).
+                {' '}<em>* p {'<'} 0.05</em>
+            </span>
+        </div>
+    );
+}
+
+function CalcButton({ onClick, computed }: { onClick: () => void; computed: boolean }) {
+    return (
+        <button
+            onClick={onClick}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${computed ? 'bg-gray-50 text-gray-600 hover:bg-gray-100 border-gray-200' : 'bg-primary-50 text-primary-700 hover:bg-primary-100 border-primary-200'}`}
+        >
+            <Calculator className="w-3.5 h-3.5" />
+            {computed ? 'Tính lại p-value' : 'Tính p-value'}
+        </button>
+    );
+}
+
+/** Use a counter instead of boolean so re-clicking 'Tính lại' forces useMemo recalc */
+function useComputeP(): [boolean, number, () => void] {
+    const [ver, setVer] = useState(0);
+    return [ver > 0, ver, () => setVer(v => v + 1)];
+}
+
+// ════════════════════════════════════════════════════════════
 // 3.2.1: BIOMARKER THEO NHÓM CĂN NGUYÊN
 // ════════════════════════════════════════════════════════════
 function Table321({ patients }: { patients: Patient[] }) {
+    const [computed, computeVer, triggerCompute] = useComputeP();
+
     const data = useMemo(() => {
         const hasVK = patients.filter(p => p.viKhuan?.some(vk => vk.coKhong));
         const noVK = patients.filter(p => !p.viKhuan?.some(vk => vk.coKhong));
@@ -721,6 +938,7 @@ function Table321({ patients }: { patients: Patient[] }) {
             const vals = group.map(p => p.xetNghiem[key]).filter(num) as number[];
             return {
                 n: vals.length,
+                vals,
                 median: vals.length > 0 ? median(vals).toFixed(2) : '—',
                 q1q3: vals.length > 0 ? `${q1(vals).toFixed(2)}–${q3(vals).toFixed(2)}` : '—',
                 meanSd: vals.length > 0 ? `${mean(vals).toFixed(2)} ± ${sd(vals).toFixed(2)}` : '—',
@@ -734,8 +952,9 @@ function Table321({ patients }: { patients: Patient[] }) {
             label: labels[key],
             hasVK: extract(hasVK, key),
             noVK: extract(noVK, key),
+            pValue: computed ? mannWhitneyU(extract(hasVK, key).vals, extract(noVK, key).vals)?.p ?? null : null,
         }));
-    }, [patients]);
+    }, [patients, computeVer]);
 
     const rows = data.map(d => [
         d.label,
@@ -743,7 +962,7 @@ function Table321({ patients }: { patients: Patient[] }) {
         String(d.hasVK.n),
         `${d.noVK.median} (${d.noVK.q1q3})`,
         String(d.noVK.n),
-        <span className="text-gray-400 italic text-xs">Cần phần mềm TK</span>,
+        computed ? <PCell p={d.pValue} /> : <span className="text-gray-400 italic text-xs">—</span>,
     ]);
 
     return (
@@ -751,12 +970,16 @@ function Table321({ patients }: { patients: Patient[] }) {
             id="table-321"
             title="Bảng 3.8 — Biomarker theo nhóm căn nguyên vi sinh"
             subtitle="Mục 3.1.4: So sánh nồng độ biomarker giữa nhóm có VK và không phát hiện VK"
-            note="Giá trị p cần kiểm định Mann-Whitney U (phần mềm thống kê chuyên dụng). Nên phân nhóm thêm: VK điển hình, VK không điển hình, nhiễm phối hợp nếu đủ cỡ mẫu."
         >
+            <div className="flex items-center gap-3 mb-3">
+                <CalcButton onClick={triggerCompute} computed={computed} />
+                {computed && <span className="text-xs text-gray-500">Kiểm định: Mann-Whitney U (two-tailed)</span>}
+            </div>
             <DataTable
                 headers={['Biomarker', 'Có VK — Median (Q1–Q3)', 'n₁', 'Không VK — Median (Q1–Q3)', 'n₂', 'p']}
                 rows={rows}
             />
+            {computed && <PValueDisclaimer />}
         </SectionCard>
     );
 }
@@ -765,73 +988,61 @@ function Table321({ patients }: { patients: Patient[] }) {
 // 3.2.2: BIOMARKER THEO PSI CLASS
 // ════════════════════════════════════════════════════════════
 function Table322({ patients }: { patients: Patient[] }) {
+    const [computed, computeVer, triggerCompute] = useComputeP();
+
     const data = useMemo(() => {
         const nhe = patients.filter(p => p.psi.tongDiem > 0 && ['I', 'II'].includes(psiClass(p.psi.tongDiem)));
         const nang = patients.filter(p => p.psi.tongDiem > 0 && ['III', 'IV', 'V'].includes(psiClass(p.psi.tongDiem)));
 
-        const extract = (group: Patient[], key: 'sTREM1' | 'tIMP1' | 'il6' | 'il10' | 'il17') => {
-            const vals = group.map(p => p.xetNghiem[key]).filter(num) as number[];
+        const extract = (group: Patient[], key: string) => {
+            const vals = group.map(p => p.xetNghiem[key as keyof typeof p.xetNghiem] as number | null).filter(num) as number[];
             return {
                 n: vals.length,
+                vals,
                 median: vals.length > 0 ? median(vals).toFixed(2) : '—',
                 q1q3: vals.length > 0 ? `${q1(vals).toFixed(2)}–${q3(vals).toFixed(2)}` : '—',
             };
         };
 
-        const markers: ('sTREM1' | 'tIMP1' | 'il6' | 'il10' | 'il17')[] = ['sTREM1', 'tIMP1', 'il6', 'il10', 'il17'];
-        const labels: Record<string, string> = { sTREM1: 'sTREM-1', tIMP1: 'TIMP-1', il6: 'IL-6', il10: 'IL-10', il17: 'IL-17' };
-
-        // Also include CRP and PCT
-        const crpNhe = nhe.map(p => p.xetNghiem.crp).filter(num) as number[];
-        const crpNang = nang.map(p => p.xetNghiem.crp).filter(num) as number[];
-        const pctNhe = nhe.map(p => p.xetNghiem.procalcitonin).filter(num) as number[];
-        const pctNang = nang.map(p => p.xetNghiem.procalcitonin).filter(num) as number[];
+        const allKeys = ['sTREM1', 'tIMP1', 'il6', 'il10', 'il17', 'crp', 'procalcitonin'];
+        const labels: Record<string, string> = { sTREM1: 'sTREM-1', tIMP1: 'TIMP-1', il6: 'IL-6', il10: 'IL-10', il17: 'IL-17', crp: 'CRP (mg/L)', procalcitonin: 'PCT (ng/mL)' };
 
         return {
-            markers: markers.map(key => ({
+            markers: allKeys.map(key => ({
                 label: labels[key],
                 nhe: extract(nhe, key),
                 nang: extract(nang, key),
+                pValue: computed ? mannWhitneyU(extract(nhe, key).vals, extract(nang, key).vals)?.p ?? null : null,
             })),
-            crp: {
-                nhe: { n: crpNhe.length, median: crpNhe.length > 0 ? median(crpNhe).toFixed(2) : '—', q1q3: crpNhe.length > 0 ? `${q1(crpNhe).toFixed(2)}–${q3(crpNhe).toFixed(2)}` : '—' },
-                nang: { n: crpNang.length, median: crpNang.length > 0 ? median(crpNang).toFixed(2) : '—', q1q3: crpNang.length > 0 ? `${q1(crpNang).toFixed(2)}–${q3(crpNang).toFixed(2)}` : '—' },
-            },
-            pct: {
-                nhe: { n: pctNhe.length, median: pctNhe.length > 0 ? median(pctNhe).toFixed(2) : '—', q1q3: pctNhe.length > 0 ? `${q1(pctNhe).toFixed(2)}–${q3(pctNhe).toFixed(2)}` : '—' },
-                nang: { n: pctNang.length, median: pctNang.length > 0 ? median(pctNang).toFixed(2) : '—', q1q3: pctNang.length > 0 ? `${q1(pctNang).toFixed(2)}–${q3(pctNang).toFixed(2)}` : '—' },
-            },
             nNhe: nhe.length,
             nNang: nang.length,
         };
-    }, [patients]);
+    }, [patients, computeVer]);
 
-    const makeRow = (label: string, nhe: { n: number; median: string; q1q3: string }, nang: { n: number; median: string; q1q3: string }) => [
-        label,
-        `${nhe.median} (${nhe.q1q3})`,
-        String(nhe.n),
-        `${nang.median} (${nang.q1q3})`,
-        String(nang.n),
-        <span className="text-gray-400 italic text-xs">Cần TK</span>,
-    ];
-
-    const rows = [
-        ...data.markers.map(d => makeRow(d.label, d.nhe, d.nang)),
-        makeRow('CRP (mg/L)', data.crp.nhe, data.crp.nang),
-        makeRow('PCT (ng/mL)', data.pct.nhe, data.pct.nang),
-    ];
+    const rows = data.markers.map(d => [
+        d.label,
+        `${d.nhe.median} (${d.nhe.q1q3})`,
+        String(d.nhe.n),
+        `${d.nang.median} (${d.nang.q1q3})`,
+        String(d.nang.n),
+        computed ? <PCell p={d.pValue} /> : <span className="text-gray-400 italic text-xs">—</span>,
+    ]);
 
     return (
         <SectionCard
             id="table-322"
             title="Bảng 3.9 — Biomarker theo mức độ nặng (PSI)"
             subtitle={`Mục 3.2.1: So sánh nhóm nhẹ (PSI I–II, n=${data.nNhe}) vs nhóm nặng (PSI III–V, n=${data.nNang})`}
-            note="Giá trị p cần kiểm định Mann-Whitney U test. Nên phân tích thêm theo từng class PSI (I-V) nếu đủ cỡ mẫu."
         >
+            <div className="flex items-center gap-3 mb-3">
+                <CalcButton onClick={triggerCompute} computed={computed} />
+                {computed && <span className="text-xs text-gray-500">Kiểm định: Mann-Whitney U (two-tailed)</span>}
+            </div>
             <DataTable
                 headers={['Biomarker', 'PSI I–II — Median (Q1–Q3)', 'n₁', 'PSI III–V — Median (Q1–Q3)', 'n₂', 'p']}
                 rows={rows}
             />
+            {computed && <PValueDisclaimer />}
         </SectionCard>
     );
 }
@@ -840,6 +1051,8 @@ function Table322({ patients }: { patients: Patient[] }) {
 // 3.2.3: BIOMARKER THEO KẾT CỤC
 // ════════════════════════════════════════════════════════════
 function Table323({ patients }: { patients: Patient[] }) {
+    const [computed, computeVer, triggerCompute] = useComputeP();
+
     const data = useMemo(() => {
         const tuVong = patients.filter(p => p.ketCuc?.tuVong);
         const song = patients.filter(p => !p.ketCuc?.tuVong && (p.ketCuc?.tienTrienTotXuatVien || p.ketCuc?.xinVe));
@@ -848,10 +1061,11 @@ function Table323({ patients }: { patients: Patient[] }) {
         const socNK = patients.filter(p => p.ketCuc?.socNhiemKhuan || p.ketCuc?.dienBienDieuTri?.includes('Sốc nhiễm khuẩn'));
         const khongSocNK = patients.filter(p => !(p.ketCuc?.socNhiemKhuan || p.ketCuc?.dienBienDieuTri?.includes('Sốc nhiễm khuẩn')));
 
-        const extract = (group: Patient[], key: 'sTREM1' | 'tIMP1' | 'il6' | 'il10' | 'il17' | 'crp' | 'procalcitonin') => {
+        const extract = (group: Patient[], key: string) => {
             const vals = group.map(p => p.xetNghiem[key as keyof typeof p.xetNghiem] as number | null).filter(num) as number[];
             return {
                 n: vals.length,
+                vals,
                 median: vals.length > 0 ? median(vals).toFixed(2) : '—',
                 q1q3: vals.length > 0 ? `${q1(vals).toFixed(2)}–${q3(vals).toFixed(2)}` : '—',
             };
@@ -860,7 +1074,7 @@ function Table323({ patients }: { patients: Patient[] }) {
         return { tuVong, song, thoMay, khongThoMay, socNK, khongSocNK, extract };
     }, [patients]);
 
-    const markers: { key: 'sTREM1' | 'tIMP1' | 'il6' | 'il10' | 'il17' | 'crp' | 'procalcitonin'; label: string }[] = [
+    const markers: { key: string; label: string }[] = [
         { key: 'sTREM1', label: 'sTREM-1' },
         { key: 'tIMP1', label: 'TIMP-1' },
         { key: 'il6', label: 'IL-6' },
@@ -870,55 +1084,31 @@ function Table323({ patients }: { patients: Patient[] }) {
         { key: 'procalcitonin', label: 'PCT' },
     ];
 
-    // Tử vong vs Sống
-    const rows1 = markers.map(m => {
-        const tv = data.extract(data.tuVong, m.key);
-        const s = data.extract(data.song, m.key);
-        return [
-            m.label,
-            `${tv.median} (${tv.q1q3})`,
-            String(tv.n),
-            `${s.median} (${s.q1q3})`,
-            String(s.n),
-            <span className="text-gray-400 italic text-xs">Cần TK</span>,
-        ];
-    });
-
-    // Thở máy
-    const rows2 = markers.map(m => {
-        const co = data.extract(data.thoMay, m.key);
-        const khong = data.extract(data.khongThoMay, m.key);
-        return [
-            m.label,
-            `${co.median} (${co.q1q3})`,
-            String(co.n),
-            `${khong.median} (${khong.q1q3})`,
-            String(khong.n),
-            <span className="text-gray-400 italic text-xs">Cần TK</span>,
-        ];
-    });
-
-    // Sốc NK
-    const rows3 = markers.map(m => {
-        const co = data.extract(data.socNK, m.key);
-        const khong = data.extract(data.khongSocNK, m.key);
-        return [
-            m.label,
-            `${co.median} (${co.q1q3})`,
-            String(co.n),
-            `${khong.median} (${khong.q1q3})`,
-            String(khong.n),
-            <span className="text-gray-400 italic text-xs">Cần TK</span>,
-        ];
-    });
+    const buildRows = (group1: Patient[], group2: Patient[]) =>
+        markers.map(m => {
+            const g1 = data.extract(group1, m.key);
+            const g2 = data.extract(group2, m.key);
+            const pVal = computed ? mannWhitneyU(g1.vals, g2.vals)?.p ?? null : null;
+            return [
+                m.label,
+                `${g1.median} (${g1.q1q3})`,
+                String(g1.n),
+                `${g2.median} (${g2.q1q3})`,
+                String(g2.n),
+                computed ? <PCell p={pVal} /> : <span className="text-gray-400 italic text-xs">—</span>,
+            ];
+        });
 
     return (
         <SectionCard
             id="table-323"
             title="Bảng 3.10 — Biomarker theo kết cục lâm sàng"
             subtitle="Mục 3.2.1: So sánh nồng độ biomarker giữa các nhóm kết cục (tử vong, thở máy, sốc NK)"
-            note="Giá trị p cần kiểm định Mann-Whitney U test hoặc Kruskal-Wallis test (phần mềm thống kê chuyên dụng)."
         >
+            <div className="flex items-center gap-3 mb-3">
+                <CalcButton onClick={triggerCompute} computed={computed} />
+                {computed && <span className="text-xs text-gray-500">Kiểm định: Mann-Whitney U (two-tailed)</span>}
+            </div>
             <div className="space-y-6">
                 <div>
                     <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
@@ -926,7 +1116,7 @@ function Table323({ patients }: { patients: Patient[] }) {
                     </h4>
                     <DataTable
                         headers={['Biomarker', 'Tử vong — Median (Q1–Q3)', 'n', 'Sống — Median (Q1–Q3)', 'n', 'p']}
-                        rows={rows1}
+                        rows={buildRows(data.tuVong, data.song)}
                     />
                 </div>
 
@@ -936,7 +1126,7 @@ function Table323({ patients }: { patients: Patient[] }) {
                     </h4>
                     <DataTable
                         headers={['Biomarker', 'Thở máy — Median (Q1–Q3)', 'n', 'Không — Median (Q1–Q3)', 'n', 'p']}
-                        rows={rows2}
+                        rows={buildRows(data.thoMay, data.khongThoMay)}
                     />
                 </div>
 
@@ -946,10 +1136,11 @@ function Table323({ patients }: { patients: Patient[] }) {
                     </h4>
                     <DataTable
                         headers={['Biomarker', 'Sốc NK — Median (Q1–Q3)', 'n', 'Không — Median (Q1–Q3)', 'n', 'p']}
-                        rows={rows3}
+                        rows={buildRows(data.socNK, data.khongSocNK)}
                     />
                 </div>
             </div>
+            {computed && <PValueDisclaimer />}
         </SectionCard>
     );
 }
@@ -958,6 +1149,8 @@ function Table323({ patients }: { patients: Patient[] }) {
 // 3.2.4: TƯƠNG QUAN BIOMARKER vs PSI / NGÀY ĐT
 // ════════════════════════════════════════════════════════════
 function Table324({ patients }: { patients: Patient[] }) {
+    const [computed, computeVer, triggerCompute] = useComputeP();
+
     const data = useMemo(() => {
         const withPSI = patients.filter(p => p.psi.tongDiem > 0);
         const withNgayDT = patients.filter(p => num(p.ketCuc?.tongSoNgayDieuTri));
@@ -972,18 +1165,20 @@ function Table324({ patients }: { patients: Patient[] }) {
             return { n: pairs.length, r };
         };
 
-        const markers: { key: 'sTREM1' | 'tIMP1' | 'il6' | 'il10' | 'il17'; label: string }[] = [
+        const allKeys: { key: string; label: string }[] = [
             { key: 'sTREM1', label: 'sTREM-1' },
             { key: 'tIMP1', label: 'TIMP-1' },
             { key: 'il6', label: 'IL-6' },
             { key: 'il10', label: 'IL-10' },
             { key: 'il17', label: 'IL-17' },
+            { key: 'crp', label: 'CRP' },
+            { key: 'procalcitonin', label: 'PCT' },
         ];
 
-        return markers.map(m => ({
+        return allKeys.map(m => ({
             label: m.label,
-            vsPSI: correlate(withPSI, p => p.psi.tongDiem, p => p.xetNghiem[m.key]),
-            vsNgayDT: correlate(withNgayDT, p => p.ketCuc?.tongSoNgayDieuTri ?? null, p => p.xetNghiem[m.key]),
+            vsPSI: correlate(withPSI, p => p.psi.tongDiem, p => p.xetNghiem[m.key as keyof typeof p.xetNghiem] as number | null),
+            vsNgayDT: correlate(withNgayDT, p => p.ketCuc?.tongSoNgayDieuTri ?? null, p => p.xetNghiem[m.key as keyof typeof p.xetNghiem] as number | null),
         }));
     }, [patients]);
 
@@ -1003,41 +1198,216 @@ function Table324({ patients }: { patients: Patient[] }) {
         d.label,
         formatR(d.vsPSI.r),
         String(d.vsPSI.n),
-        <span className="text-gray-400 italic text-xs">Cần TK</span>,
+        computed ? <PCell p={d.vsPSI.r !== null ? spearmanPValue(d.vsPSI.r, d.vsPSI.n) : null} /> : <span className="text-gray-400 italic text-xs">—</span>,
         formatR(d.vsNgayDT.r),
         String(d.vsNgayDT.n),
-        <span className="text-gray-400 italic text-xs">Cần TK</span>,
+        computed ? <PCell p={d.vsNgayDT.r !== null ? spearmanPValue(d.vsNgayDT.r, d.vsNgayDT.n) : null} /> : <span className="text-gray-400 italic text-xs">—</span>,
     ]);
-
-    // Also add CRP and PCT
-    const withPSI = patients.filter(p => p.psi.tongDiem > 0);
-    const withNgayDT = patients.filter(p => num(p.ketCuc?.tongSoNgayDieuTri));
-
-    const extraCorrelate = (group: Patient[], getX: (p: Patient) => number | null, getY: (p: Patient) => number | null) => {
-        const pairs = group
-            .map(p => ({ x: getX(p), y: getY(p) }))
-            .filter(d => d.x !== null && d.y !== null) as { x: number; y: number }[];
-        if (pairs.length < 5) return { n: pairs.length, r: null };
-        return { n: pairs.length, r: spearmanCorrelation(pairs.map(d => d.x), pairs.map(d => d.y)) };
-    };
-
-    const crpPSI = extraCorrelate(withPSI, p => p.psi.tongDiem, p => p.xetNghiem.crp);
-    const crpDT = extraCorrelate(withNgayDT, p => p.ketCuc?.tongSoNgayDieuTri ?? null, p => p.xetNghiem.crp);
-    const pctPSI = extraCorrelate(withPSI, p => p.psi.tongDiem, p => p.xetNghiem.procalcitonin);
-    const pctDT = extraCorrelate(withNgayDT, p => p.ketCuc?.tongSoNgayDieuTri ?? null, p => p.xetNghiem.procalcitonin);
-
-    rows.push(['CRP', formatR(crpPSI.r), String(crpPSI.n), <span className="text-gray-400 italic text-xs">Cần TK</span>, formatR(crpDT.r), String(crpDT.n), <span className="text-gray-400 italic text-xs">Cần TK</span>]);
-    rows.push(['PCT', formatR(pctPSI.r), String(pctPSI.n), <span className="text-gray-400 italic text-xs">Cần TK</span>, formatR(pctDT.r), String(pctDT.n), <span className="text-gray-400 italic text-xs">Cần TK</span>]);
 
     return (
         <SectionCard
             id="table-324"
             title="Bảng 3.11 — Tương quan Spearman giữa biomarker với PSI Score và thời gian điều trị"
             subtitle="Mục 3.2.1: Phân tích tương quan (r: hệ số tương quan Spearman rank)"
-            note="Hệ số r tính tự động bằng Spearman rank correlation. Giá trị p cần kiểm định thống kê chuyên dụng (SPSS/R). Tương quan không chứng minh nhân quả."
         >
+            <div className="flex items-center gap-3 mb-3">
+                <CalcButton onClick={triggerCompute} computed={computed} />
+                {computed && <span className="text-xs text-gray-500">p-value: xấp xỉ t-distribution (two-tailed)</span>}
+            </div>
             <DataTable
                 headers={['Biomarker', 'r vs PSI', 'n', 'p', 'r vs Ngày ĐT', 'n', 'p']}
+                rows={rows}
+            />
+            {computed && <PValueDisclaimer />}
+        </SectionCard>
+    );
+}
+
+// ════════════════════════════════════════════════════════════
+// 3.3: THUỐC ĐÃ DÙNG TRƯỚC NHẬP VIỆN
+// ════════════════════════════════════════════════════════════
+function Table33Drug({ patients, drugGroup1, drugGroup2 }: { patients: Patient[]; drugGroup1: string[]; drugGroup2: DrugGenericName[] }) {
+    const N = patients.length;
+
+    const { rows, totalDrugUsers } = useMemo(() => {
+        // Build tenGoc → nhom1 map from settings
+        const gocToNhom1 = new Map<string, string>();
+        drugGroup2.forEach(g => gocToNhom1.set(g.ten, g.nhom1));
+
+        // Scan ALL patients to collect actual drug usage
+        type DrugStat = { patientIds: Set<string>; days: number[] };
+        const byGeneric = new Map<string, DrugStat>();
+        const byGroup1 = new Map<string, Set<string>>();
+        let totalUsers = 0;
+
+        patients.forEach((p, idx) => {
+            const pid = p.id || `patient_${idx}`;
+            const drugs = p.tienSu?.thuocDaDung || [];
+            if (drugs.length > 0) totalUsers++;
+
+            const seenGroup1 = new Set<string>();
+            drugs.forEach(t => {
+                const goc = t.tenGoc?.trim() || '';
+                if (!goc) return;
+
+                if (!byGeneric.has(goc)) byGeneric.set(goc, { patientIds: new Set(), days: [] });
+                const stat = byGeneric.get(goc)!;
+                stat.patientIds.add(pid);
+                if (t.thoiGianDung !== null && t.thoiGianDung !== undefined) {
+                    stat.days.push(t.thoiGianDung);
+                }
+
+                const nhom1 = gocToNhom1.get(goc) || 'Chưa phân loại';
+                seenGroup1.add(nhom1);
+            });
+
+            seenGroup1.forEach(g1 => {
+                if (!byGroup1.has(g1)) byGroup1.set(g1, new Set());
+                byGroup1.get(g1)!.add(pid);
+            });
+        });
+
+        // Collect all known generics (from settings + from patient data)
+        const allGenerics = new Set<string>();
+        drugGroup2.forEach(g => allGenerics.add(g.ten));
+        byGeneric.forEach((_, goc) => allGenerics.add(goc));
+
+        // Build rows
+        const result: { type: 'group' | 'item' | 'unclassified'; name: string; n: number; pctStr: string; daysMeanSd: string }[] = [];
+
+        drugGroup1.forEach(g1 => {
+            const g1Count = byGroup1.get(g1)?.size || 0;
+            result.push({ type: 'group', name: g1, n: g1Count, pctStr: pct(g1Count, N), daysMeanSd: '' });
+
+            // Get all generics in this group (from settings + patient data)
+            const genericsInGroup = [...allGenerics].filter(goc => gocToNhom1.get(goc) === g1);
+            genericsInGroup.forEach(goc => {
+                const stat = byGeneric.get(goc);
+                const count = stat?.patientIds.size || 0;
+                const m = stat && stat.days.length > 0 ? mean(stat.days) : null;
+                const s = stat && stat.days.length > 1 ? sd(stat.days) : null;
+                const dayStr = m !== null ? `${m.toFixed(1)} ± ${(s ?? 0).toFixed(1)}` : '—';
+                result.push({ type: 'item', name: goc, n: count, pctStr: pct(count, N), daysMeanSd: dayStr });
+            });
+        });
+
+        // Unclassified generics (in patient data but not mapped to any group)
+        const knownInGroups = new Set<string>();
+        drugGroup1.forEach(g1 => {
+            [...allGenerics].filter(goc => gocToNhom1.get(goc) === g1).forEach(goc => knownInGroups.add(goc));
+        });
+        const unclassified = [...allGenerics].filter(goc => !knownInGroups.has(goc));
+
+        if (unclassified.length > 0) {
+            const ucCount = byGroup1.get('Chưa phân loại')?.size || 0;
+            result.push({ type: 'unclassified', name: 'Chưa phân loại', n: ucCount, pctStr: pct(ucCount, N), daysMeanSd: '' });
+            unclassified.forEach(goc => {
+                const stat = byGeneric.get(goc);
+                const count = stat?.patientIds.size || 0;
+                const m = stat && stat.days.length > 0 ? mean(stat.days) : null;
+                const s = stat && stat.days.length > 1 ? sd(stat.days) : null;
+                const dayStr = m !== null ? `${m.toFixed(1)} ± ${(s ?? 0).toFixed(1)}` : '—';
+                result.push({ type: 'item', name: goc, n: count, pctStr: pct(count, N), daysMeanSd: dayStr });
+            });
+        }
+
+        return { rows: result, totalDrugUsers: totalUsers };
+    }, [patients, drugGroup1, drugGroup2, N]);
+
+    return (
+        <SectionCard
+            id="table-33-drug"
+            title="Bảng 3.x — Thuốc đã dùng trước nhập viện"
+            subtitle={`Thống kê thuốc theo nhóm — ${totalDrugUsers}/${N} BN có dùng thuốc trước nhập viện`}
+        >
+            <div className="overflow-x-auto">
+                <table className="min-w-full text-sm border-collapse">
+                    <thead>
+                        <tr className="bg-gray-50">
+                            <th className="p-2.5 border border-gray-200 font-semibold text-gray-700 text-left">Thuốc</th>
+                            <th className="p-2.5 border border-gray-200 font-semibold text-gray-700 text-center w-20">n</th>
+                            <th className="p-2.5 border border-gray-200 font-semibold text-gray-700 text-center w-20">%</th>
+                            <th className="p-2.5 border border-gray-200 font-semibold text-gray-700 text-center w-40">Số ngày dùng (Mean ± SD)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows.length === 0 && (
+                            <tr><td colSpan={4} className="p-4 text-center text-gray-400 italic">Chưa có dữ liệu thuốc. Hãy nhập thuốc (chọn tên gốc) trong form Tiền sử.</td></tr>
+                        )}
+                        {rows.map((r, i) => (
+                            <tr key={i} className={r.type === 'group' || r.type === 'unclassified' ? 'bg-gray-50 font-semibold' : 'hover:bg-gray-50/80'}>
+                                <td className={`p-2.5 border border-gray-200 ${r.type === 'item' ? 'pl-8 text-gray-700' : 'text-gray-900'}`}>
+                                    {r.name}
+                                </td>
+                                <td className="p-2.5 border border-gray-200 text-center text-gray-600">{r.n > 0 ? r.n : '—'}</td>
+                                <td className="p-2.5 border border-gray-200 text-center text-gray-600">{r.n > 0 ? r.pctStr : '—'}</td>
+                                <td className="p-2.5 border border-gray-200 text-center text-gray-600">{r.daysMeanSd || '—'}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </SectionCard>
+    );
+}
+
+// ════════════════════════════════════════════════════════════
+// 3.4: DIỄN BIẾN ĐIỀU TRỊ & KẾT CỤC BỔ SUNG
+// ════════════════════════════════════════════════════════════
+function Table34Outcome({ patients }: { patients: Patient[] }) {
+    const N = patients.length;
+    const data = useMemo(() => {
+        const thoMay = patients.filter(p => p.ketCuc?.thoMay).length;
+        const socNK = patients.filter(p => p.ketCuc?.socNhiemKhuan).length;
+        const locMau = patients.filter(p => p.ketCuc?.locMau).length;
+        const ngayLocMau = patients.map(p => p.ketCuc?.soNgayLocMau).filter(num);
+
+        // Diễn biến điều trị (dynamic)
+        const dienBien: Record<string, number> = {};
+        patients.forEach(p => {
+            p.ketCuc?.dienBienDieuTri?.forEach(db => {
+                if (db) dienBien[db] = (dienBien[db] || 0) + 1;
+            });
+        });
+
+        // Tình trạng ra viện
+        const raVien: Record<string, number> = {};
+        patients.forEach(p => {
+            const tt = p.ketCuc?.tinhTrangRaVien || '';
+            if (tt) raVien[tt] = (raVien[tt] || 0) + 1;
+        });
+
+        return { thoMay, socNK, locMau, ngayLocMau, dienBien, raVien };
+    }, [patients]);
+
+    const rows: (string | React.ReactNode)[][] = [
+        ['Diễn biến điều trị', '', ''],
+        ['  Thở máy', String(data.thoMay), pct(data.thoMay, N)],
+        ['  Sốc nhiễm khuẩn', String(data.socNK), pct(data.socNK, N)],
+        ['  Lọc máu', String(data.locMau), pct(data.locMau, N)],
+    ];
+    if (data.ngayLocMau.length > 0) {
+        rows.push(['    Số ngày lọc máu (Mean ± SD)', meanSd(data.ngayLocMau), `n = ${data.ngayLocMau.length}`]);
+    }
+    Object.entries(data.dienBien).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => {
+        rows.push([`  ${k}`, String(v), pct(v, N)]);
+    });
+
+    if (Object.keys(data.raVien).length > 0) {
+        rows.push(['Tình trạng ra viện', '', '']);
+        Object.entries(data.raVien).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => {
+            rows.push([`  ${k}`, String(v), pct(v, N)]);
+        });
+    }
+
+    return (
+        <SectionCard
+            id="table-34-outcome"
+            title="Bảng 3.x — Diễn biến điều trị & Kết cục bổ sung"
+            subtitle="Thở máy, sốc nhiễm khuẩn, lọc máu, diễn biến và tình trạng ra viện"
+        >
+            <DataTable
+                headers={['Đặc điểm', 'n / Giá trị', '% / Ghi chú']}
                 rows={rows}
             />
         </SectionCard>
@@ -1045,8 +1415,285 @@ function Table324({ patients }: { patients: Patient[] }) {
 }
 
 // ════════════════════════════════════════════════════════════
-// GHI CHÚ — PHẦN KHÔNG THỂ THỰC HIỆN
+// 3.5: THỜI GIAN SỬ DỤNG KHÁNG SINH
 // ════════════════════════════════════════════════════════════
+function Table35KS({ patients }: { patients: Patient[] }) {
+    const N = patients.length;
+
+    const parseDate = (s: string): Date | null => {
+        if (!s) return null;
+        if (s.includes('-')) { const d = new Date(s); return isNaN(d.getTime()) ? null : d; }
+        const parts = s.split('/');
+        if (parts.length !== 3) return null;
+        const [d, m, y] = parts.map(Number);
+        if (!d || !m || !y) return null;
+        return new Date(y, m - 1, d);
+    };
+
+    const data = useMemo(() => {
+        const coKS = patients.filter(p => p.ketCuc?.ngayBatDauKhangSinh).length;
+        const thoiGianKS: number[] = [];
+        const thoiGianNVdenKS: number[] = [];
+
+        patients.forEach(p => {
+            const ngayBD = parseDate(p.ketCuc?.ngayBatDauKhangSinh || '');
+            const ngayKT = parseDate(p.ketCuc?.ngayKetThucKhangSinh || '');
+            const ngayVV = parseDate(p.hanhChinh.ngayVaoVien);
+
+            if (ngayBD && ngayKT) {
+                const days = Math.round((ngayKT.getTime() - ngayBD.getTime()) / (1000 * 60 * 60 * 24));
+                if (days >= 0) thoiGianKS.push(days);
+            }
+            if (ngayVV && ngayBD) {
+                const days = Math.round((ngayBD.getTime() - ngayVV.getTime()) / (1000 * 60 * 60 * 24));
+                if (days >= 0) thoiGianNVdenKS.push(days);
+            }
+        });
+
+        return { coKS, thoiGianKS, thoiGianNVdenKS };
+    }, [patients]);
+
+    const rows: (string | React.ReactNode)[][] = [
+        ['BN có dùng KS nội viện', String(data.coKS), pct(data.coKS, N)],
+        ['Thời gian nhập viện → bắt đầu KS (ngày)', data.thoiGianNVdenKS.length > 0 ? meanSd(data.thoiGianNVdenKS) : '—', data.thoiGianNVdenKS.length > 0 ? `Median: ${median(data.thoiGianNVdenKS).toFixed(0)}, n = ${data.thoiGianNVdenKS.length}` : '—'],
+        ['Tổng thời gian dùng KS (ngày)', data.thoiGianKS.length > 0 ? meanSd(data.thoiGianKS) : '—', data.thoiGianKS.length > 0 ? `Median: ${median(data.thoiGianKS).toFixed(0)}, n = ${data.thoiGianKS.length}` : '—'],
+    ];
+
+    return (
+        <SectionCard
+            id="table-35-ks"
+            title="Bảng 3.x — Thời gian sử dụng kháng sinh"
+            subtitle="Thời điểm bắt đầu và tổng thời gian sử dụng kháng sinh trong viện"
+        >
+            <DataTable
+                headers={['Đặc điểm', 'Mean ± SD', 'Median / n']}
+                rows={rows}
+            />
+        </SectionCard>
+    );
+}
+
+// ════════════════════════════════════════════════════════════
+// KAPLAN-MEIER SURVIVAL CURVE
+// ════════════════════════════════════════════════════════════
+function computeKaplanMeier(patients: Patient[]): { time: number; survival: number; events: number; atRisk: number; censored: number }[] {
+    // Build dataset: time = tongSoNgayDieuTri, event = tuVong (1 = death, 0 = censored)
+    const dataset: { time: number; event: boolean }[] = [];
+    patients.forEach(p => {
+        const t = p.ketCuc?.tongSoNgayDieuTri;
+        if (t !== null && t !== undefined && t > 0) {
+            dataset.push({ time: t, event: !!p.ketCuc?.tuVong });
+        }
+    });
+
+    if (dataset.length === 0) return [];
+
+    // Sort by time
+    dataset.sort((a, b) => a.time - b.time);
+
+    // Unique event times
+    const eventTimes = [...new Set(dataset.filter(d => d.event).map(d => d.time))].sort((a, b) => a - b);
+
+    const results: { time: number; survival: number; events: number; atRisk: number; censored: number }[] = [];
+    let survival = 1;
+    let nAtRisk = dataset.length;
+    let prevTime = 0;
+
+    // Add initial point
+    results.push({ time: 0, survival: 1, events: 0, atRisk: nAtRisk, censored: 0 });
+
+    eventTimes.forEach(t => {
+        // Count censored between prevTime and t
+        const censoredBefore = dataset.filter(d => !d.event && d.time > prevTime && d.time < t).length;
+        nAtRisk -= censoredBefore;
+
+        // Count events at time t
+        const events = dataset.filter(d => d.event && d.time === t).length;
+        const censored = dataset.filter(d => !d.event && d.time === t).length;
+
+        survival *= (nAtRisk - events) / nAtRisk;
+        results.push({ time: t, survival, events, atRisk: nAtRisk, censored });
+
+        nAtRisk -= (events + censored);
+        prevTime = t;
+    });
+
+    // Add final point at max time
+    const maxTime = Math.max(...dataset.map(d => d.time));
+    if (results[results.length - 1].time < maxTime) {
+        results.push({ time: maxTime, survival, events: 0, atRisk: nAtRisk, censored: 0 });
+    }
+
+    return results;
+}
+
+function KaplanMeierChart({ patients }: { patients: Patient[] }) {
+    const N = patients.length;
+    const kmData = useMemo(() => computeKaplanMeier(patients), [patients]);
+
+    const totalEvents = patients.filter(p => p.ketCuc?.tuVong && num(p.ketCuc?.tongSoNgayDieuTri)).length;
+    const totalCensored = patients.filter(p => !p.ketCuc?.tuVong && num(p.ketCuc?.tongSoNgayDieuTri)).length;
+
+    if (kmData.length < 2) {
+        return (
+            <SectionCard
+                id="km-chart"
+                title="Biểu đồ Kaplan-Meier — Đường cong sống còn"
+                subtitle="Cần ít nhất 2 bệnh nhân có ngày điều trị và sự kiện tử vong để vẽ biểu đồ"
+            >
+                <div className="p-8 text-center text-gray-400 italic">
+                    Chưa đủ dữ liệu để vẽ biểu đồ Kaplan-Meier.
+                    Cần: tongSoNgayDieuTri &gt; 0 và có ít nhất 1 sự kiện tử vong.
+                </div>
+            </SectionCard>
+        );
+    }
+
+    // Chart dimensions
+    const W = 700, H = 350;
+    const margin = { top: 20, right: 30, bottom: 50, left: 60 };
+    const plotW = W - margin.left - margin.right;
+    const plotH = H - margin.top - margin.bottom;
+
+    const maxTime = Math.max(...kmData.map(d => d.time));
+    const scaleX = (t: number) => margin.left + (t / maxTime) * plotW;
+    const scaleY = (s: number) => margin.top + (1 - s) * plotH;
+
+    // Build step path
+    let pathD = `M ${scaleX(0)} ${scaleY(1)}`;
+    for (let i = 1; i < kmData.length; i++) {
+        const prev = kmData[i - 1];
+        const curr = kmData[i];
+        // Horizontal step to current time at previous survival
+        pathD += ` L ${scaleX(curr.time)} ${scaleY(prev.survival)}`;
+        // Vertical drop to current survival
+        pathD += ` L ${scaleX(curr.time)} ${scaleY(curr.survival)}`;
+    }
+
+    // Censored marks (tick marks for non-event patients)
+    const censoredMarks: { x: number; y: number }[] = [];
+    patients.forEach(p => {
+        if (!p.ketCuc?.tuVong && num(p.ketCuc?.tongSoNgayDieuTri) && p.ketCuc!.tongSoNgayDieuTri! > 0) {
+            const t = p.ketCuc!.tongSoNgayDieuTri!;
+            // Find survival at this time
+            let survAtT = 1;
+            for (let i = kmData.length - 1; i >= 0; i--) {
+                if (kmData[i].time <= t) { survAtT = kmData[i].survival; break; }
+            }
+            censoredMarks.push({ x: scaleX(t), y: scaleY(survAtT) });
+        }
+    });
+
+    // Y-axis ticks
+    const yTicks = [0, 0.25, 0.5, 0.75, 1.0];
+    // X-axis ticks
+    const xStep = Math.max(1, Math.ceil(maxTime / 6));
+    const xTicks: number[] = [];
+    for (let i = 0; i <= maxTime; i += xStep) xTicks.push(i);
+    if (xTicks[xTicks.length - 1] < maxTime) xTicks.push(maxTime);
+
+    return (
+        <SectionCard
+            id="km-chart"
+            title="Biểu đồ Kaplan-Meier — Đường cong sống còn"
+            subtitle={`Sự kiện: tử vong (n=${totalEvents}), censored (n=${totalCensored}). Thời gian: số ngày điều trị.`}
+        >
+            <div className="flex flex-col items-center">
+                <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[750px]" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    {/* Grid */}
+                    {yTicks.map(t => (
+                        <line key={`y-${t}`} x1={margin.left} x2={W - margin.right} y1={scaleY(t)} y2={scaleY(t)}
+                            stroke="#e5e7eb" strokeWidth={0.5} />
+                    ))}
+                    {xTicks.map(t => (
+                        <line key={`x-${t}`} x1={scaleX(t)} x2={scaleX(t)} y1={margin.top} y2={H - margin.bottom}
+                            stroke="#e5e7eb" strokeWidth={0.5} />
+                    ))}
+
+                    {/* Axes */}
+                    <line x1={margin.left} x2={margin.left} y1={margin.top} y2={H - margin.bottom}
+                        stroke="#374151" strokeWidth={1} />
+                    <line x1={margin.left} x2={W - margin.right} y1={H - margin.bottom} y2={H - margin.bottom}
+                        stroke="#374151" strokeWidth={1} />
+
+                    {/* Y-axis labels */}
+                    {yTicks.map(t => (
+                        <text key={`yl-${t}`} x={margin.left - 8} y={scaleY(t) + 4}
+                            textAnchor="end" fontSize={11} fill="#6b7280">{(t * 100).toFixed(0)}%</text>
+                    ))}
+
+                    {/* X-axis labels */}
+                    {xTicks.map(t => (
+                        <text key={`xl-${t}`} x={scaleX(t)} y={H - margin.bottom + 18}
+                            textAnchor="middle" fontSize={11} fill="#6b7280">{t}</text>
+                    ))}
+
+                    {/* Axis titles */}
+                    <text x={W / 2} y={H - 5} textAnchor="middle" fontSize={12} fill="#374151" fontWeight={500}>
+                        Thời gian (ngày)
+                    </text>
+                    <text x={15} y={H / 2} textAnchor="middle" fontSize={12} fill="#374151" fontWeight={500}
+                        transform={`rotate(-90, 15, ${H / 2})`}>
+                        Tỷ lệ sống (%)
+                    </text>
+
+                    {/* KM step curve */}
+                    <path d={pathD} fill="none" stroke="#0d9488" strokeWidth={2.5} />
+
+                    {/* Censored marks */}
+                    {censoredMarks.map((m, i) => (
+                        <line key={`c-${i}`} x1={m.x} x2={m.x} y1={m.y - 5} y2={m.y + 5}
+                            stroke="#0d9488" strokeWidth={1.5} />
+                    ))}
+
+                    {/* Median survival line if applicable */}
+                    {kmData.some(d => d.survival <= 0.5) && (() => {
+                        const medianPoint = kmData.find(d => d.survival <= 0.5)!;
+                        return (
+                            <>
+                                <line x1={margin.left} x2={scaleX(medianPoint.time)} y1={scaleY(0.5)} y2={scaleY(0.5)}
+                                    stroke="#ef4444" strokeWidth={1} strokeDasharray="4 3" />
+                                <line x1={scaleX(medianPoint.time)} x2={scaleX(medianPoint.time)} y1={scaleY(0.5)} y2={H - margin.bottom}
+                                    stroke="#ef4444" strokeWidth={1} strokeDasharray="4 3" />
+                                <text x={scaleX(medianPoint.time) + 4} y={H - margin.bottom - 5}
+                                    fontSize={10} fill="#ef4444">Median: {medianPoint.time}d</text>
+                            </>
+                        );
+                    })()}
+                </svg>
+
+                {/* At-risk table */}
+                <div className="mt-4 overflow-x-auto w-full max-w-[750px]">
+                    <table className="text-xs border-collapse w-full">
+                        <thead>
+                            <tr className="bg-gray-50">
+                                <th className="p-1.5 border border-gray-200 text-left font-semibold text-gray-600 w-32">Ngày</th>
+                                {kmData.map((d, i) => (
+                                    <th key={i} className="p-1.5 border border-gray-200 text-center text-gray-600">{d.time}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td className="p-1.5 border border-gray-200 font-medium text-gray-700">Số BN có nguy cơ</td>
+                                {kmData.map((d, i) => (
+                                    <td key={i} className="p-1.5 border border-gray-200 text-center text-gray-600">{d.atRisk}</td>
+                                ))}
+                            </tr>
+                            <tr>
+                                <td className="p-1.5 border border-gray-200 font-medium text-gray-700">Tỷ lệ sống (%)</td>
+                                {kmData.map((d, i) => (
+                                    <td key={i} className="p-1.5 border border-gray-200 text-center text-gray-600">{(d.survival * 100).toFixed(1)}</td>
+                                ))}
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </SectionCard>
+    );
+}
+
 function NotesSection() {
     return (
         <div className="space-y-4">
@@ -1059,15 +1706,11 @@ function NotesSection() {
                         <ul className="mt-2 space-y-1.5 text-sm text-amber-800">
                             <li className="flex items-start gap-2">
                                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0" />
-                                <span><strong>Tiền sử dùng kháng sinh trước nhập viện</strong> — Cần thêm biến boolean + tên KS vào phần TienSu</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0" />
                                 <span><strong>Kết quả PCR đa mồi</strong> — Hệ thống chỉ có dữ liệu từ cấy vi khuẩn, chưa có biến riêng cho PCR multiplex</span>
                             </li>
                             <li className="flex items-start gap-2">
                                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0" />
-                                <span><strong>Tình trạng dinh dưỡng chi tiết</strong> — Chỉ có BMI, chưa có albumin huyết thanh trước điều trị hoặc SGA score</span>
+                                <span><strong>Tình trạng dinh dưỡng chi tiết</strong> — Chưa có SGA score (Subjective Global Assessment). Albumin đã có trong xét nghiệm.</span>
                             </li>
                         </ul>
                     </div>

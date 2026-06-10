@@ -1,6 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { patientService } from '../services/patientService';
-import type { Patient } from '../types/patient';
+import { settingsService } from '../services/settingsService';
+import type { Patient, DrugGenericName } from '../types/patient';
+import { DEFAULT_DRUG_GROUP_1 } from '../data/formOptions';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
     PieChart, Pie, Cell, ResponsiveContainer,
@@ -26,6 +28,8 @@ export default function AnalyticsPage() {
     const [patients, setPatients] = useState<Patient[]>([]);
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState<Tab>('overview');
+    const [drugGroup1, setDrugGroup1] = useState<string[]>([]);
+    const [drugGroup2, setDrugGroup2] = useState<DrugGenericName[]>([]);
 
     useEffect(() => {
         const unsub = patientService.subscribeAll((data) => {
@@ -33,6 +37,31 @@ export default function AnalyticsPage() {
             setLoading(false);
         });
         return unsub;
+    }, []);
+
+    // Load drug groups for Expected Results tab
+    useEffect(() => {
+        settingsService.getList('cap_drug_group_1').then((items) => {
+            if (items && items.length > 0) setDrugGroup1(items);
+            else {
+                const raw = localStorage.getItem('cap_drug_group_1');
+                setDrugGroup1(raw ? JSON.parse(raw) : DEFAULT_DRUG_GROUP_1);
+            }
+        }).catch(() => {
+            const raw = localStorage.getItem('cap_drug_group_1');
+            setDrugGroup1(raw ? JSON.parse(raw) : DEFAULT_DRUG_GROUP_1);
+        });
+
+        settingsService.getDrugGenericNames().then((items) => {
+            if (items && items.length > 0) setDrugGroup2(items);
+            else {
+                const raw = localStorage.getItem('cap_drug_group_2');
+                if (raw) try { setDrugGroup2(JSON.parse(raw)); } catch { /* ignore */ }
+            }
+        }).catch(() => {
+            const raw = localStorage.getItem('cap_drug_group_2');
+            if (raw) try { setDrugGroup2(JSON.parse(raw)); } catch { /* ignore */ }
+        });
     }, []);
 
     if (loading) {
@@ -72,7 +101,7 @@ export default function AnalyticsPage() {
             {tab === 'overview' && <OverviewTab patients={patients} />}
             {tab === 'micro' && <MicroTab patients={patients} />}
             {tab === 'biomarker' && <BiomarkerTab patients={patients} />}
-            {tab === 'expected' && <ExpectedResultsTab patients={patients} />}
+            {tab === 'expected' && <ExpectedResultsTab patients={patients} drugGroup1={drugGroup1} drugGroup2={drugGroup2} />}
         </div>
     );
 }

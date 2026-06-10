@@ -77,4 +77,19 @@ export const settingsService = {
     async saveBackupColumnConfig(uid: string, columns: string[]): Promise<void> {
         await setDoc(doc(db, `user_settings/${uid}/preferences/backup_columns`), { columns });
     },
+
+    /** Drug generic names (Nhóm 2) — stored as objects */
+    async getDrugGenericNames(): Promise<{ ten: string; nhom1: string }[] | null> {
+        try {
+            const snap = await getDoc(doc(db, 'app_settings/drug_generic_names'));
+            if (snap.exists()) return snap.data().items ?? null;
+        } catch (e) {
+            console.warn('Failed to load drug generic names from Firestore', e);
+        }
+        return null;
+    },
+
+    async saveDrugGenericNames(items: { ten: string; nhom1: string }[]): Promise<void> {
+        await setDoc(doc(db, 'app_settings/drug_generic_names'), { items });
+    },
 };

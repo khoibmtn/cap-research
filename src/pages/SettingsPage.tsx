@@ -12,11 +12,13 @@ import PatientDetailModal from '../components/backup/PatientDetailModal';
 import {
     DEFAULT_BACTERIA, DEFAULT_ANTIBIOTICS, NGHE_NGHIEP_OPTIONS,
     DEFAULT_NOI_O, DEFAULT_DIEN_BIEN_DIEU_TRI, DEFAULT_TINH_TRANG_RA_VIEN,
+    DEFAULT_DRUG_GROUP_1,
 } from '../data/formOptions';
+import type { DrugGenericName } from '../types/patient';
 import {
     Upload, Download, Info, Plus, Trash2, Pencil, Check, X,
     ShieldAlert, MapPin, Stethoscope, Bug, Printer, HardDrive,
-    Loader2, Eye, RotateCcw, FileSpreadsheet, ChevronUp, Search, Settings2,
+    Loader2, Eye, RotateCcw, FileSpreadsheet, ChevronUp, Search, Settings2, Pill,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -184,6 +186,7 @@ const TABS = [
     { key: 'hanhchinh', label: 'Hành chính', icon: MapPin },
     { key: 'lamsang', label: 'Lâm sàng', icon: Stethoscope },
     { key: 'vikhuan', label: 'Vi khuẩn', icon: Bug },
+    { key: 'thuoc', label: 'Thuốc', icon: Pill },
     { key: 'inbanc', label: 'In BANC', icon: Printer },
     { key: 'backup', label: 'Backup', icon: HardDrive },
 ] as const;
@@ -241,6 +244,12 @@ export default function SettingsPage() {
     const [usedNgheNghiep, setUsedNgheNghiep] = useState<Set<string>>(new Set());
     const [usedNoiO, setUsedNoiO] = useState<Set<string>>(new Set());
 
+    // Thuốc tab
+    const [drugGroup1, setDrugGroup1] = useState<string[]>([]);
+    const [drugGroup2, setDrugGroup2] = useState<DrugGenericName[]>([]);
+    const [usedDrugGroup1, setUsedDrugGroup1] = useState<Set<string>>(new Set());
+    const [usedDrugGeneric, setUsedDrugGeneric] = useState<Set<string>>(new Set());
+
     // In BANC tab
     const [printSettings, setPrintSettings] = useState<PrintSettings>(DEFAULT_PRINT_SETTINGS);
 
@@ -287,6 +296,44 @@ export default function SettingsPage() {
                 // Offline: use localStorage
                 setter(loadListLocal(key, defaults));
             });
+        });
+
+        // Drug Group 1 (string list)
+        settingsService.getList('cap_drug_group_1').then((items) => {
+            if (items && items.length > 0) {
+                setDrugGroup1(items);
+                localStorage.setItem('cap_drug_group_1', JSON.stringify(items));
+            } else {
+                const local = loadListLocal('cap_drug_group_1', DEFAULT_DRUG_GROUP_1);
+                setDrugGroup1(local);
+                settingsService.saveList('cap_drug_group_1', local).catch(() => { });
+            }
+        }).catch(() => {
+            setDrugGroup1(loadListLocal('cap_drug_group_1', DEFAULT_DRUG_GROUP_1));
+        });
+
+        // Drug Group 2 (generic names — objects)
+        settingsService.getDrugGenericNames().then((items) => {
+            if (items && items.length > 0) {
+                setDrugGroup2(items);
+                localStorage.setItem('cap_drug_group_2', JSON.stringify(items));
+            } else {
+                const raw = localStorage.getItem('cap_drug_group_2');
+                if (raw) {
+                    try {
+                        const parsed = JSON.parse(raw);
+                        if (Array.isArray(parsed)) setDrugGroup2(parsed);
+                    } catch { /* ignore */ }
+                }
+            }
+        }).catch(() => {
+            const raw = localStorage.getItem('cap_drug_group_2');
+            if (raw) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) setDrugGroup2(parsed);
+                } catch { /* ignore */ }
+            }
         });
 
         // Addresses
@@ -339,6 +386,7 @@ export default function SettingsPage() {
             const aSet = new Set<string>();
             const dbSet = new Set<string>();
             const ttSet = new Set<string>();
+            const dgSet = new Set<string>();
             const nnSet = new Set<string>();
             const noSet = new Set<string>();
 
@@ -370,6 +418,13 @@ export default function SettingsPage() {
                     }
                     if (kc.tinhTrangRaVien) ttSet.add(kc.tinhTrangRaVien);
                 }
+                // Thuốc đã dùng (tiền sử)
+                p.tienSu?.thuocDaDung?.forEach((t) => {
+                    if (t.tenGoc) {
+                        dgSet.add(t.tenGoc);
+                        // Find nhom1 for this tenGoc — we'll check later
+                    }
+                });
             });
             setUsedBacteria(bSet);
             setUsedAntibiotics(aSet);
@@ -377,6 +432,17 @@ export default function SettingsPage() {
             setUsedTinhTrang(ttSet);
             setUsedNgheNghiep(nnSet);
             setUsedNoiO(noSet);
+            setUsedDrugGeneric(dgSet);
+            // Derive used drug group 1 from used generics
+            settingsService.getDrugGenericNames().then((items) => {
+                if (items) {
+                    const dg1Used = new Set<string>();
+                    items.forEach(g => {
+                        if (dgSet.has(g.ten)) dg1Used.add(g.nhom1);
+                    });
+                    setUsedDrugGroup1(dg1Used);
+                }
+            }).catch(() => { });
         }).catch(() => { });
     }, []);
 
@@ -594,7 +660,19 @@ export default function SettingsPage() {
                 </div>
             )}
 
-            {/* ══════════════ TAB 4: In BANC ══════════════ */}
+            {/* ══════════════ TAB 4: Thuốc ══════════════ */}
+            {activeTab === 'thuoc' && (
+                <DrugSettingsTab
+                    drugGroup1={drugGroup1}
+                    setDrugGroup1={setDrugGroup1}
+                    drugGroup2={drugGroup2}
+                    setDrugGroup2={setDrugGroup2}
+                    usedDrugGroup1={usedDrugGroup1}
+                    usedDrugGeneric={usedDrugGeneric}
+                />
+            )}
+
+            {/* ══════════════ TAB 5: In BANC ══════════════ */}
             {activeTab === 'inbanc' && (
                 <div className="space-y-6">
                     <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -737,6 +815,197 @@ export default function SettingsPage() {
                     setConflicts={setConflicts}
                 />
             )}
+        </div>
+    );
+}
+
+// ─── Drug Settings Tab ───────────────────────────────────────────────────
+interface DrugSettingsTabProps {
+    drugGroup1: string[];
+    setDrugGroup1: (items: string[]) => void;
+    drugGroup2: DrugGenericName[];
+    setDrugGroup2: (items: DrugGenericName[]) => void;
+    usedDrugGroup1: Set<string>;
+    usedDrugGeneric: Set<string>;
+}
+
+function DrugSettingsTab({ drugGroup1, setDrugGroup1, drugGroup2, setDrugGroup2, usedDrugGroup1, usedDrugGeneric }: DrugSettingsTabProps) {
+    const [newGenericName, setNewGenericName] = useState('');
+    const [newGenericGroup, setNewGenericGroup] = useState('');
+    const [editIdx, setEditIdx] = useState<number | null>(null);
+    const [editName, setEditName] = useState('');
+    const [editGroup, setEditGroup] = useState('');
+
+    const persistGroup2 = useCallback((list: DrugGenericName[]) => {
+        setDrugGroup2(list);
+        localStorage.setItem('cap_drug_group_2', JSON.stringify(list));
+        settingsService.saveDrugGenericNames(list).catch(() => { });
+    }, [setDrugGroup2]);
+
+    const handleAddGeneric = () => {
+        const name = newGenericName.trim();
+        if (!name || !newGenericGroup) return;
+        if (drugGroup2.some(g => g.ten === name)) { toast.error('Tên gốc này đã tồn tại'); return; }
+        persistGroup2([...drugGroup2, { ten: name, nhom1: newGenericGroup }]);
+        setNewGenericName('');
+        setNewGenericGroup('');
+        toast.success(`Đã thêm "${name}"`);
+    };
+
+    const startEditGeneric = (idx: number) => {
+        setEditIdx(idx);
+        setEditName(drugGroup2[idx].ten);
+        setEditGroup(drugGroup2[idx].nhom1);
+    };
+
+    const saveEditGeneric = (idx: number) => {
+        const name = editName.trim();
+        if (!name || !editGroup) return;
+        if (name !== drugGroup2[idx].ten && drugGroup2.some(g => g.ten === name)) {
+            toast.error('Tên gốc này đã tồn tại');
+            return;
+        }
+        const updated = [...drugGroup2];
+        updated[idx] = { ten: name, nhom1: editGroup };
+        persistGroup2(updated);
+        setEditIdx(null);
+        toast.success('Đã cập nhật');
+    };
+
+    const deleteGeneric = (idx: number) => {
+        const name = drugGroup2[idx].ten;
+        if (usedDrugGeneric.has(name)) {
+            toast.error(`Không thể xóa "${name}" vì đang được sử dụng trong dữ liệu bệnh nhân`);
+            return;
+        }
+        persistGroup2(drugGroup2.filter((_, i) => i !== idx));
+        toast.success(`Đã xóa "${name}"`);
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* Frame 1: Nhóm 1 */}
+            <EditableListTable
+                title="Nhóm 1: Phân loại thuốc"
+                description="Quản lý các nhóm thuốc lớn (Kháng sinh, Corticoid, ...). Nhóm đang được tên gốc sử dụng sẽ không thể xóa."
+                storageKey="cap_drug_group_1"
+                items={drugGroup1}
+                setItems={setDrugGroup1}
+                usedItems={usedDrugGroup1}
+                placeholder="Nhập nhóm thuốc mới..."
+            />
+
+            {/* Frame 2: Nhóm 2 — Tên gốc */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <h3 className="font-heading font-semibold text-gray-900 mb-1">Nhóm 2: Tên gốc</h3>
+                <p className="text-sm text-gray-500 mb-4">
+                    Quản lý tên thuốc gốc (generic name). Mỗi tên gốc thuộc một nhóm thuốc ở Nhóm 1.
+                </p>
+
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="max-h-80 overflow-y-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-50 sticky top-0 z-10">
+                                <tr>
+                                    <th className="text-left px-4 py-2.5 font-medium text-gray-600 w-12">#</th>
+                                    <th className="text-left px-4 py-2.5 font-medium text-gray-600">Tên gốc</th>
+                                    <th className="text-left px-4 py-2.5 font-medium text-gray-600 w-40">Nhóm</th>
+                                    <th className="text-center px-4 py-2.5 font-medium text-gray-600 w-10">Đang dùng</th>
+                                    <th className="text-right px-4 py-2.5 font-medium text-gray-600 w-24">Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {drugGroup2.length === 0 && (
+                                    <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400 italic">Chưa có dữ liệu</td></tr>
+                                )}
+                                {drugGroup2.map((item, idx) => {
+                                    const inUse = usedDrugGeneric.has(item.ten);
+                                    const isEditing = editIdx === idx;
+                                    return (
+                                        <tr key={idx} className={`hover:bg-gray-50/50 transition-colors ${inUse ? 'bg-amber-50/40' : ''}`}>
+                                            <td className="px-4 py-2 text-gray-400 tabular-nums">{idx + 1}</td>
+                                            <td className="px-4 py-2">
+                                                {isEditing ? (
+                                                    <input autoFocus value={editName}
+                                                        onChange={(e) => setEditName(e.target.value)}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') saveEditGeneric(idx); if (e.key === 'Escape') setEditIdx(null); }}
+                                                        className="w-full px-2 py-1 rounded border border-primary-300 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                                                ) : (
+                                                    <span className="text-gray-800">{item.ten}</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                {isEditing ? (
+                                                    <select value={editGroup} onChange={(e) => setEditGroup(e.target.value)}
+                                                        className="w-full px-2 py-1 rounded border border-primary-300 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                                                        <option value="">Chọn nhóm</option>
+                                                        {drugGroup1.map(g => <option key={g} value={g}>{g}</option>)}
+                                                    </select>
+                                                ) : (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
+                                                        {item.nhom1}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-2 text-center">
+                                                {inUse && (
+                                                    <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-medium">
+                                                        <ShieldAlert className="w-3 h-3" /> Có
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-2 text-right">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    {isEditing ? (
+                                                        <>
+                                                            <button onClick={() => saveEditGeneric(idx)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Lưu">
+                                                                <Check className="w-4 h-4" />
+                                                            </button>
+                                                            <button onClick={() => setEditIdx(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors" title="Hủy">
+                                                                <X className="w-4 h-4" />
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button onClick={() => startEditGeneric(idx)} className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="Sửa">
+                                                                <Pencil className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button onClick={() => deleteGeneric(idx)} disabled={inUse}
+                                                                className={`p-1.5 rounded-lg transition-colors ${inUse ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-red-600 hover:bg-red-50'}`}
+                                                                title={inUse ? 'Đang được sử dụng — không thể xóa' : 'Xóa'}>
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                    <input value={newGenericName} onChange={(e) => setNewGenericName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddGeneric(); }}
+                        placeholder="Nhập tên gốc mới..."
+                        className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                    <select value={newGenericGroup} onChange={(e) => setNewGenericGroup(e.target.value)}
+                        className="w-40 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                        <option value="">Chọn nhóm</option>
+                        {drugGroup1.map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                    <button onClick={handleAddGeneric} disabled={!newGenericName.trim() || !newGenericGroup}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                        <Plus className="w-4 h-4" /> Thêm
+                    </button>
+                </div>
+                <p className="mt-2 text-xs text-gray-400">
+                    Tổng: {drugGroup2.length} tên gốc • {usedDrugGeneric.size} đang sử dụng
+                </p>
+            </div>
         </div>
     );
 }

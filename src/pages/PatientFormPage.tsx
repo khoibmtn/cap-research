@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Save, Loader2, Edit, ArrowLeft, Printer, Trash2, XCircle } from 'lucide-react';
 import { patientService } from '../services/patientService';
+import { settingsService } from '../services/settingsService';
 import { useCalculatedIndices } from '../hooks/useCalculatedIndices';
 import { usePSICalculator } from '../hooks/usePSICalculator';
-import type { Patient } from '../types/patient';
+import type { Patient, DrugGenericName } from '../types/patient';
 import { createDefaultPatient } from '../types/patient';
 import { usePrintRecord } from '../hooks/usePrintRecord';
 import StepHanhChinh from '../components/form/StepHanhChinh';
@@ -51,6 +52,8 @@ export default function PatientFormPage() {
     // Snapshot of saved data to detect unsaved changes
     const savedDataRef = useRef<string>('');
     const [isDirty, setIsDirty] = useState(false);
+    // Drug generic names from settings
+    const [drugGenericNames, setDrugGenericNames] = useState<DrugGenericName[]>([]);
 
     // Auto-calculated indices
     const indices = useCalculatedIndices({
@@ -112,6 +115,31 @@ export default function PatientFormPage() {
         };
         init();
     }, [id, isEdit]);
+
+    // Load drug generic names from settings
+    useEffect(() => {
+        settingsService.getDrugGenericNames().then((items) => {
+            if (items && items.length > 0) {
+                setDrugGenericNames(items);
+            } else {
+                const raw = localStorage.getItem('cap_drug_group_2');
+                if (raw) {
+                    try {
+                        const parsed = JSON.parse(raw);
+                        if (Array.isArray(parsed)) setDrugGenericNames(parsed);
+                    } catch { /* ignore */ }
+                }
+            }
+        }).catch(() => {
+            const raw = localStorage.getItem('cap_drug_group_2');
+            if (raw) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) setDrugGenericNames(parsed);
+                } catch { /* ignore */ }
+            }
+        });
+    }, []);
 
     // Track dirty state (for both new and edit modes)
     const isDirtyRef = useRef(false);
@@ -273,8 +301,8 @@ export default function PatientFormPage() {
         if (!validate()) return false;
 
         // Inject calculated values at save time (not in useEffect to avoid focus loss)
-        // Filter out medication entries without a drug name
-        const cleanedThuocDaDung = (formData.tienSu.thuocDaDung || []).filter(t => t.tenThuoc.trim());
+        // Filter out medication entries without a drug name or generic name
+        const cleanedThuocDaDung = (formData.tienSu.thuocDaDung || []).filter(t => t.tenGoc?.trim() || t.tenThuoc.trim());
 
         const dataToSave: FormData = {
             ...formData,
@@ -378,7 +406,7 @@ export default function PatientFormPage() {
     const renderStep = () => {
         switch (currentStep) {
             case 0: return <StepHanhChinh data={formData} onChange={updateField} existingCodes={existingCodes} currentPatientId={isEdit ? id : undefined} />;
-            case 1: return <StepTienSu data={formData.tienSu} onChange={(v) => updateField('tienSu', v)} />;
+            case 1: return <StepTienSu data={formData.tienSu} onChange={(v) => updateField('tienSu', v)} drugGenericNames={drugGenericNames} />;
             case 2: return <StepLamSang data={formData.lamSang} ngayVaoVien={formData.hanhChinh.ngayVaoVien} onChange={(v) => updateField('lamSang', v)} />;
             case 3: return <StepXetNghiem data={formData.xetNghiem} indices={indices} onChange={(v) => updateField('xetNghiem', v)} />;
             case 4: return <StepHinhAnh data={formData.hinhAnh} onChange={(v) => updateField('hinhAnh', v)} />;

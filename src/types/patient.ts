@@ -17,11 +17,18 @@ export interface HanhChinh {
 // ==================== TIỀN SỬ ====================
 export interface ThuocDaDung {
     id: string;
-    tenThuoc: string;
+    tenGoc: string; // tên gốc (generic name) — bắt buộc chọn từ danh sách
+    tenThuoc: string; // tên biệt dược — nhập tự do
     lieuLuong: string;
     tongLieu: string;
     duongDung: string;
     thoiGianDung: number | null; // ngày
+}
+
+// ==================== THUỐC (Settings) ====================
+export interface DrugGenericName {
+    ten: string;   // tên gốc
+    nhom1: string; // thuộc nhóm 1 (Kháng sinh, Corticoid, ...)
 }
 
 export interface TienSu {
