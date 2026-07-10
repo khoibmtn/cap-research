@@ -12,7 +12,7 @@ import {
 import {
     Users, Skull, Activity, Stethoscope, Heart, MapPin,
     Bug, FlaskConical, Droplets, ThermometerSun,
-    Clock, Pill,
+    Clock, Pill, AlertTriangle,
 } from 'lucide-react';
 import { mean, sd, median, q1, q3, meanSd, frac, psiClass } from '../utils/statsHelpers';
 import ExpectedResultsTab from '../components/analytics/ExpectedResultsTab';
@@ -64,6 +64,11 @@ export default function AnalyticsPage() {
         });
     }, []);
 
+    // Filter out disabled patients for statistics
+    const allPatients = patients;
+    const enabledPatients = patients.filter(p => !p.disabled);
+    const disabledCount = allPatients.length - enabledPatients.length;
+
     if (loading) {
         return <div className="text-center py-12 text-gray-400">Đang tải dữ liệu...</div>;
     }
@@ -78,9 +83,35 @@ export default function AnalyticsPage() {
     return (
         <div>
             <h1 className="font-heading text-2xl font-bold text-gray-900 mb-2">Thống kê nghiên cứu</h1>
-            <p className="text-sm text-gray-500 mb-6">
-                Nghiên cứu đặc điểm căn nguyên vi sinh và dấu ấn sinh học ở bệnh nhân VPMPCĐ
+            <p className="text-sm text-gray-500 mb-4">
+                Nghiên cứu đặc điểm căn nguyên vi sinh và dấu ấn sinh học ở bệnh nhân VPMPĐCĐ
             </p>
+
+            {/* Statistics sample banner */}
+            <div className={`flex items-center gap-3 mb-5 px-4 py-3 rounded-xl border ${
+                disabledCount > 0
+                    ? 'bg-amber-50 border-amber-200'
+                    : 'bg-green-50 border-green-200'
+            }`}>
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                    disabledCount > 0 ? 'bg-amber-100' : 'bg-green-100'
+                }`}>
+                    {disabledCount > 0
+                        ? <AlertTriangle className="w-5 h-5 text-amber-600" />
+                        : <Users className="w-5 h-5 text-green-600" />
+                    }
+                </div>
+                <div className="text-sm">
+                    <span className="font-semibold text-gray-800">
+                        Đang thống kê trên <span className="text-lg font-bold text-primary-700">{enabledPatients.length}</span> bệnh nhân
+                    </span>
+                    {disabledCount > 0 && (
+                        <span className="text-amber-700 ml-2">
+                            (<span className="font-semibold">{disabledCount}</span> bệnh nhân bị loại khỏi thống kê / Tổng: {allPatients.length})
+                        </span>
+                    )}
+                </div>
+            </div>
 
             {/* Tab bar */}
             <div className="flex gap-1 mb-6 border-b border-gray-200">
@@ -98,10 +129,10 @@ export default function AnalyticsPage() {
                 ))}
             </div>
 
-            {tab === 'overview' && <OverviewTab patients={patients} />}
-            {tab === 'micro' && <MicroTab patients={patients} />}
-            {tab === 'biomarker' && <BiomarkerTab patients={patients} />}
-            {tab === 'expected' && <ExpectedResultsTab patients={patients} drugGroup1={drugGroup1} drugGroup2={drugGroup2} />}
+            {tab === 'overview' && <OverviewTab patients={enabledPatients} />}
+            {tab === 'micro' && <MicroTab patients={enabledPatients} />}
+            {tab === 'biomarker' && <BiomarkerTab patients={enabledPatients} />}
+            {tab === 'expected' && <ExpectedResultsTab patients={enabledPatients} drugGroup1={drugGroup1} drugGroup2={drugGroup2} />}
         </div>
     );
 }

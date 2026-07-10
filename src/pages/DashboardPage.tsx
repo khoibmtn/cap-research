@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, FileDown, Trash2, Eye, Edit, Printer, HardDrive, Loader2, Settings2, ChevronDown, ChevronRight, ChevronLeft, CircleCheck, CircleAlert, SlidersHorizontal, X } from 'lucide-react';
+import { Plus, Search, FileDown, Trash2, Eye, Edit, Printer, HardDrive, Loader2, Settings2, ChevronDown, ChevronRight, ChevronLeft, CircleCheck, CircleAlert, SlidersHorizontal, X, ToggleLeft, ToggleRight } from 'lucide-react';
 import { patientService } from '../services/patientService';
 import { settingsService } from '../services/settingsService';
 import { exportPatientsToExcel } from '../services/exportService';
@@ -615,6 +615,16 @@ export default function DashboardPage() {
         toast.success('Đã xuất file Excel');
     };
 
+    const handleToggleDisabled = async (patient: Patient) => {
+        const newState = !patient.disabled;
+        try {
+            await patientService.update(patient.id, { disabled: newState });
+            toast.success(newState ? `Đã loại "${patient.hanhChinh.hoTen}" khỏi thống kê` : `Đã đưa "${patient.hanhChinh.hoTen}" vào thống kê`);
+        } catch {
+            toast.error('Lỗi khi cập nhật trạng thái');
+        }
+    };
+
     const handleBackup = async () => {
         if (patients.length === 0) { toast.error('Không có dữ liệu để backup'); return; }
         setBackingUp(true);
@@ -675,7 +685,17 @@ export default function DashboardPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
                     <h1 className="font-heading text-2xl font-bold text-gray-900">Danh sách bệnh nhân</h1>
-                    <p className="text-sm text-gray-500 mt-1">Tổng cộng {patients.length} bệnh nhân nghiên cứu</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                        Tổng cộng <span className="font-semibold text-gray-700">{patients.length}</span> bệnh nhân nghiên cứu
+                        {' · '}
+                        <span className="font-semibold text-green-600">{patients.filter(p => !p.disabled).length}</span> đưa vào thống kê
+                        {patients.filter(p => p.disabled).length > 0 && (
+                            <>
+                                {' · '}
+                                <span className="font-semibold text-red-500">{patients.filter(p => p.disabled).length}</span> loại khỏi thống kê
+                            </>
+                        )}
+                    </p>
                 </div>
                 <div className="flex gap-2">
                     {selectedIds.size > 0 && (
@@ -1034,12 +1054,17 @@ export default function DashboardPage() {
                                     <tbody className="divide-y divide-gray-100">
                                         {paged.map((p, idx) => {
                                             const isSelected = selectedIds.has(p.id);
-                                            const rowBg = isSelected
-                                                ? 'bg-amber-50'
-                                                : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60';
-                                            const stickyBg = isSelected
-                                                ? 'bg-amber-50'
-                                                : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                                            const isDisabled = !!p.disabled;
+                                            const rowBg = isDisabled
+                                                ? 'bg-red-50/40'
+                                                : isSelected
+                                                    ? 'bg-amber-50'
+                                                    : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60';
+                                            const stickyBg = isDisabled
+                                                ? 'bg-red-50'
+                                                : isSelected
+                                                    ? 'bg-amber-50'
+                                                    : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50';
                                             return (
                                                 <tr key={p.id} className={`hover:bg-gray-100/60 transition-colors ${rowBg}`}>
                                                     <td className={`px-3 py-3 sticky left-0 z-10 ${stickyBg}`}>
@@ -1051,14 +1076,31 @@ export default function DashboardPage() {
                                                         />
                                                     </td>
                                                     {activeColumns.map((col) => (
-                                                        <td key={col.key} className={`px-4 py-3${col.key === 'xquang' || col.key === 'ctScanner' ? '' : ' whitespace-nowrap'}`}
+                                                        <td key={col.key} className={`px-4 py-3${col.key === 'xquang' || col.key === 'ctScanner' ? '' : ' whitespace-nowrap'}${isDisabled ? ' text-red-400' : ''}`}
                                                             style={col.minWidth ? { minWidth: col.minWidth } : undefined}
                                                         >
-                                                            {renderCell(col, p)}
+                                                            {isDisabled && (col.key === 'maBNNC' || col.key === 'hoTen')
+                                                                ? <span className="text-red-500 font-medium">{col.getValue(p)}</span>
+                                                                : renderCell(col, p)
+                                                            }
                                                         </td>
                                                     ))}
                                                     <td className={`px-4 py-3 sticky right-0 z-10 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.06)] ${stickyBg}`}>
                                                         <div className="flex items-center justify-end gap-1">
+                                                            <button
+                                                                onClick={() => handleToggleDisabled(p)}
+                                                                className={`p-1.5 rounded-lg transition-colors ${
+                                                                    isDisabled
+                                                                        ? 'text-red-400 hover:text-green-600 hover:bg-green-50'
+                                                                        : 'text-green-500 hover:text-red-500 hover:bg-red-50'
+                                                                }`}
+                                                                title={isDisabled ? 'Bật lại — Đưa vào thống kê' : 'Tắt — Loại khỏi thống kê'}
+                                                            >
+                                                                {isDisabled
+                                                                    ? <ToggleLeft className="w-5 h-5" />
+                                                                    : <ToggleRight className="w-5 h-5" />
+                                                                }
+                                                            </button>
                                                             <button
                                                                 onClick={() => navigate(`/patient/${p.id}`)}
                                                                 className="p-1.5 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"

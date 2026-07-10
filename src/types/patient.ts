@@ -231,6 +231,7 @@ export interface Patient {
     viKhuan: ViKhuan[];
     psi: PSIData;
     ketCuc: KetCuc;
+    disabled?: boolean; // true = loại khỏi thống kê (mặc định: false = enabled)
     createdAt: Timestamp | null;
     updatedAt: Timestamp | null;
 }
