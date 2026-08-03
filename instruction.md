@@ -73,7 +73,17 @@ Chọn các tổn thương trên X-quang và CT (thâm nhiễm, đông đặc, t
 ### Bước 6 — Vi khuẩn
 Thêm từng vi khuẩn được phân lập. Mỗi vi khuẩn có thể ghi kèm kháng sinh đồ (nhạy S / trung gian I / kháng R cho từng kháng sinh). Danh sách vi khuẩn và kháng sinh được quản lý ở phần Cài đặt.
 
-### Bước 7 — PSI
+### Bước 7 — CURB-65 & PSI
+Tab này hiển thị 2 thang điểm đánh giá mức độ nặng, tất cả đều được **tự động tính** từ dữ liệu bạn đã nhập ở các bước trước.
+
+**CURB-65 (phía trên):**
+- Gồm 5 cấu phần: **C** (Confusion — rối loạn ý thức), **U** (Ure > 7), **R** (Nhịp thở ≥ 30), **B** (Huyết áp thấp), **65** (Tuổi ≥ 65).
+- Các cấu phần U, R, B, 65 tự động đánh giá từ dữ liệu lâm sàng và xét nghiệm.
+- Riêng cấu phần **C** (Confusion): khi điểm Glasgow của BN ≤ 13, phần mềm sẽ **hỏi bạn** "Bệnh nhân có rối loạn ý thức mới xuất hiện không?". Bạn chọn Có hoặc Không. Nếu Glasgow > 13 thì C tự động = 0.
+- Tổng điểm CURB-65 từ 0 đến 5. Phân nhóm: 0–1 = Nhẹ, 2 = Trung bình, 3–5 = Nặng.
+- Khi bạn sửa bất kỳ dữ liệu nào (tuổi, ure, nhịp thở, huyết áp, Glasgow), điểm CURB-65 sẽ **tự động cập nhật** ngay lập tức. Nếu thiếu cấu phần, phần mềm sẽ báo "Chưa đủ dữ liệu".
+
+**PSI (phía dưới):**
 Phần mềm tự tính điểm PSI (PORT Score) dựa trên các thông tin đã nhập ở các bước trước. Hiển thị tổng điểm và phân tầng nguy cơ (Class I → V).
 
 ### Bước 8 — Kết cục

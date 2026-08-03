@@ -323,6 +323,43 @@ src/
 | III | 71–90 | Trung bình |
 | IV | 91–130 | Nặng |
 | V | > 130 | Rất nặng |
+---
+
+### 2.9b CURB65Data — CURB-65 Severity Score
+
+| Field | Type | Mô tả |
+|---|---|---|
+| `confusion` | boolean | BN có rối loạn ý thức mới (do user xác nhận) |
+| `confusionAsked` | boolean | Đã hỏi user về confusion |
+| `tongDiem` | number | Tổng điểm CURB-65 (0–5) |
+| `phanNhom` | string | Nhóm: Nhẹ / Trung bình / Nặng |
+| `chiTiet` | CURB65ChiTiet | Chi tiết 5 cấu phần |
+| `duDuLieu` | boolean | Có đủ dữ liệu tính toán |
+
+#### CURB65ChiTiet
+
+| Field | Type | Mô tả |
+|---|---|---|
+| `c` | boolean \| null | Confusion (Glasgow ≤ threshold → hỏi user) |
+| `u` | boolean \| null | Ure > 7 mmol/L |
+| `r` | boolean \| null | Respiratory rate ≥ 30 |
+| `b` | boolean \| null | Blood pressure: systolic < 90 OR diastolic ≤ 60 |
+| `age65` | boolean \| null | Age ≥ 65 |
+
+#### Phân nhóm
+
+| Score | Nhóm | Gợi ý |
+|---|---|---|
+| 0–1 | Nhẹ | Điều trị ngoại trú |
+| 2 | Trung bình | Nhập viện ngắn |
+| 3–5 | Nặng | Cân nhắc ICU |
+
+#### Logic tính
+
+- **C:** Glasgow ≤ threshold (mặc định 13) → trigger prompt hỏi "BN có rối loạn ý thức mới?". C = +1 nếu user confirm "Có".
+- **U, R, B, 65:** Tự động tính từ dữ liệu lâm sàng/xét nghiệm.
+- **duDuLieu = true** khi tuổi + ure + nhịp thở + huyết áp + Glasgow đều có giá trị.
+- Kết quả tự động cập nhật khi user thay đổi bất kỳ cấu phần nào.
 
 ---
 
