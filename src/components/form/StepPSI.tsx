@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { PSIData, LamSang, XetNghiem, TienSu, HinhAnh } from '../../types/patient';
 import { PSI_LABELS } from '../../data/formOptions';
+import toast from 'react-hot-toast';
 
 interface Props {
     data: PSIData;
@@ -11,6 +12,9 @@ interface Props {
     tienSu: TienSu;
     hinhAnh: HinhAnh;
     psiResult: { tongDiem: number; phanTang: string; chiTietDiem: Record<string, number> };
+    /** Confusion state from CURB-65 (answered in Lâm sàng tab) */
+    confusion?: boolean;
+    confusionAsked?: boolean;
     onChange: (data: PSIData) => void;
 }
 
@@ -22,7 +26,7 @@ function parseHuyetAp(s: string): { tamThu: number | null } {
     return { tamThu: isNaN(tamThu) ? null : tamThu };
 }
 
-export default function StepPSI({ data, tuoi, gioiTinh, lamSang, xetNghiem, tienSu, hinhAnh, psiResult, onChange }: Props) {
+export default function StepPSI({ data, tuoi, gioiTinh, lamSang, xetNghiem, tienSu, hinhAnh, psiResult, confusion, confusionAsked, onChange }: Props) {
     const hasAutoChecked = useRef(false);
 
     // Auto-check PSI criteria from clinical + lab data (once when navigating to this tab)
@@ -81,10 +85,29 @@ export default function StepPSI({ data, tuoi, gioiTinh, lamSang, xetNghiem, tien
         }
     }, []); // Run once on mount
 
+    // Auto-sync thayDoiTriGiac from Confusion answer in Lâm sàng tab
+    useEffect(() => {
+        if (confusionAsked && confusion !== undefined) {
+            const current = data.criteria.thayDoiTriGiac;
+            if (confusion && !current) {
+                // User answered "Có" → auto-check
+                onChange({ ...data, criteria: { ...data.criteria, thayDoiTriGiac: true } });
+            }
+        }
+    }, [confusion, confusionAsked]);
+
     const toggleCriteria = (key: string) => {
+        const newValue = !data.criteria[key as keyof typeof data.criteria];
+        // Warn if unchecking thayDoiTriGiac while confusion is confirmed
+        if (key === 'thayDoiTriGiac' && !newValue && confusion && confusionAsked) {
+            toast.error(
+                'Cảnh báo: Bạn đã xác nhận BN có rối loạn ý thức mới ở tab Lâm sàng. Việc bỏ chọn "Thay đổi tri giác" ở PSI có thể không chính xác.',
+                { duration: 5000, icon: '⚠️' }
+            );
+        }
         onChange({
             ...data,
-            criteria: { ...data.criteria, [key]: !data.criteria[key as keyof typeof data.criteria] },
+            criteria: { ...data.criteria, [key]: newValue },
         });
     };
 
@@ -98,7 +121,7 @@ export default function StepPSI({ data, tuoi, gioiTinh, lamSang, xetNghiem, tien
 
     return (
         <div className="space-y-6">
-            <h2 className="font-heading font-semibold text-lg text-gray-900">G. Tính điểm PSI</h2>
+            <h2 className="font-heading font-semibold text-lg text-gray-900">H. Tính điểm PSI</h2>
 
             {/* Auto-check notice */}
             <div className="text-xs text-primary-600 bg-primary-50 rounded-lg px-3 py-2">

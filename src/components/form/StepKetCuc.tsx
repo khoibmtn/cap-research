@@ -108,7 +108,7 @@ export default function StepKetCuc({ data, ngayVaoVien, ngayRaVien, onChange }: 
 
     return (
         <div className="space-y-6">
-            <h2 className="font-heading font-semibold text-lg text-gray-900">H. Kết cục</h2>
+            <h2 className="font-heading font-semibold text-lg text-gray-900">I. Kết cục</h2>
 
             {/* ── 1. Diễn biến điều trị (multichoice — dynamic from settings) ── */}
             <div>

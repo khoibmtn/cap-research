@@ -229,6 +229,8 @@ export default function SettingsPage() {
     // Lâm sàng tab
     const [dienBien, setDienBien] = useState<string[]>([]);
     const [tinhTrang, setTinhTrang] = useState<string[]>([]);
+    const [glasgowThreshold, setGlasgowThreshold] = useState(13);
+    const [glasgowSaving, setGlasgowSaving] = useState(false);
 
     // Vi khuẩn tab
     const [bacteria, setBacteria] = useState<string[]>([]);
@@ -377,6 +379,11 @@ export default function SettingsPage() {
                 try { setPrintSettings({ ...DEFAULT_PRINT_SETTINGS, ...JSON.parse(storedPrint) }); } catch { /* ignore */ }
             }
         });
+
+        // Clinical settings (Glasgow threshold)
+        settingsService.getClinicalSettings().then((data) => {
+            if (data?.glasgowThreshold) setGlasgowThreshold(data.glasgowThreshold);
+        }).catch(() => { /* use default */ });
     }, []);
 
     // Fetch used items from patient data
@@ -632,6 +639,47 @@ export default function SettingsPage() {
                         usedItems={usedTinhTrang}
                         placeholder="Nhập tình trạng mới..."
                     />
+
+                    {/* Glasgow threshold setting */}
+                    <div className="bg-white rounded-xl border border-gray-200 p-5">
+                        <h3 className="font-heading font-semibold text-base text-gray-900 mb-1">Ngưỡng rối loạn ý thức (Glasgow)</h3>
+                        <p className="text-xs text-gray-500 mb-4">
+                            Khi điểm Glasgow ≤ ngưỡng này, hệ thống sẽ hỏi xác nhận rối loạn ý thức để tính điểm CURB-65 (cấu phần C) và PSI (thay đổi tri giác).
+                        </p>
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <label className="text-sm font-medium text-gray-700">Glasgow ≤</label>
+                                <select
+                                    value={glasgowThreshold}
+                                    onChange={(e) => setGlasgowThreshold(Number(e.target.value))}
+                                    className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent w-20"
+                                >
+                                    {Array.from({ length: 13 }, (_, i) => 15 - i).map(v => (
+                                        <option key={v} value={v}>{v}</option>
+                                    ))}
+                                </select>
+                                <span className="text-xs text-gray-400">(mặc định: 13)</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    setGlasgowSaving(true);
+                                    try {
+                                        await settingsService.saveClinicalSettings({ glasgowThreshold });
+                                        toast.success('Đã lưu ngưỡng Glasgow');
+                                    } catch {
+                                        toast.error('Lỗi khi lưu');
+                                    } finally {
+                                        setGlasgowSaving(false);
+                                    }
+                                }}
+                                disabled={glasgowSaving}
+                                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                            >
+                                {glasgowSaving ? 'Đang lưu...' : 'Lưu'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 

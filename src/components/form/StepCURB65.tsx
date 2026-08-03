@@ -14,7 +14,6 @@ interface Props {
         duDuLieu: boolean;
         glasgowBelowThreshold: boolean;
     };
-    onChange: (data: CURB65Data) => void;
 }
 
 function parseHuyetAp(s: string): { tamThu: number | null; tamTruong: number | null } {
@@ -28,7 +27,7 @@ function parseHuyetAp(s: string): { tamThu: number | null; tamTruong: number | n
     };
 }
 
-export default function StepCURB65({ data, tuoi, lamSang, xetNghiem, curb65Result, onChange }: Props) {
+export default function StepCURB65({ data, tuoi, lamSang, xetNghiem, curb65Result }: Props) {
     const { tongDiem, phanNhom, chiTiet, duDuLieu, glasgowBelowThreshold } = curb65Result;
     const { tamThu, tamTruong } = parseHuyetAp(lamSang.huyetAp);
 
@@ -70,9 +69,7 @@ export default function StepCURB65({ data, tuoi, lamSang, xetNghiem, curb65Resul
     if (tamThu === null && tamTruong === null) missingFields.push('Huyết áp (tab Lâm sàng)');
     if (lamSang.diemGlasgow === null) missingFields.push('Glasgow (tab Lâm sàng)');
 
-    const handleConfusionChange = (value: boolean) => {
-        onChange({ ...data, confusion: value, confusionAsked: true });
-    };
+
 
     return (
         <div className="space-y-6">
@@ -138,44 +135,21 @@ export default function StepCURB65({ data, tuoi, lamSang, xetNghiem, curb65Resul
                 })}
             </div>
 
-            {/* Confusion question — only when Glasgow < threshold */}
+            {/* Confusion status — read-only, question is in Lâm sàng tab */}
             {glasgowBelowThreshold && (
-                <div className="p-4 bg-blue-50 rounded-xl border border-blue-200 space-y-3">
-                    <div className="flex items-start gap-2">
-                        <span className="text-lg">⚕️</span>
-                        <div>
-                            <p className="text-sm font-semibold text-blue-900">
-                                Glasgow = {lamSang.diemGlasgow} → Đánh giá Confusion
-                            </p>
-                            <p className="text-sm text-blue-800 mt-1">
-                                Có rối loạn ý thức và/hoặc định hướng (người, nơi chốn, thời gian) <strong>mới xuất hiện</strong> không?
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex gap-3 ml-8">
-                        <button
-                            type="button"
-                            onClick={() => handleConfusionChange(true)}
-                            className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                                data.confusion && data.confusionAsked
-                                    ? 'bg-red-100 border-red-300 text-red-800 ring-2 ring-red-400'
-                                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                            }`}
-                        >
-                            Có
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => handleConfusionChange(false)}
-                            className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                                !data.confusion && data.confusionAsked
-                                    ? 'bg-green-100 border-green-300 text-green-800 ring-2 ring-green-400'
-                                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                            }`}
-                        >
-                            Không
-                        </button>
-                    </div>
+                <div className={`p-3 rounded-lg border text-sm ${
+                    data.confusionAsked
+                        ? data.confusion
+                            ? 'bg-red-50 border-red-200 text-red-800'
+                            : 'bg-green-50 border-green-200 text-green-800'
+                        : 'bg-amber-50 border-amber-200 text-amber-800'
+                }`}>
+                    {data.confusionAsked
+                        ? data.confusion
+                            ? '⚠️ Rối loạn ý thức mới: Có → C = +1 (đã xác nhận tại tab Lâm sàng)'
+                            : '✅ Rối loạn ý thức mới: Không → C = 0 (đã xác nhận tại tab Lâm sàng)'
+                        : '⏳ Chưa trả lời câu hỏi rối loạn ý thức — vui lòng kiểm tra tại tab Lâm sàng'
+                    }
                 </div>
             )}
 

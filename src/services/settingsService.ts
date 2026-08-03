@@ -92,4 +92,19 @@ export const settingsService = {
     async saveDrugGenericNames(items: { ten: string; nhom1: string }[]): Promise<void> {
         await setDoc(doc(db, 'app_settings/drug_generic_names'), { items });
     },
+
+    /** Clinical settings (Glasgow threshold, etc.) */
+    async getClinicalSettings(): Promise<{ glasgowThreshold: number } | null> {
+        try {
+            const snap = await getDoc(doc(db, 'app_settings/clinical'));
+            if (snap.exists()) return snap.data() as { glasgowThreshold: number };
+        } catch (e) {
+            console.warn('Failed to load clinical settings from Firestore', e);
+        }
+        return null;
+    },
+
+    async saveClinicalSettings(settings: { glasgowThreshold: number }): Promise<void> {
+        await setDoc(doc(db, 'app_settings/clinical'), settings);
+    },
 };

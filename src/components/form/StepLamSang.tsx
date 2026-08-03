@@ -1,4 +1,4 @@
-import type { LamSang } from '../../types/patient';
+import type { LamSang, CURB65Data } from '../../types/patient';
 import { DOM_TINH_OPTIONS, BEN_OPTIONS } from '../../data/formOptions';
 import DateInput from '../ui/DateInput';
 import toast from 'react-hot-toast';
@@ -7,6 +7,11 @@ interface Props {
     data: LamSang;
     ngayVaoVien: string;
     onChange: (data: LamSang) => void;
+    /** CURB-65 data for confusion question */
+    curb65Data?: CURB65Data;
+    onCurb65Change?: (data: CURB65Data) => void;
+    /** Glasgow threshold from settings */
+    glasgowThreshold?: number;
 }
 
 // ── Extracted outside to avoid remount/focus-loss on every render ──
@@ -30,7 +35,7 @@ function NumberInput({ label, value, unit, step, onChange }: {
     );
 }
 
-export default function StepLamSang({ data, ngayVaoVien, onChange }: Props) {
+export default function StepLamSang({ data, ngayVaoVien, onChange, curb65Data, onCurb65Change, glasgowThreshold = 13 }: Props) {
     const update = (field: keyof LamSang, value: unknown) => {
         onChange({ ...data, [field]: value });
     };
@@ -52,6 +57,27 @@ export default function StepLamSang({ data, ngayVaoVien, onChange }: Props) {
         if (tc && vao && tc > vao) {
             toast.error('Thời điểm triệu chứng phải ≤ ngày nhập viện. Đã xóa giá trị.', { duration: 4000 });
             onChange({ ...data, thoiDiemTrieuChung: '' });
+        }
+    };
+
+    // Glasgow combobox options (3-15)
+    const glasgowOptions = Array.from({ length: 13 }, (_, i) => 15 - i); // [15, 14, ..., 3]
+
+    // Confusion logic
+    const glasgowBelowThreshold = data.diemGlasgow !== null && data.diemGlasgow <= glasgowThreshold;
+
+    const handleConfusionChange = (value: boolean) => {
+        if (curb65Data && onCurb65Change) {
+            onCurb65Change({ ...curb65Data, confusion: value, confusionAsked: true });
+        }
+    };
+
+    // When Glasgow changes above threshold, reset confusion
+    const handleGlasgowChange = (v: number | null) => {
+        update('diemGlasgow', v);
+        if (v !== null && v > glasgowThreshold && curb65Data && onCurb65Change) {
+            // Glasgow above threshold → auto-reset confusion
+            onCurb65Change({ ...curb65Data, confusion: false, confusionAsked: false });
         }
     };
 
@@ -82,8 +108,66 @@ export default function StepLamSang({ data, ngayVaoVien, onChange }: Props) {
                 <NumberInput label="Nhịp thở" value={data.nhipTho} unit="lần/phút" step="1" onChange={(v) => update('nhipTho', v)} />
                 <NumberInput label="SpO2" value={data.spO2} unit="%" onChange={(v) => update('spO2', v)} />
                 <NumberInput label="BMI" value={data.bmi} unit="kg/m²" onChange={(v) => update('bmi', v)} />
-                <NumberInput label="Điểm Glasgow" value={data.diemGlasgow} step="1" onChange={(v) => update('diemGlasgow', v)} />
+                {/* Glasgow combobox */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Điểm Glasgow</label>
+                    <select
+                        value={data.diemGlasgow ?? ''}
+                        onChange={(e) => handleGlasgowChange(e.target.value ? Number(e.target.value) : null)}
+                        className={`w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                            glasgowBelowThreshold
+                                ? 'border-amber-400 bg-amber-50'
+                                : 'border-gray-200'
+                        }`}
+                    >
+                        <option value="">-- Chọn --</option>
+                        {glasgowOptions.map(v => (
+                            <option key={v} value={v}>{v}{v <= glasgowThreshold ? ' ⚠' : ''}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
+
+            {/* Confusion question — shown when Glasgow <= threshold */}
+            {glasgowBelowThreshold && curb65Data && onCurb65Change && (
+                <div className="p-4 bg-blue-50 rounded-xl border border-blue-200 space-y-3 -mt-2">
+                    <div className="flex items-start gap-2">
+                        <span className="text-lg">⚕️</span>
+                        <div>
+                            <p className="text-sm font-semibold text-blue-900">
+                                Glasgow = {data.diemGlasgow} (≤ {glasgowThreshold}) → Đánh giá rối loạn ý thức
+                            </p>
+                            <p className="text-sm text-blue-800 mt-1">
+                                Có rối loạn ý thức và/hoặc định hướng (người, nơi chốn, thời gian) <strong>mới xuất hiện</strong> không?
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex gap-3 ml-8">
+                        <button
+                            type="button"
+                            onClick={() => handleConfusionChange(true)}
+                            className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                                curb65Data.confusion && curb65Data.confusionAsked
+                                    ? 'bg-red-100 border-red-300 text-red-800 ring-2 ring-red-400'
+                                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                        >
+                            Có
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleConfusionChange(false)}
+                            className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                                !curb65Data.confusion && curb65Data.confusionAsked
+                                    ? 'bg-green-100 border-green-300 text-green-800 ring-2 ring-green-400'
+                                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                        >
+                            Không
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Respiratory symptoms */}
             <div>

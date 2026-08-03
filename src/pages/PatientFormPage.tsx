@@ -56,6 +56,8 @@ export default function PatientFormPage() {
     const [isDirty, setIsDirty] = useState(false);
     // Drug generic names from settings
     const [drugGenericNames, setDrugGenericNames] = useState<DrugGenericName[]>([]);
+    // Glasgow confusion threshold from clinical settings
+    const [glasgowThreshold, setGlasgowThreshold] = useState(13);
 
     // Auto-calculated indices
     const indices = useCalculatedIndices({
@@ -81,7 +83,7 @@ export default function PatientFormPage() {
         huyetAp: formData.lamSang.huyetAp,
         diemGlasgow: formData.lamSang.diemGlasgow,
         confusion: formData.curb65?.confusion ?? false,
-        confusionGlasgowThreshold: 13,
+        confusionGlasgowThreshold: glasgowThreshold,
     });
 
     // NOTE: Calculated values (indices, PSI) are injected at save time
@@ -152,6 +154,13 @@ export default function PatientFormPage() {
                 } catch { /* ignore */ }
             }
         });
+    }, []);
+
+    // Load clinical settings (Glasgow threshold)
+    useEffect(() => {
+        settingsService.getClinicalSettings().then((settings) => {
+            if (settings?.glasgowThreshold) setGlasgowThreshold(settings.glasgowThreshold);
+        }).catch(() => { /* use default 13 */ });
     }, []);
 
     // Track dirty state (for both new and edit modes)
@@ -427,7 +436,7 @@ export default function PatientFormPage() {
         switch (currentStep) {
             case 0: return <StepHanhChinh data={formData} onChange={updateField} existingCodes={existingCodes} currentPatientId={isEdit ? id : undefined} />;
             case 1: return <StepTienSu data={formData.tienSu} onChange={(v) => updateField('tienSu', v)} drugGenericNames={drugGenericNames} />;
-            case 2: return <StepLamSang data={formData.lamSang} ngayVaoVien={formData.hanhChinh.ngayVaoVien} onChange={(v) => updateField('lamSang', v)} />;
+            case 2: return <StepLamSang data={formData.lamSang} ngayVaoVien={formData.hanhChinh.ngayVaoVien} onChange={(v) => updateField('lamSang', v)} curb65Data={formData.curb65} onCurb65Change={(v) => updateField('curb65', v)} glasgowThreshold={glasgowThreshold} />;
             case 3: return <StepXetNghiem data={formData.xetNghiem} indices={indices} onChange={(v) => updateField('xetNghiem', v)} />;
             case 4: return <StepHinhAnh data={formData.hinhAnh} onChange={(v) => updateField('hinhAnh', v)} />;
             case 5: return <StepViKhuan data={formData.viKhuan} onChange={(v) => updateField('viKhuan', v)} />;
@@ -439,10 +448,9 @@ export default function PatientFormPage() {
                         lamSang={formData.lamSang}
                         xetNghiem={formData.xetNghiem}
                         curb65Result={curb65Result}
-                        onChange={(v) => updateField('curb65', v)}
                     />
                     <hr className="border-gray-200" />
-                    <StepPSI data={formData.psi} tuoi={formData.hanhChinh.tuoi} gioiTinh={formData.hanhChinh.gioiTinh} lamSang={formData.lamSang} xetNghiem={formData.xetNghiem} tienSu={formData.tienSu} hinhAnh={formData.hinhAnh} psiResult={psiResult} onChange={(v) => updateField('psi', v)} />
+                    <StepPSI data={formData.psi} tuoi={formData.hanhChinh.tuoi} gioiTinh={formData.hanhChinh.gioiTinh} lamSang={formData.lamSang} xetNghiem={formData.xetNghiem} tienSu={formData.tienSu} hinhAnh={formData.hinhAnh} psiResult={psiResult} confusion={formData.curb65?.confusion} confusionAsked={formData.curb65?.confusionAsked} onChange={(v) => updateField('psi', v)} />
                 </div>
             );
             case 7: return <StepKetCuc data={formData.ketCuc} ngayVaoVien={formData.hanhChinh.ngayVaoVien} ngayRaVien={formData.hanhChinh.ngayRaVien} onChange={(v) => updateField('ketCuc', v)} />;
