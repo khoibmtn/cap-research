@@ -9,6 +9,7 @@ import { useCURB65Calculator } from '../hooks/useCURB65Calculator';
 import type { Patient, DrugGenericName } from '../types/patient';
 import { createDefaultPatient } from '../types/patient';
 import { usePrintRecord } from '../hooks/usePrintRecord';
+import { useEnterToNextField } from '../hooks/useEnterToNextField';
 import StepHanhChinh from '../components/form/StepHanhChinh';
 import StepTienSu from '../components/form/StepTienSu';
 import StepLamSang from '../components/form/StepLamSang';
@@ -58,6 +59,9 @@ export default function PatientFormPage() {
     const [drugGenericNames, setDrugGenericNames] = useState<DrugGenericName[]>([]);
     // Glasgow confusion threshold from clinical settings
     const [glasgowThreshold, setGlasgowThreshold] = useState(13);
+
+    // Kích hoạt tính năng Enter để chuyển ô
+    useEnterToNextField();
 
     // Auto-calculated indices
     const indices = useCalculatedIndices({
