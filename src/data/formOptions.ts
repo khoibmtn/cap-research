@@ -87,3 +87,12 @@ export const PSI_LABELS: Record<string, { label: string; diem: number }> = {
     paO2_60: { label: 'PaO2 < 60 mmHg hoặc SpO2 < 90%', diem: 10 },
     tranDichMangPhoi: { label: 'Tràn dịch màng phổi', diem: 10 },
 };
+
+export const CURB65_LABELS: Record<string, { label: string; diem: number; moTa: string }> = {
+    c: { label: 'C — Confusion', diem: 1, moTa: 'Rối loạn ý thức và/hoặc định hướng mới xuất hiện' },
+    u: { label: 'U — Urea > 7 mmol/L', diem: 1, moTa: 'Ure huyết thanh > 7 mmol/L' },
+    r: { label: 'R — Respiratory rate ≥ 30', diem: 1, moTa: 'Nhịp thở ≥ 30 lần/phút' },
+    b: { label: 'B — Blood pressure', diem: 1, moTa: 'HA tâm thu < 90 hoặc HA tâm trương ≤ 60 mmHg' },
+    age65: { label: '65 — Age ≥ 65', diem: 1, moTa: 'Tuổi ≥ 65' },
+};
+

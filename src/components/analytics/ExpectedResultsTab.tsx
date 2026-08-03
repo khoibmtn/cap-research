@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { Patient, DrugGenericName } from '../../types/patient';
+import { createDefaultCURB65 } from '../../types/patient';
 import { mean, sd, median, q1, q3, meanSd, frac, pct, psiClass } from '../../utils/statsHelpers';
-import { mannWhitneyU, spearmanPValue, formatPValue, pSignificance } from '../../utils/statisticalTests';
+import { mannWhitneyU, spearmanPValue, formatPValue, pSignificance, cohensKappa } from '../../utils/statisticalTests';
 import { AlertTriangle, Info, BookOpen, Calculator } from 'lucide-react';
 
 // ─── VK classification mapping ──────────────────────────────
@@ -106,6 +107,9 @@ export default function ExpectedResultsTab({ patients, drugGroup1 = [], drugGrou
             {/* ── 3.1.4: Phân loại PSI ── */}
             <Table314 patients={patients} />
 
+            {/* ── 3.1.4b: Phân tầng CURB-65 ── */}
+            <TableCURB65Dist patients={patients} />
+
             {/* ── 3.1.5: Hình ảnh học ── */}
             <Table315 patients={patients} />
 
@@ -126,6 +130,15 @@ export default function ExpectedResultsTab({ patients, drugGroup1 = [], drugGrou
 
             {/* ── 3.2.4: Tương quan ── */}
             <Table324 patients={patients} />
+
+            {/* ── 3.2.5: Biomarker theo CURB-65 ── */}
+            <TableCURB65Biomarker patients={patients} />
+
+            {/* ── 3.2.6: Tương quan Spearman vs CURB-65 ── */}
+            <TableCURB65Spearman patients={patients} />
+
+            {/* ── 3.2.7: So sánh PSI vs CURB-65 ── */}
+            <TablePSICURB65Compare patients={patients} />
 
             {/* ── 3.3: Thuốc đã dùng trước nhập viện ── */}
             <Table33Drug patients={patients} drugGroup1={drugGroup1.length > 0 ? drugGroup1 : ['Kháng sinh', 'Corticoid']} drugGroup2={drugGroup2} />
@@ -582,6 +595,268 @@ function Table314({ patients }: { patients: Patient[] }) {
                 headers={['Phân loại PSI', 'n', '%', 'Ghi chú']}
                 rows={rows}
             />
+        </SectionCard>
+    );
+}
+
+// ════════════════════════════════════════════════════════════
+// 3.1.4b: PHÂN TẦNG CURB-65
+// ════════════════════════════════════════════════════════════
+function getCurb65(p: Patient) {
+    return p.curb65 ?? createDefaultCURB65();
+}
+
+function TableCURB65Dist({ patients }: { patients: Patient[] }) {
+    const N = patients.length;
+    const data = useMemo(() => {
+        const withData = patients.filter(p => getCurb65(p).duDuLieu);
+        const scoreDist: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        withData.forEach(p => {
+            const s = getCurb65(p).tongDiem;
+            scoreDist[s] = (scoreDist[s] || 0) + 1;
+        });
+        const scores = withData.map(p => getCurb65(p).tongDiem);
+        const nhe = withData.filter(p => getCurb65(p).tongDiem <= 1).length;
+        const nang = withData.filter(p => getCurb65(p).tongDiem >= 2).length;
+        return { withData: withData.length, scoreDist, scores, nhe, nang };
+    }, [patients]);
+
+    const rows: (string | React.ReactNode)[][] = [
+        ['CURB-65 Score (Mean ± SD)', data.scores.length > 0 ? meanSd(data.scores) : '—', data.scores.length > 0 ? minMax(data.scores) : '—', `n = ${data.scores.length}`],
+    ];
+    for (let s = 0; s <= 5; s++) {
+        const label = s <= 1 ? 'Nhẹ' : s === 2 ? 'Trung bình' : 'Nặng';
+        rows.push([`${s} điểm`, String(data.scoreDist[s] || 0), pct(data.scoreDist[s] || 0, N), label]);
+    }
+    rows.push(['Nhóm nhẹ (0–1)', String(data.nhe), pct(data.nhe, N), '']);
+    rows.push(['Nhóm nặng (≥2)', String(data.nang), pct(data.nang, N), '']);
+
+    return (
+        <SectionCard
+            id="table-curb65-dist"
+            title="Bảng 3.4b — Phân tầng mức độ nặng theo CURB-65"
+            subtitle={`Mục 3.1.2: Phân tầng nguy cơ theo CURB-65 (n = ${data.withData} bệnh nhân có đủ dữ liệu)`}
+        >
+            <DataTable
+                headers={['Phân loại CURB-65', 'n', '%', 'Ghi chú']}
+                rows={rows}
+            />
+            {data.withData < N && (
+                <div className="mt-2 text-xs text-amber-600">
+                    ⚠ {N - data.withData} bệnh nhân chưa đủ dữ liệu CURB-65 (thiếu cấu phần).
+                </div>
+            )}
+        </SectionCard>
+    );
+}
+
+// ════════════════════════════════════════════════════════════
+// 3.2.5: BIOMARKER THEO CURB-65
+// ════════════════════════════════════════════════════════════
+function TableCURB65Biomarker({ patients }: { patients: Patient[] }) {
+    const [computed, computeVer, triggerCompute] = useComputeP();
+
+    const data = useMemo(() => {
+        const withData = patients.filter(p => getCurb65(p).duDuLieu);
+        const nhe = withData.filter(p => getCurb65(p).tongDiem <= 1);
+        const nang = withData.filter(p => getCurb65(p).tongDiem >= 2);
+
+        const extract = (group: Patient[], key: string) => {
+            const vals = group.map(p => p.xetNghiem[key as keyof typeof p.xetNghiem] as number | null).filter(num) as number[];
+            return {
+                n: vals.length,
+                vals,
+                median: vals.length > 0 ? median(vals).toFixed(2) : '—',
+                q1q3: vals.length > 0 ? `${q1(vals).toFixed(2)}–${q3(vals).toFixed(2)}` : '—',
+            };
+        };
+
+        const allKeys = ['sTREM1', 'tIMP1', 'il6', 'il10', 'il17', 'crp', 'procalcitonin'];
+        const labels: Record<string, string> = { sTREM1: 'sTREM-1', tIMP1: 'TIMP-1', il6: 'IL-6', il10: 'IL-10', il17: 'IL-17', crp: 'CRP (mg/L)', procalcitonin: 'PCT (ng/mL)' };
+
+        return {
+            markers: allKeys.map(key => ({
+                label: labels[key],
+                nhe: extract(nhe, key),
+                nang: extract(nang, key),
+                pValue: computed ? mannWhitneyU(extract(nhe, key).vals, extract(nang, key).vals)?.p ?? null : null,
+            })),
+            nNhe: nhe.length,
+            nNang: nang.length,
+        };
+    }, [patients, computeVer]);
+
+    const rows = data.markers.map(d => [
+        d.label,
+        `${d.nhe.median} (${d.nhe.q1q3})`,
+        String(d.nhe.n),
+        `${d.nang.median} (${d.nang.q1q3})`,
+        String(d.nang.n),
+        computed ? <PCell p={d.pValue} /> : <span className="text-gray-400 italic text-xs">—</span>,
+    ]);
+
+    return (
+        <SectionCard
+            id="table-curb65-biomarker"
+            title="Bảng 3.9b — Biomarker theo mức độ nặng (CURB-65)"
+            subtitle={`Mục 3.2: So sánh nhóm nhẹ (CURB-65 0–1, n=${data.nNhe}) vs nhóm nặng (CURB-65 ≥2, n=${data.nNang})`}
+        >
+            <div className="flex items-center gap-3 mb-3">
+                <CalcButton onClick={triggerCompute} computed={computed} />
+                {computed && <span className="text-xs text-gray-500">Kiểm định: Mann-Whitney U (two-tailed)</span>}
+            </div>
+            <DataTable
+                headers={['Biomarker', 'CURB 0–1 — Median (Q1–Q3)', 'n₁', 'CURB ≥2 — Median (Q1–Q3)', 'n₂', 'p']}
+                rows={rows}
+            />
+            {computed && <PValueDisclaimer />}
+        </SectionCard>
+    );
+}
+
+// ════════════════════════════════════════════════════════════
+// 3.2.6: TƯƠNG QUAN SPEARMAN VS CURB-65
+// ════════════════════════════════════════════════════════════
+function TableCURB65Spearman({ patients }: { patients: Patient[] }) {
+    const [computed, , triggerCompute] = useComputeP();
+
+    const data = useMemo(() => {
+        const withCURB = patients.filter(p => getCurb65(p).duDuLieu);
+
+        const correlate = (group: Patient[], getX: (p: Patient) => number | null, getY: (p: Patient) => number | null) => {
+            const pairs = group
+                .map(p => ({ x: getX(p), y: getY(p) }))
+                .filter(d => d.x !== null && d.y !== null) as { x: number; y: number }[];
+            if (pairs.length < 5) return { n: pairs.length, r: null };
+            const r = spearmanCorrelation(pairs.map(d => d.x), pairs.map(d => d.y));
+            return { n: pairs.length, r };
+        };
+
+        const allKeys: { key: string; label: string }[] = [
+            { key: 'sTREM1', label: 'sTREM-1' },
+            { key: 'tIMP1', label: 'TIMP-1' },
+            { key: 'il6', label: 'IL-6' },
+            { key: 'il10', label: 'IL-10' },
+            { key: 'il17', label: 'IL-17' },
+            { key: 'crp', label: 'CRP' },
+            { key: 'procalcitonin', label: 'PCT' },
+        ];
+
+        return allKeys.map(m => ({
+            label: m.label,
+            vsCURB: correlate(withCURB, p => getCurb65(p).tongDiem, p => p.xetNghiem[m.key as keyof typeof p.xetNghiem] as number | null),
+        }));
+    }, [patients]);
+
+    const formatR = (r: number | null) => {
+        if (r === null) return '—';
+        const abs = Math.abs(r);
+        let strength = '';
+        if (abs < 0.2) strength = ' (rất yếu)';
+        else if (abs < 0.4) strength = ' (yếu)';
+        else if (abs < 0.6) strength = ' (TB)';
+        else if (abs < 0.8) strength = ' (mạnh)';
+        else strength = ' (rất mạnh)';
+        return `${r.toFixed(3)}${strength}`;
+    };
+
+    const rows = data.map(d => [
+        d.label,
+        formatR(d.vsCURB.r),
+        String(d.vsCURB.n),
+        computed ? <PCell p={d.vsCURB.r !== null ? spearmanPValue(d.vsCURB.r, d.vsCURB.n) : null} /> : <span className="text-gray-400 italic text-xs">—</span>,
+    ]);
+
+    return (
+        <SectionCard
+            id="table-curb65-spearman"
+            title="Bảng 3.11b — Tương quan Spearman giữa biomarker với CURB-65 Score"
+            subtitle="Mục 3.2: Phân tích tương quan (r: hệ số tương quan Spearman rank)"
+        >
+            <div className="flex items-center gap-3 mb-3">
+                <CalcButton onClick={triggerCompute} computed={computed} />
+                {computed && <span className="text-xs text-gray-500">p-value: xấp xỉ t-distribution (two-tailed)</span>}
+            </div>
+            <DataTable
+                headers={['Biomarker', 'r vs CURB-65', 'n', 'p']}
+                rows={rows}
+            />
+            {computed && <PValueDisclaimer />}
+        </SectionCard>
+    );
+}
+
+// ════════════════════════════════════════════════════════════
+// 3.2.7: SO SÁNH PSI vs CURB-65 (CONCORDANCE)
+// ════════════════════════════════════════════════════════════
+function TablePSICURB65Compare({ patients }: { patients: Patient[] }) {
+    const [computed, computeVer, triggerCompute] = useComputeP();
+
+    const data = useMemo(() => {
+        const both = patients.filter(p => p.psi.tongDiem > 0 && getCurb65(p).duDuLieu);
+        const n = both.length;
+        if (n === 0) return null;
+
+        const psiScores = both.map(p => p.psi.tongDiem);
+        const curbScores = both.map(p => getCurb65(p).tongDiem);
+
+        const psiSevere = both.map(p => ['III', 'IV', 'V'].includes(psiClass(p.psi.tongDiem)));
+        const curbSevere = both.map(p => getCurb65(p).tongDiem >= 2);
+
+        const psiSevereN = psiSevere.filter(Boolean).length;
+        const curbSevereN = curbSevere.filter(Boolean).length;
+
+        let concordant = 0, discordant = 0;
+        for (let i = 0; i < n; i++) {
+            if (psiSevere[i] === curbSevere[i]) concordant++;
+            else discordant++;
+        }
+
+        const kappa = computed ? cohensKappa(psiSevere, curbSevere) : null;
+
+        return { n, psiMeanSd: meanSd(psiScores), curbMeanSd: meanSd(curbScores), psiSevereN, curbSevereN, concordant, discordant, kappa };
+    }, [patients, computeVer]);
+
+    if (!data) {
+        return (
+            <SectionCard id="table-psi-curb65" title="Bảng 3.12 — So sánh PSI vs CURB-65" subtitle="">
+                <p className="text-sm text-gray-500 italic">Chưa có bệnh nhân có đủ dữ liệu cả PSI và CURB-65.</p>
+            </SectionCard>
+        );
+    }
+
+    const rows: (string | React.ReactNode)[][] = [
+        ['Số bệnh nhân có cả PSI + CURB-65', String(data.n), '', ''],
+        ['PSI Score (Mean ± SD)', data.psiMeanSd, '', ''],
+        ['CURB-65 Score (Mean ± SD)', data.curbMeanSd, '', ''],
+        ['Nhóm nặng — PSI III–V', String(data.psiSevereN), pct(data.psiSevereN, data.n), ''],
+        ['Nhóm nặng — CURB-65 ≥2', String(data.curbSevereN), pct(data.curbSevereN, data.n), ''],
+        ['Concordance (cùng nhóm)', String(data.concordant), pct(data.concordant, data.n), 'Cùng nhẹ hoặc cùng nặng'],
+        ['Discordance (khác nhóm)', String(data.discordant), pct(data.discordant, data.n), 'PSI và CURB-65 khác mức độ'],
+        [
+            "Cohen's Kappa (κ)",
+            data.kappa ? data.kappa.kappa.toFixed(3) : (computed ? 'n/a' : <span className="text-gray-400 italic text-xs">—</span>),
+            data.kappa ? data.kappa.interpretation : '',
+            'Mức độ đồng thuận',
+        ],
+    ];
+
+    return (
+        <SectionCard
+            id="table-psi-curb65"
+            title="Bảng 3.12 — So sánh mức độ phù hợp giữa PSI và CURB-65"
+            subtitle={`Mục 3.2: Concordance giữa 2 thang điểm (n = ${data.n})`}
+            note="Nhóm nặng: PSI III–V vs CURB-65 ≥2. Cohen's Kappa: < 0 Kém, 0–0.20 Yếu, 0.21–0.40 Tạm, 0.41–0.60 TB, 0.61–0.80 Tốt, 0.81–1.0 Rất tốt."
+        >
+            <div className="flex items-center gap-3 mb-3">
+                <CalcButton onClick={triggerCompute} computed={computed} />
+                {computed && <span className="text-xs text-gray-500">Cohen's Kappa: mức độ đồng thuận vượt ngoài sự ngẫu nhiên</span>}
+            </div>
+            <DataTable
+                headers={['Đặc điểm', 'Giá trị', '%', 'Ghi chú']}
+                rows={rows}
+            />
+            {computed && <PValueDisclaimer />}
         </SectionCard>
     );
 }

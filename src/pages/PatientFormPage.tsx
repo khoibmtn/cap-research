@@ -5,6 +5,7 @@ import { patientService } from '../services/patientService';
 import { settingsService } from '../services/settingsService';
 import { useCalculatedIndices } from '../hooks/useCalculatedIndices';
 import { usePSICalculator } from '../hooks/usePSICalculator';
+import { useCURB65Calculator } from '../hooks/useCURB65Calculator';
 import type { Patient, DrugGenericName } from '../types/patient';
 import { createDefaultPatient } from '../types/patient';
 import { usePrintRecord } from '../hooks/usePrintRecord';
@@ -14,6 +15,7 @@ import StepLamSang from '../components/form/StepLamSang';
 import StepXetNghiem from '../components/form/StepXetNghiem';
 import StepHinhAnh from '../components/form/StepHinhAnh';
 import StepViKhuan from '../components/form/StepViKhuan';
+import StepCURB65 from '../components/form/StepCURB65';
 import StepPSI from '../components/form/StepPSI';
 import StepKetCuc from '../components/form/StepKetCuc';
 import toast from 'react-hot-toast';
@@ -26,7 +28,7 @@ const STEPS = [
     { key: 'xet-nghiem', label: 'Xét nghiệm' },
     { key: 'hinh-anh', label: 'Hình ảnh' },
     { key: 'vi-khuan', label: 'Vi khuẩn' },
-    { key: 'psi', label: 'PSI' },
+    { key: 'curb65-psi', label: 'CURB-65 & PSI' },
     { key: 'ket-cuc', label: 'Kết cục' },
 ];
 
@@ -69,6 +71,17 @@ export default function PatientFormPage() {
         tuoi: formData.hanhChinh.tuoi,
         gioiTinh: formData.hanhChinh.gioiTinh,
         criteria: formData.psi.criteria,
+    });
+
+    // CURB-65 calculator
+    const curb65Result = useCURB65Calculator({
+        tuoi: formData.hanhChinh.tuoi,
+        ure: formData.xetNghiem.ure,
+        nhipTho: formData.lamSang.nhipTho,
+        huyetAp: formData.lamSang.huyetAp,
+        diemGlasgow: formData.lamSang.diemGlasgow,
+        confusion: formData.curb65?.confusion ?? false,
+        confusionGlasgowThreshold: 13,
     });
 
     // NOTE: Calculated values (indices, PSI) are injected at save time
@@ -310,6 +323,13 @@ export default function PatientFormPage() {
             tienSu: { ...formData.tienSu, thuocDaDung: cleanedThuocDaDung },
             chiSoTinhToan: { nlr: indices.nlr, plr: indices.plr, car: indices.car },
             psi: { ...formData.psi, tongDiem: psiResult.tongDiem, phanTang: psiResult.phanTang },
+            curb65: {
+                ...(formData.curb65 ?? { confusion: false, confusionAsked: false }),
+                tongDiem: curb65Result.tongDiem,
+                phanNhom: curb65Result.phanNhom,
+                chiTiet: curb65Result.chiTiet,
+                duDuLieu: curb65Result.duDuLieu,
+            },
         };
 
         setSaving(true);
@@ -411,7 +431,20 @@ export default function PatientFormPage() {
             case 3: return <StepXetNghiem data={formData.xetNghiem} indices={indices} onChange={(v) => updateField('xetNghiem', v)} />;
             case 4: return <StepHinhAnh data={formData.hinhAnh} onChange={(v) => updateField('hinhAnh', v)} />;
             case 5: return <StepViKhuan data={formData.viKhuan} onChange={(v) => updateField('viKhuan', v)} />;
-            case 6: return <StepPSI data={formData.psi} tuoi={formData.hanhChinh.tuoi} gioiTinh={formData.hanhChinh.gioiTinh} lamSang={formData.lamSang} xetNghiem={formData.xetNghiem} tienSu={formData.tienSu} hinhAnh={formData.hinhAnh} psiResult={psiResult} onChange={(v) => updateField('psi', v)} />;
+            case 6: return (
+                <div className="space-y-8">
+                    <StepCURB65
+                        data={formData.curb65 ?? { confusion: false, confusionAsked: false, tongDiem: 0, phanNhom: '', chiTiet: { c: null, u: null, r: null, b: null, age65: null }, duDuLieu: false }}
+                        tuoi={formData.hanhChinh.tuoi}
+                        lamSang={formData.lamSang}
+                        xetNghiem={formData.xetNghiem}
+                        curb65Result={curb65Result}
+                        onChange={(v) => updateField('curb65', v)}
+                    />
+                    <hr className="border-gray-200" />
+                    <StepPSI data={formData.psi} tuoi={formData.hanhChinh.tuoi} gioiTinh={formData.hanhChinh.gioiTinh} lamSang={formData.lamSang} xetNghiem={formData.xetNghiem} tienSu={formData.tienSu} hinhAnh={formData.hinhAnh} psiResult={psiResult} onChange={(v) => updateField('psi', v)} />
+                </div>
+            );
             case 7: return <StepKetCuc data={formData.ketCuc} ngayVaoVien={formData.hanhChinh.ngayVaoVien} ngayRaVien={formData.hanhChinh.ngayRaVien} onChange={(v) => updateField('ketCuc', v)} />;
             default: return null;
         }

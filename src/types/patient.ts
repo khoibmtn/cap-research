@@ -197,6 +197,24 @@ export interface PSIData {
     phanTang: string; // Class I-V
 }
 
+// ==================== CURB-65 ====================
+export interface CURB65ChiTiet {
+    c: boolean | null;       // Confusion — null nếu chưa đánh giá
+    u: boolean | null;       // Urea > 7 mmol/L
+    r: boolean | null;       // Respiratory rate ≥ 30
+    b: boolean | null;       // BP: systolic < 90 OR diastolic ≤ 60
+    age65: boolean | null;   // Age ≥ 65
+}
+
+export interface CURB65Data {
+    confusion: boolean;          // User xác nhận: "Có rối loạn ý thức mới?"
+    confusionAsked: boolean;     // Đã hỏi câu hỏi Confusion chưa
+    tongDiem: number;            // 0–5
+    phanNhom: string;            // 'Nhẹ (0–1)' | 'Trung bình (2)' | 'Nặng (3–5)'
+    chiTiet: CURB65ChiTiet;
+    duDuLieu: boolean;           // Có đủ 5 cấu phần để tính
+}
+
 // ==================== KẾT CỤC ====================
 export interface KetCuc {
     // Diễn biến điều trị (multichoice) — legacy booleans + flexible array
@@ -230,6 +248,7 @@ export interface Patient {
     hinhAnh: HinhAnh;
     viKhuan: ViKhuan[];
     psi: PSIData;
+    curb65?: CURB65Data;
     ketCuc: KetCuc;
     disabled?: boolean; // true = loại khỏi thống kê (mặc định: false = enabled)
     createdAt: Timestamp | null;
@@ -283,6 +302,15 @@ export const createDefaultPSICriteria = (): PSICriteria => ({
     glucoseMau250: false, paO2_60: false, tranDichMangPhoi: false,
 });
 
+export const createDefaultCURB65 = (): CURB65Data => ({
+    confusion: false,
+    confusionAsked: false,
+    tongDiem: 0,
+    phanNhom: '',
+    chiTiet: { c: null, u: null, r: null, b: null, age65: null },
+    duDuLieu: false,
+});
+
 export const createDefaultKetCuc = (): KetCuc => ({
     thoMay: false, socNhiemKhuan: false, locMau: false, soNgayLocMau: null,
     dienBienDieuTri: [],
@@ -314,5 +342,6 @@ export const createDefaultPatient = (): Omit<Patient, 'id' | 'createdAt' | 'upda
         tongDiem: 0,
         phanTang: '',
     },
+    curb65: createDefaultCURB65(),
     ketCuc: createDefaultKetCuc(),
 });

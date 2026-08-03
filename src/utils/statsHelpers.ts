@@ -66,3 +66,17 @@ export function boxPlotData(values: number[]): [number, number, number, number, 
     const sorted = [...values].sort((a, b) => a - b);
     return [sorted[0], q1(sorted), median(sorted), q3(sorted), sorted[sorted.length - 1]];
 }
+
+/** CURB-65 group label from total score */
+export function curb65Group(score: number): string {
+    if (score <= 1) return 'Nhẹ';
+    if (score === 2) return 'Trung bình';
+    return 'Nặng';
+}
+
+/** Min–Max format */
+export function minMax(values: number[]): string {
+    if (values.length === 0) return '—';
+    return `${Math.min(...values)}–${Math.max(...values)}`;
+}
+

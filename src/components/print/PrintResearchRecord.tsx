@@ -397,13 +397,34 @@ function PatientRecord({ patient: p, settings }: { patient: Patient; settings: P
                 )}
             </div>
 
-            {/* ══════ D. PSI ══════ */}
+            {/* ══════ CURB-65 ══════ */}
             <div className="print-section">
-                <h2>D. PHÂN ĐỘ MỨC ĐỘ NẶNG THEO THANG ĐIỂM PSI</h2>
-                <div>- Tổng điểm: {dotFill(psi.tongDiem)}</div>
-                {settings.showPsiLevel && (
-                    <div>- Mức độ: {dotFill(getPhanTang(psi.tongDiem))}</div>
-                )}
+                <h2>D. PHÂN ĐỘ MỨC ĐỘ NẶNG</h2>
+                <div style={{ marginBottom: 8 }}>
+                    <strong>1. CURB-65:</strong>
+                    <div style={{ marginLeft: 16 }}>
+                        <div>- Tổng điểm: {dotFill(p.curb65?.duDuLieu ? p.curb65.tongDiem : 'Chưa đủ dữ liệu')}</div>
+                        <div>- Phân nhóm: {dotFill(p.curb65?.duDuLieu ? p.curb65.phanNhom : '')}</div>
+                        <div style={{ marginTop: 4 }}>
+                            {CB(p.curb65?.chiTiet?.c === true)} C — Confusion (Rối loạn ý thức mới){'  '}
+                            {CB(p.curb65?.chiTiet?.u === true)} U — Ure {'>'} 7 mmol/L{'  '}
+                            {CB(p.curb65?.chiTiet?.r === true)} R — Nhịp thở ≥ 30
+                        </div>
+                        <div>
+                            {CB(p.curb65?.chiTiet?.b === true)} B — HA {'<'} 90/60 mmHg{'  '}
+                            {CB(p.curb65?.chiTiet?.age65 === true)} 65 — Tuổi ≥ 65
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <strong>2. PSI:</strong>
+                    <div style={{ marginLeft: 16 }}>
+                        <div>- Tổng điểm: {dotFill(psi.tongDiem)}</div>
+                        {settings.showPsiLevel && (
+                            <div>- Mức độ: {dotFill(getPhanTang(psi.tongDiem))}</div>
+                        )}
+                    </div>
+                </div>
             </div>
 
             {/* ══════ E. KẾT CỤC ĐIỀU TRỊ ══════ */}

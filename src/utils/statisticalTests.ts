@@ -178,3 +178,42 @@ export function pSignificance(p: number | null | undefined): 'significant' | 'tr
     if (p < 0.1) return 'trend';
     return 'ns';
 }
+
+// ═══════════════════════════════════════════════════════
+// COHEN'S KAPPA (agreement between 2 binary classifiers)
+// ═══════════════════════════════════════════════════════
+export function cohensKappa(a: boolean[], b: boolean[]): { kappa: number; interpretation: string } | null {
+    const n = a.length;
+    if (n !== b.length || n < 2) return null;
+
+    // 2×2 contingency table
+    let a11 = 0, a10 = 0, a01 = 0, a00 = 0;
+    for (let i = 0; i < n; i++) {
+        if (a[i] && b[i]) a11++;
+        else if (a[i] && !b[i]) a10++;
+        else if (!a[i] && b[i]) a01++;
+        else a00++;
+    }
+
+    const po = (a11 + a00) / n; // observed agreement
+    const pYesA = (a11 + a10) / n;
+    const pYesB = (a11 + a01) / n;
+    const pNoA = (a00 + a01) / n;
+    const pNoB = (a00 + a10) / n;
+    const pe = pYesA * pYesB + pNoA * pNoB; // expected agreement by chance
+
+    if (pe >= 1) return { kappa: 1, interpretation: 'Hoàn hảo' };
+
+    const kappa = (po - pe) / (1 - pe);
+
+    let interpretation: string;
+    if (kappa < 0) interpretation = 'Kém (Poor)';
+    else if (kappa <= 0.20) interpretation = 'Yếu (Slight)';
+    else if (kappa <= 0.40) interpretation = 'Tạm (Fair)';
+    else if (kappa <= 0.60) interpretation = 'Trung bình (Moderate)';
+    else if (kappa <= 0.80) interpretation = 'Tốt (Substantial)';
+    else interpretation = 'Rất tốt (Almost Perfect)';
+
+    return { kappa: Math.max(-1, Math.min(1, kappa)), interpretation };
+}
+

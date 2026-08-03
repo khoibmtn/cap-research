@@ -2,7 +2,7 @@
  * 9 Mock CAP patients — values strictly match formOptions.ts categories.
  */
 
-import type { Patient } from '../types/patient';
+import type { Patient, CURB65Data } from '../types/patient';
 
 type MockPatient = Omit<Patient, 'id' | 'createdAt' | 'updatedAt'>;
 
@@ -843,5 +843,58 @@ const p9: MockPatient = {
     },
 };
 
+/* ───────── CURB-65 auto-calc for mocks ───────── */
+
+function calcCurb65(p: MockPatient): CURB65Data {
+    const tuoi = p.hanhChinh.tuoi;
+    const ure = p.xetNghiem.ure;
+    const nhipTho = p.lamSang.nhipTho;
+    const ha = p.lamSang.huyetAp;
+    const glasgow = p.lamSang.diemGlasgow;
+
+    let tamThu: number | null = null;
+    let tamTruong: number | null = null;
+    if (ha && ha.includes('/')) {
+        const parts = ha.split('/').map(Number);
+        tamThu = !isNaN(parts[0]) ? parts[0] : null;
+        tamTruong = parts.length > 1 && !isNaN(parts[1]) ? parts[1] : null;
+    }
+
+    const c = glasgow !== null && glasgow <= 13;
+    const u = ure !== null && ure > 7;
+    const r = nhipTho !== null && nhipTho >= 30;
+    const b = (tamThu !== null && tamThu < 90) || (tamTruong !== null && tamTruong <= 60);
+    const age65 = tuoi !== null && tuoi >= 65;
+
+    const duDuLieu = tuoi !== null && ure !== null && nhipTho !== null && tamThu !== null && glasgow !== null;
+    const tongDiem = duDuLieu ? [c, u, r, b, age65].filter(Boolean).length : 0;
+    let phanNhom = '';
+    if (duDuLieu) {
+        if (tongDiem <= 1) phanNhom = 'Nhẹ — Điều trị ngoại trú';
+        else if (tongDiem === 2) phanNhom = 'Trung bình — Nhập viện ngắn';
+        else phanNhom = 'Nặng — Cân nhắc ICU';
+    }
+
+    return {
+        confusion: c,
+        confusionAsked: glasgow !== null && glasgow <= 13,
+        tongDiem,
+        phanNhom,
+        chiTiet: {
+            c: duDuLieu ? c : null,
+            u: duDuLieu ? u : null,
+            r: duDuLieu ? r : null,
+            b: duDuLieu ? b : null,
+            age65: duDuLieu ? age65 : null,
+        },
+        duDuLieu,
+    };
+}
+
 /* ───────── EXPORT ───────── */
-export const mockPatients: MockPatient[] = [p1, p2, p3, p4, p5, p6, p7, p8, p9];
+const rawMocks: MockPatient[] = [p1, p2, p3, p4, p5, p6, p7, p8, p9];
+export const mockPatients: MockPatient[] = rawMocks.map(p => ({
+    ...p,
+    curb65: calcCurb65(p),
+}));
+

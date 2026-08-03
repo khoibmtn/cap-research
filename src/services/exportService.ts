@@ -85,6 +85,15 @@ export function exportPatientsToExcel(patients: Patient[]) {
             // PSI
             'PSI Tổng điểm': p.psi.tongDiem,
             'PSI Phân tầng': p.psi.phanTang,
+            // CURB-65
+            'CURB-65 Score': p.curb65?.tongDiem ?? '',
+            'CURB-65 Group': p.curb65?.phanNhom ?? '',
+            'CURB-65 Đủ dữ liệu': p.curb65?.duDuLieu ? 'Có' : 'Không',
+            'CURB-65 C (Confusion)': p.curb65?.chiTiet?.c === true ? 1 : p.curb65?.chiTiet?.c === false ? 0 : '',
+            'CURB-65 U (Ure > 7)': p.curb65?.chiTiet?.u === true ? 1 : p.curb65?.chiTiet?.u === false ? 0 : '',
+            'CURB-65 R (RR ≥ 30)': p.curb65?.chiTiet?.r === true ? 1 : p.curb65?.chiTiet?.r === false ? 0 : '',
+            'CURB-65 B (BP)': p.curb65?.chiTiet?.b === true ? 1 : p.curb65?.chiTiet?.b === false ? 0 : '',
+            'CURB-65 65 (Age)': p.curb65?.chiTiet?.age65 === true ? 1 : p.curb65?.chiTiet?.age65 === false ? 0 : '',
             // Kết cục
             'Tử vong': p.ketCuc.tuVong ? 'Có' : 'Không',
             'Xin về': p.ketCuc.xinVe ? 'Có' : 'Không',
