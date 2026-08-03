@@ -436,7 +436,10 @@ export default function PatientFormPage() {
         switch (currentStep) {
             case 0: return <StepHanhChinh data={formData} onChange={updateField} existingCodes={existingCodes} currentPatientId={isEdit ? id : undefined} />;
             case 1: return <StepTienSu data={formData.tienSu} onChange={(v) => updateField('tienSu', v)} drugGenericNames={drugGenericNames} />;
-            case 2: return <StepLamSang data={formData.lamSang} ngayVaoVien={formData.hanhChinh.ngayVaoVien} onChange={(v) => updateField('lamSang', v)} curb65Data={formData.curb65} onCurb65Change={(v) => updateField('curb65', v)} glasgowThreshold={glasgowThreshold} />;
+            case 2: {
+                const curb65 = formData.curb65 ?? { confusion: false, confusionAsked: false, tongDiem: 0, phanNhom: '', chiTiet: { c: null, u: null, r: null, b: null, age65: null }, duDuLieu: false };
+                return <StepLamSang data={formData.lamSang} ngayVaoVien={formData.hanhChinh.ngayVaoVien} onChange={(v) => updateField('lamSang', v)} curb65Data={curb65} onCurb65Change={(v) => updateField('curb65', v)} glasgowThreshold={glasgowThreshold} />;
+            }
             case 3: return <StepXetNghiem data={formData.xetNghiem} indices={indices} onChange={(v) => updateField('xetNghiem', v)} />;
             case 4: return <StepHinhAnh data={formData.hinhAnh} onChange={(v) => updateField('hinhAnh', v)} />;
             case 5: return <StepViKhuan data={formData.viKhuan} onChange={(v) => updateField('viKhuan', v)} />;
