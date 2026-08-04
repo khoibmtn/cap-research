@@ -6,7 +6,7 @@
 
 - **Thu thập dữ liệu** bệnh nhân một cách có hệ thống theo 8 nhóm thông tin (từ hành chính đến kết cục điều trị)
 - **Lưu trữ an toàn** trên đám mây (Firebase), truy cập được từ mọi thiết bị có trình duyệt web
-- **Xuất dữ liệu** ra Excel để phân tích thống kê
+- **Xuất dữ liệu** ra Excel hoặc file SPSS (.sav) để phân tích thống kê
 - **In bệnh án nghiên cứu** (BANC) theo mẫu tùy chỉnh
 - **Sao lưu và khôi phục** dữ liệu để tránh mất mát
 - **Xem thống kê nhanh** về tình hình nghiên cứu (tổng BN, tỷ lệ tử vong, phân bố vi khuẩn, phân bố PSI)
@@ -42,6 +42,14 @@ Trên điện thoại, bấm vào biểu tượng ☰ ở góc trái để mở 
 **In bệnh án nghiên cứu:** Bấm biểu tượng máy in (🖨) ở cuối hàng để in cho 1 BN. Nếu muốn in nhiều BN cùng lúc, tích chọn checkbox ở cột đầu tiên rồi bấm nút **"In N BN"** xuất hiện phía trên.
 
 **Xuất Excel:** Bấm nút **"Xuất Excel"** → tải về file `.xlsx` chứa toàn bộ dữ liệu. File này có thể mở bằng Excel, Google Sheets để phân tích thống kê.
+
+**Xuất SPSS (.sav):** Bấm nút **"Xuất SPSS"** (màu xanh dương) → tải về file `.sav` dùng được trực tiếp trong SPSS — không cần qua file trung gian Excel hay CSV. File xuất ra đã có đầy đủ:
+- Tên biến (variable name) và nhãn biến (variable label) theo chuẩn SPSS
+- Bảng mã giá trị (value labels) cho các biến phân loại
+- Biến boolean (checkbox) được mã hóa nhị phân (0 = Không, 1 = Có)
+- Các thông tin động (X-quang, CT, vi khuẩn, kháng sinh, thuốc) được trải phẳng thành các cột riêng
+
+> Để tùy chỉnh tên biến và bảng mã, vào **Cài đặt → SPSS Variables**.
 
 **Tạo bản sao lưu nhanh:** Bấm nút **"Backup"** → hệ thống tạo ngay 1 bản sao lưu lưu trên cloud.
 
@@ -137,7 +145,7 @@ Dành cho **Mục tiêu 2** — dấu ấn sinh học:
 
 ## Cài đặt — Tùy chỉnh phần mềm
 
-Trang Cài đặt có 5 tab dọc ngang:
+Trang Cài đặt có **6 tab**:
 
 ### Tab "Hành chính" — Quản lý danh mục nhập liệu
 
@@ -157,6 +165,10 @@ Trang Cài đặt có 5 tab dọc ngang:
 - **Danh sách vi khuẩn:** Thêm, sửa, xóa tên các loại vi khuẩn. Vi khuẩn nào đã gắn với bệnh nhân thì không xóa được.
 - **Danh sách kháng sinh:** Tương tự, quản lý các kháng sinh dùng trong kháng sinh đồ.
 
+### Tab "Thuốc" — Quản lý danh mục thuốc
+
+Quản lý danh sách thuốc dùng trong phần nhập tiền sử thuốc của bệnh nhân: thuốc nhóm 1 (tên biệt dược), thuốc nhóm 2 (tên gốc). Thuốc nào đang được bệnh nhân sử dụng sẽ không xóa được.
+
 ### Tab "In BANC" — Cài đặt trang in bệnh án nghiên cứu
 
 Tùy chỉnh bản in bệnh án nghiên cứu theo ý bạn:
@@ -166,6 +178,46 @@ Tùy chỉnh bản in bệnh án nghiên cứu theo ý bạn:
 - **Tiêu đề in:** Nhập 2 dòng tiêu đề đầu trang (ví dụ: dòng 1 "SỞ Y TẾ HẢI PHÒNG", dòng 2 "TTYT THỦY NGUYÊN")
 - **Tiêu đề ký:** Nhập chức danh ký bên trái (VD: "TRƯỞNG KHOA") và bên phải (VD: "BÁC SĨ ĐIỀU TRỊ")
 - **Hiển thị PSI:** Bật/tắt việc in phân tầng PSI trên bệnh án
+
+### Tab "SPSS Variables" — Cấu hình xuất file SPSS
+
+Đây là nơi bạn quản lý cách dữ liệu được tổ chức khi xuất ra file SPSS (`.sav`).
+
+**Cấu hình số slot (dữ liệu có thể thay đổi theo bệnh nhân):**
+
+Vì SPSS yêu cầu số cột cố định, các trường thay đổi số lượng (ảnh X-quang, CT, vi khuẩn...) được trải thành nhiều cột. Bạn điều chỉnh số slot tối đa cho từng loại:
+
+| Loại dữ liệu | Mặc định |
+|---|---|
+| X-quang tổn thương | 5 slot |
+| CT tổn thương | 5 slot |
+| Vi khuẩn | 5 slot |
+| Kháng sinh / vi khuẩn | 15 slot |
+| Thuốc đã dùng | 10 slot |
+
+Sau khi thay đổi, bấm **"Áp dụng slot config"** để lưu. Phần mềm hiển thị tổng số biến ước tính.
+
+**Bảng biến SPSS:**
+
+Danh sách toàn bộ biến (200+ biến), chia theo nhóm:
+- **Hành chính:** mã BN, tuổi, giới tính, địa chỉ...
+- **Tiền sử:** đái tháo đường, tăng huyết áp... (mã 0/1)
+- **Lâm sàng:** mạch, huyết áp, nhiệt độ, triệu chứng...
+- **Xét nghiệm:** WBC, CRP, PCT, biomarker...
+- **PSI / CURB-65:** các tiêu chí và tổng điểm
+- **Kết cục:** diễn biến điều trị, tình trạng ra viện...
+
+Bạn có thể:
+- **Tìm kiếm** theo tên biến hoặc nhãn
+- **Lọc** theo nhóm biến
+- **Sửa** tên biến và nhãn bằng cách bấm biểu tượng bút chì ✏️
+- **Sửa bảng mã** (value labels) bằng cách bấm vào số bên cột "Bảng mã"
+
+Biến có nhãn `[template]` là biến động — sẽ được nhân ra đủ slot khi xuất file.
+
+Bấm **"Khôi phục mặc định"** để đặt lại toàn bộ về cấu hình ban đầu.
+
+Bấm **"Xuất SPSS (.sav)"** để xuất ngay file với cấu hình đã thiết lập.
 
 ### Tab "Backup" — Sao lưu và khôi phục dữ liệu
 

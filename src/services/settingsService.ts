@@ -1,6 +1,7 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { AddressEntry } from './exportService';
+import type { SpssVarConfig } from '../types/spssTypes';
 
 const SETTINGS_DOC = 'app_settings/addresses';
 
@@ -106,5 +107,23 @@ export const settingsService = {
 
     async saveClinicalSettings(settings: { glasgowThreshold: number }): Promise<void> {
         await setDoc(doc(db, 'app_settings/clinical'), settings);
+    },
+
+    /** SPSS variable config (variable names, labels, value labels, slot counts) */
+    async getSpssConfig(): Promise<SpssVarConfig | null> {
+        try {
+            const snap = await getDoc(doc(db, 'app_settings/spss_config'));
+            if (snap.exists()) return snap.data() as SpssVarConfig;
+        } catch (e) {
+            console.warn('Failed to load SPSS config from Firestore', e);
+        }
+        return null;
+    },
+
+    async saveSpssConfig(config: SpssVarConfig): Promise<void> {
+        await setDoc(doc(db, 'app_settings/spss_config'), {
+            ...config,
+            lastModified: new Date().toISOString(),
+        });
     },
 };

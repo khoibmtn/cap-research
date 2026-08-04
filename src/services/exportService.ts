@@ -1,5 +1,9 @@
 import * as XLSX from 'xlsx';
 import type { Patient } from '../types/patient';
+import type { SpssVarConfig } from '../types/spssTypes';
+import { writeSAV, downloadSAV } from '../utils/savWriter';
+import { buildDefaultSpssConfig } from '../utils/spssDefaultConfig';
+import { patientToSpssRow } from '../utils/patientToSpssRow';
 
 export function exportPatientsToExcel(patients: Patient[]) {
     const rows = patients.map((p) => {
@@ -158,6 +162,38 @@ export function exportPatientsToExcel(patients: Patient[]) {
     ws['!cols'] = colWidths;
 
     XLSX.writeFile(wb, `CAP_Research_Data_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPSS .sav Export
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Export all patients to a native SPSS .sav file.
+ * Uses SpssVarConfig (from Settings) if provided; falls back to defaults.
+ *
+ * @param patients   List of patients to export
+ * @param config     User-configured SPSS variable config (from Firestore/Settings)
+ */
+export function exportPatientsToSAV(
+    patients: Patient[],
+    config?: SpssVarConfig | null,
+): void {
+    const effectiveConfig = config ?? buildDefaultSpssConfig();
+    const { slotConfig, vars } = effectiveConfig;
+
+    // Flatten each patient to a SPSS row
+    const rows = patients.map((p) => patientToSpssRow(p, slotConfig));
+
+    // Generate the .sav binary
+    const savData = writeSAV(vars, rows, {
+        fileLabel: 'CAP Research — Community Acquired Pneumonia',
+        slots: slotConfig,
+    });
+
+    // Trigger browser download
+    const dateStr = new Date().toISOString().split('T')[0];
+    downloadSAV(savData, `CAP_Research_Data_${dateStr}.sav`);
 }
 
 export function generateAddressTemplate() {
