@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, FileDown, Trash2, Eye, Edit, Printer, HardDrive, Loader2, Settings2, ChevronDown, ChevronRight, ChevronLeft, CircleCheck, CircleAlert, SlidersHorizontal, X, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, Search, FileDown, Trash2, Eye, Edit, Printer, HardDrive, Loader2, Settings2, ChevronDown, ChevronRight, ChevronLeft, CircleCheck, CircleAlert, SlidersHorizontal, X, ToggleLeft, ToggleRight, Database } from 'lucide-react';
+
 import { patientService } from '../services/patientService';
 import { settingsService } from '../services/settingsService';
-import { exportPatientsToExcel } from '../services/exportService';
+import { exportPatientsToExcel, exportPatientsToSAV } from '../services/exportService';
 import { usePrintRecord } from '../hooks/usePrintRecord';
 import { useEditGuardConfirm } from '../contexts/EditGuardContext';
 import type { Patient } from '../types/patient';
@@ -615,6 +616,17 @@ export default function DashboardPage() {
         toast.success('Đã xuất file Excel');
     };
 
+    const handleExportSAV = () => {
+        if (patients.length === 0) { toast.error('Không có dữ liệu để xuất'); return; }
+        try {
+            exportPatientsToSAV(patients, null);
+            toast.success(`Đã xuất ${patients.length} bệnh nhân ra file SPSS (.sav)`);
+        } catch (e) {
+            console.error(e);
+            toast.error('Lỗi khi tạo file SPSS');
+        }
+    };
+
     const handleToggleDisabled = async (patient: Patient) => {
         const newState = !patient.disabled;
         try {
@@ -730,6 +742,16 @@ export default function DashboardPage() {
                     >
                         <FileDown className="w-4 h-4" />
                         <span className="hidden sm:inline">Xuất Excel</span>
+                    </button>
+                    <button
+                        onClick={handleExportSAV}
+                        title="Xuất SPSS (.sav) với cấu hình mặc định. Để tùy chỉnh biến SPSS, vào Cài đặt → SPSS Variables"
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium
+              text-blue-700 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100
+              transition-colors"
+                    >
+                        <Database className="w-4 h-4" />
+                        <span className="hidden sm:inline">Xuất SPSS</span>
                     </button>
                     <Link
                         to="/patient/new"

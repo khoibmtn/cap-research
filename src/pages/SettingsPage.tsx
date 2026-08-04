@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useEditGuardConfirm } from '../contexts/EditGuardContext';
-import { generateAddressTemplate, parseAddressExcel, type AddressEntry } from '../services/exportService';
+import { generateAddressTemplate, parseAddressExcel, exportPatientsToSAV, type AddressEntry } from '../services/exportService';
 import { patientService } from '../services/patientService';
 import { settingsService } from '../services/settingsService';
 import { backupService, type BackupMetadata, type BackupPatient, type SearchResult } from '../services/backupService';
@@ -15,10 +15,15 @@ import {
     DEFAULT_DRUG_GROUP_1,
 } from '../data/formOptions';
 import type { DrugGenericName } from '../types/patient';
+import type { SpssVarConfig, SpssVarDef, SpssSlotConfig, SpssVarGroup } from '../types/spssTypes';
+import { SPSS_VAR_GROUP_LABELS } from '../types/spssTypes';
+
+import { buildDefaultSpssConfig } from '../utils/spssDefaultConfig';
 import {
     Upload, Download, Info, Plus, Trash2, Pencil, Check, X,
     ShieldAlert, MapPin, Stethoscope, Bug, Printer, HardDrive,
     Loader2, Eye, RotateCcw, FileSpreadsheet, ChevronUp, Search, Settings2, Pill,
+    Database, RefreshCcw, Tag,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -188,6 +193,7 @@ const TABS = [
     { key: 'vikhuan', label: 'Vi khuẩn', icon: Bug },
     { key: 'thuoc', label: 'Thuốc', icon: Pill },
     { key: 'inbanc', label: 'In BANC', icon: Printer },
+    { key: 'spss', label: 'SPSS Variables', icon: Database },
     { key: 'backup', label: 'Backup', icon: HardDrive },
 ] as const;
 
@@ -215,6 +221,393 @@ const DEFAULT_PRINT_SETTINGS: PrintSettings = {
     signRight: '',
     showPsiLevel: false,
 };
+
+// ─── SpssSettingsTab Component ────────────────────────────────────────────────
+
+interface SpssSettingsTabProps {
+    config: SpssVarConfig;
+    loading: boolean;
+    patients: import('../types/patient').Patient[];
+    onChange: (updated: SpssVarConfig) => void;
+    onReset: () => void;
+    onExport: () => void;
+}
+
+function ValueLabelEditorModal({
+    varDef,
+    onSave,
+    onClose,
+}: {
+    varDef: SpssVarDef;
+    onSave: (labels: Record<number, string>) => void;
+    onClose: () => void;
+}) {
+    const [pairs, setPairs] = useState<{ code: string; label: string }[]>(() =>
+        Object.entries(varDef.valueLabels ?? {}).map(([k, v]) => ({ code: k, label: v }))
+    );
+
+    const addRow = () => setPairs(prev => [...prev, { code: '', label: '' }]);
+    const removeRow = (i: number) => setPairs(prev => prev.filter((_, idx) => idx !== i));
+    const updateRow = (i: number, field: 'code' | 'label', value: string) =>
+        setPairs(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: value } : r));
+
+    const handleSave = () => {
+        const labels: Record<number, string> = {};
+        for (const { code, label } of pairs) {
+            const num = parseFloat(code);
+            if (!isNaN(num) && label.trim()) labels[num] = label.trim();
+        }
+        onSave(labels);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                    <div>
+                        <h3 className="font-semibold text-gray-900 text-sm">Sửa bảng mã giá trị</h3>
+                        <p className="text-xs text-gray-500 mt-0.5 font-mono">{varDef.name}</p>
+                    </div>
+                    <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                        <X className="w-4 h-4 text-gray-500" />
+                    </button>
+                </div>
+                <div className="px-6 py-4 max-h-80 overflow-y-auto space-y-2">
+                    <div className="grid grid-cols-[80px_1fr_32px] gap-2 text-xs font-medium text-gray-500 px-1">
+                        <span>Mã (số)</span><span>Nhãn hiển thị</span><span />
+                    </div>
+                    {pairs.map((p, i) => (
+                        <div key={i} className="grid grid-cols-[80px_1fr_32px] gap-2 items-center">
+                            <input
+                                type="number"
+                                value={p.code}
+                                onChange={e => updateRow(i, 'code', e.target.value)}
+                                className="px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                placeholder="0"
+                            />
+                            <input
+                                type="text"
+                                value={p.label}
+                                onChange={e => updateRow(i, 'label', e.target.value)}
+                                className="px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                placeholder="Nhãn..."
+                            />
+                            <button onClick={() => removeRow(i)} className="p-1 text-gray-400 hover:text-red-500 transition-colors">
+                                <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    ))}
+                    <button
+                        onClick={addRow}
+                        className="flex items-center gap-1.5 text-xs text-primary-600 hover:text-primary-700 font-medium mt-2 transition-colors"
+                    >
+                        <Plus className="w-3.5 h-3.5" /> Thêm hàng
+                    </button>
+                </div>
+                <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
+                    <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Hủy</button>
+                    <button onClick={handleSave} className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors">Lưu</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function SpssSettingsTab({ config, loading, patients, onChange, onReset, onExport }: SpssSettingsTabProps) {
+    const [search, setSearch] = useState('');
+    const [filterGroup, setFilterGroup] = useState<SpssVarGroup | 'all'>('all');
+    const [editingIdx, setEditingIdx] = useState<number | null>(null);
+    const [editName, setEditName] = useState('');
+    const [editLabel, setEditLabel] = useState('');
+    const [valueLabelVar, setValueLabelVar] = useState<{ varDef: SpssVarDef; index: number } | null>(null);
+    const [slots, setSlots] = useState<SpssSlotConfig>(config.slotConfig);
+
+    // Sync slots from config on mount
+    useEffect(() => { setSlots(config.slotConfig); }, [config.slotConfig]);
+
+    const vars = config.vars;
+
+    // Filter non-template vars for display (templates shown as group summary)
+    const displayVars = vars.filter(v => {
+        const matchSearch = !search || v.name.toLowerCase().includes(search.toLowerCase()) || v.label.toLowerCase().includes(search.toLowerCase());
+        const matchGroup = filterGroup === 'all' || v.group === filterGroup;
+        return matchSearch && matchGroup;
+    });
+
+    const startEdit = (idx: number, v: SpssVarDef) => {
+        setEditingIdx(idx);
+        setEditName(v.name);
+        setEditLabel(v.label);
+    };
+
+    const saveEdit = (idx: number) => {
+        const updated = vars.map((v, i) =>
+            i === idx ? { ...v, name: editName.trim() || v.name, label: editLabel.trim() || v.label } : v
+        );
+        onChange({ ...config, vars: updated });
+        setEditingIdx(null);
+    };
+
+    const saveValueLabels = (idx: number, labels: Record<number, string>) => {
+        const updated = vars.map((v, i) => i === idx ? { ...v, valueLabels: labels } : v);
+        onChange({ ...config, vars: updated });
+        setValueLabelVar(null);
+    };
+
+    const saveSlots = () => {
+        onChange({ ...config, slotConfig: slots });
+    };
+
+    const groups = Object.entries(SPSS_VAR_GROUP_LABELS) as [SpssVarGroup, string][];
+
+    return (
+        <div className="space-y-6">
+            {/* ── Header actions ── */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <h3 className="font-heading font-semibold text-gray-900">Cấu hình SPSS Variables</h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                            Chỉnh sửa tên biến (SPSS name), nhãn (label), và bảng mã giá trị trước khi xuất file <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">.sav</span>.
+                            {patients.length > 0 && (
+                                <span className="ml-2 text-primary-600 font-medium">{patients.length} bệnh nhân sẵn sàng</span>
+                            )}
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            onClick={onReset}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 border border-gray-200 transition-colors"
+                        >
+                            <RefreshCcw className="w-3.5 h-3.5" />
+                            Khôi phục mặc định
+                        </button>
+                        <button
+                            onClick={onExport}
+                            disabled={loading || patients.length === 0}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                            Xuất SPSS (.sav)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Slot config ── */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <h3 className="font-semibold text-gray-900 text-sm mb-1">Số slot tối đa (biến động)</h3>
+                <p className="text-xs text-gray-500 mb-4">
+                    Xác định số cột SPSS dành cho dữ liệu có thể thay đổi số lượng theo bệnh nhân.
+                    Thay đổi rồi nhấn <strong>Áp dụng</strong>.
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {[
+                        { key: 'xquang' as const, label: 'X-quang tổn thương' },
+                        { key: 'ct' as const, label: 'CT tổn thương' },
+                        { key: 'viKhuan' as const, label: 'Vi khuẩn' },
+                        { key: 'khangSinhPerVK' as const, label: 'Kháng sinh / vi khuẩn' },
+                        { key: 'thuoc' as const, label: 'Thuốc đã dùng' },
+                    ].map(({ key, label }) => (
+                        <div key={key}>
+                            <label className="block text-xs text-gray-600 font-medium mb-1">{label}</label>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={key === 'khangSinhPerVK' ? 30 : 20}
+                                    value={slots[key]}
+                                    onChange={e => setSlots(prev => ({ ...prev, [key]: Math.max(1, parseInt(e.target.value) || 1) }))}
+                                    className="w-20 px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                />
+                                <span className="text-xs text-gray-400">slot</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <button
+                    onClick={saveSlots}
+                    className="mt-4 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
+                >
+                    Áp dụng slot config
+                </button>
+                <p className="mt-2 text-xs text-gray-400">
+                    Tổng biến ước tính: {
+                        (() => {
+                            const xq = slots.xquang * 5;
+                            const ct = slots.ct * 5;
+                            const vk = slots.viKhuan * (2 + slots.khangSinhPerVK * 2);
+                            const thuoc = slots.thuoc * 6;
+                            const fixed = 12 + 12 + 25 + 31 + 3 + 4 + 1 + 20 + 2 + 8 + 11;
+                            return fixed + xq + ct + vk + thuoc;
+                        })()
+                    } biến
+                </p>
+            </div>
+
+            {/* ── Variable list ── */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                {/* Toolbar */}
+                <div className="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-gray-100">
+                    <div className="relative flex-1 min-w-48">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Tìm theo tên biến hoặc label..."
+                            className="w-full pl-8 pr-3 py-2 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                    </div>
+                    <select
+                        value={filterGroup}
+                        onChange={e => setFilterGroup(e.target.value as SpssVarGroup | 'all')}
+                        className="px-3 py-2 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    >
+                        <option value="all">Tất cả nhóm</option>
+                        {groups.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                    <span className="text-xs text-gray-400">{displayVars.length} biến</span>
+                </div>
+
+                {/* Table */}
+                <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-50 sticky top-0 z-10">
+                            <tr>
+                                <th className="text-left px-4 py-2.5 font-medium text-gray-600 whitespace-nowrap w-8">#</th>
+                                <th className="text-left px-4 py-2.5 font-medium text-gray-600 whitespace-nowrap">Nhóm</th>
+                                <th className="text-left px-4 py-2.5 font-medium text-gray-600 whitespace-nowrap">SPSS Name</th>
+                                <th className="text-left px-4 py-2.5 font-medium text-gray-600">Label</th>
+                                <th className="text-center px-4 py-2.5 font-medium text-gray-600 whitespace-nowrap w-16">Kiểu</th>
+                                <th className="text-center px-4 py-2.5 font-medium text-gray-600 whitespace-nowrap w-24">Bảng mã</th>
+                                <th className="text-right px-4 py-2.5 font-medium text-gray-600 w-20">Sửa</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {displayVars.length === 0 && (
+                                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 italic">Không tìm thấy biến</td></tr>
+                            )}
+                            {displayVars.map((v, displayIdx) => {
+                                // Find actual index in config.vars
+                                const actualIdx = vars.indexOf(v);
+                                const isEditing = editingIdx === actualIdx;
+                                const hasLabels = v.valueLabels && Object.keys(v.valueLabels).length > 0;
+                                const isTemplate = v.isSlotTemplate;
+
+                                return (
+                                    <tr
+                                        key={v.name}
+                                        className={`hover:bg-gray-50/60 transition-colors ${isTemplate ? 'bg-blue-50/30' : ''}`}
+                                    >
+                                        <td className="px-4 py-2 text-gray-400 tabular-nums text-xs">{displayIdx + 1}</td>
+                                        <td className="px-4 py-2">
+                                            <span className="text-xs text-gray-500 whitespace-nowrap">
+                                                {v.group ? SPSS_VAR_GROUP_LABELS[v.group] : '—'}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-2">
+                                            {isEditing ? (
+                                                <input
+                                                    autoFocus
+                                                    value={editName}
+                                                    onChange={e => setEditName(e.target.value)}
+                                                    onKeyDown={e => { if (e.key === 'Enter') saveEdit(actualIdx); if (e.key === 'Escape') setEditingIdx(null); }}
+                                                    className="w-40 px-2 py-1 rounded border border-primary-300 text-xs font-mono focus:ring-2 focus:ring-primary-500"
+                                                />
+                                            ) : (
+                                                <span className={`font-mono text-xs ${isTemplate ? 'text-blue-700' : 'text-gray-800'}`}>
+                                                    {v.name}
+                                                    {isTemplate && <span className="ml-1 text-blue-400 text-[10px]">[template]</span>}
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-2">
+                                            {isEditing ? (
+                                                <input
+                                                    value={editLabel}
+                                                    onChange={e => setEditLabel(e.target.value)}
+                                                    onKeyDown={e => { if (e.key === 'Enter') saveEdit(actualIdx); if (e.key === 'Escape') setEditingIdx(null); }}
+                                                    className="w-full px-2 py-1 rounded border border-primary-300 text-xs focus:ring-2 focus:ring-primary-500"
+                                                />
+                                            ) : (
+                                                <span className="text-gray-700 text-xs">{v.label}</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-2 text-center">
+                                            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${v.type === 'string' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'}`}>
+                                                {v.type === 'string' ? 'Text' : 'Numeric'}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-2 text-center">
+                                            {hasLabels ? (
+                                                <button
+                                                    onClick={() => setValueLabelVar({ varDef: v, index: actualIdx })}
+                                                    className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 transition-colors font-medium"
+                                                >
+                                                    <Tag className="w-3 h-3" />
+                                                    {Object.keys(v.valueLabels!).length}
+                                                </button>
+                                            ) : (
+                                                <span className="text-gray-300 text-xs">—</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-2 text-right">
+                                            <div className="flex items-center justify-end gap-1">
+                                                {isEditing ? (
+                                                    <>
+                                                        <button onClick={() => saveEdit(actualIdx)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Lưu">
+                                                            <Check className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button onClick={() => setEditingIdx(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors" title="Hủy">
+                                                            <X className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <button onClick={() => startEdit(actualIdx, v)} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="Sửa">
+                                                        <Pencil className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Template slot info box */}
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                <div className="flex gap-3">
+                    <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-blue-800 space-y-1">
+                        <p className="font-medium">Biến dạng template [n] và [k]</p>
+                        <p className="text-xs text-blue-700">
+                            Các biến có nhãn <span className="font-mono bg-blue-100 px-1 rounded text-[11px]">[template]</span> sẽ được nhân theo slot config.
+                            Ví dụ: <span className="font-mono text-[11px]">xq{'{n}'}_vitri</span> với 5 slots sẽ sinh ra
+                            <span className="font-mono text-[11px]"> xq1_vitri, xq2_vitri, ..., xq5_vitri</span> trong file .sav —
+                            tất cả dùng chung một bảng mã giá trị.
+                        </p>
+                        <p className="text-xs text-blue-700">
+                            Kháng sinh đồ dùng cả 2 placeholder: <span className="font-mono text-[11px]">vk{'{n}'}_ks{'{k}'}_kq</span> sinh ra
+                            <em> viKhuan × khangSinhPerVK</em> biến.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Value label editor modal */}
+            {valueLabelVar && (
+                <ValueLabelEditorModal
+                    varDef={valueLabelVar.varDef}
+                    onSave={(labels) => saveValueLabels(valueLabelVar.index, labels)}
+                    onClose={() => setValueLabelVar(null)}
+                />
+            )}
+        </div>
+    );
+}
 
 // ─── Settings Page ───────────────────────────────────────────────────
 export default function SettingsPage() {
@@ -254,6 +647,11 @@ export default function SettingsPage() {
 
     // In BANC tab
     const [printSettings, setPrintSettings] = useState<PrintSettings>(DEFAULT_PRINT_SETTINGS);
+
+    // SPSS tab
+    const [spssConfig, setSpssConfig] = useState<SpssVarConfig | null>(null);
+    const [spssLoading, setSpssLoading] = useState(false);
+    const [allPatients, setAllPatients] = useState<import('../types/patient').Patient[]>([]);
 
     // Backup tab
     const [backups, setBackups] = useState<BackupMetadata[]>([]);
@@ -384,6 +782,17 @@ export default function SettingsPage() {
         settingsService.getClinicalSettings().then((data) => {
             if (data?.glasgowThreshold) setGlasgowThreshold(data.glasgowThreshold);
         }).catch(() => { /* use default */ });
+
+        // SPSS config
+        settingsService.getSpssConfig().then((data) => {
+            if (data) setSpssConfig(data);
+            else setSpssConfig(buildDefaultSpssConfig());
+        }).catch(() => {
+            setSpssConfig(buildDefaultSpssConfig());
+        });
+
+        // Load all patients for SAV export
+        patientService.getAll().then(setAllPatients).catch(() => {});
     }, []);
 
     // Fetch used items from patient data
@@ -834,7 +1243,43 @@ export default function SettingsPage() {
                     </div>
                 </div>
             )}
-            {/* ════════════ TAB 5: Backup ════════════ */}
+            {/* ════════════ TAB 6: SPSS Variables ════════════ */}
+            {activeTab === 'spss' && spssConfig && (
+                <SpssSettingsTab
+                    config={spssConfig}
+                    loading={spssLoading}
+                    patients={allPatients}
+                    onChange={(updated) => {
+                        setSpssConfig(updated);
+                        setSpssLoading(true);
+                        settingsService.saveSpssConfig(updated)
+                            .then(() => toast.success('Đã lưu cấu hình SPSS'))
+                            .catch(() => toast.error('Lỗi khi lưu cấu hình SPSS'))
+                            .finally(() => setSpssLoading(false));
+                    }}
+                    onReset={() => {
+                        const def = buildDefaultSpssConfig();
+                        setSpssConfig(def);
+                        settingsService.saveSpssConfig(def)
+                            .then(() => toast.success('Đã khôi phục cấu hình mặc định'))
+                            .catch(() => toast.error('Lỗi khi lưu'));
+                    }}
+                    onExport={() => {
+                        if (allPatients.length === 0) {
+                            toast.error('Không có bệnh nhân để xuất');
+                            return;
+                        }
+                        try {
+                            exportPatientsToSAV(allPatients, spssConfig);
+                            toast.success(`Đã xuất ${allPatients.length} bệnh nhân ra file .sav`);
+                        } catch (e) {
+                            console.error(e);
+                            toast.error('Lỗi khi tạo file SPSS');
+                        }
+                    }}
+                />
+            )}
+            {/* ════════════ TAB 7: Backup ════════════ */}
             {activeTab === 'backup' && (
                 <BackupTab
                     backups={backups}
