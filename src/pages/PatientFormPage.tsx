@@ -446,7 +446,7 @@ export default function PatientFormPage() {
             }
             case 3: return <StepXetNghiem data={formData.xetNghiem} indices={indices} onChange={(v) => updateField('xetNghiem', v)} />;
             case 4: return <StepHinhAnh data={formData.hinhAnh} onChange={(v) => updateField('hinhAnh', v)} />;
-            case 5: return <StepViKhuan data={formData.viKhuan} onChange={(v) => updateField('viKhuan', v)} />;
+            case 5: return <StepViKhuan data={formData.viKhuan} khongMocViKhuan={formData.khongMocViKhuan ?? false} onChange={(v) => updateField('viKhuan', v)} onKhongMocChange={(v) => updateField('khongMocViKhuan', v)} />;
             case 6: return (
                 <div className="space-y-8">
                     <StepCURB65

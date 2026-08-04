@@ -116,6 +116,9 @@ export default function ExpectedResultsTab({ patients, drugGroup1 = [], drugGrou
             {/* ── 3.1.6: Căn nguyên vi sinh ── */}
             <Table316 patients={patients} />
 
+            {/* ── 3.1.6b: Không mọc vi khuẩn ── */}
+            <Table316b patients={patients} />
+
             {/* ── 3.1.7: Biomarker tổng hợp ── */}
             <Table317 patients={patients} />
 
@@ -1028,6 +1031,8 @@ function Table316({ patients }: { patients: Patient[] }) {
     const N = patients.length;
     const data = useMemo(() => {
         const vkDuong = patients.filter(p => p.viKhuan?.some(vk => vk.coKhong)).length;
+        const khongMoc = patients.filter(p => p.khongMocViKhuan === true).length;
+        const chuaNhap = patients.filter(p => !p.khongMocViKhuan && !p.viKhuan?.some(vk => vk.coKhong)).length;
         const dongNhiem = patients.filter(p => (p.viKhuan?.filter(vk => vk.coKhong) || []).length >= 2).length;
 
         // Phân bố VK
@@ -1049,13 +1054,15 @@ function Table316({ patients }: { patients: Patient[] }) {
             .map(([name, count]) => ({ name, count, type: classifyVK(name) }))
             .sort((a, b) => b.count - a.count);
 
-        return { vkDuong, dongNhiem, vkList, totalDienHinh, totalKhongDienHinh };
+        return { vkDuong, khongMoc, chuaNhap, dongNhiem, vkList, totalDienHinh, totalKhongDienHinh };
     }, [patients]);
 
     const totalVK = data.vkList.reduce((s, v) => s + v.count, 0);
 
     const rows: (string | React.ReactNode)[][] = [
-        ['Tỷ lệ phát hiện vi khuẩn', String(data.vkDuong), frac(data.vkDuong, N)],
+        ['Tỷ lệ cấy dương tính (có VK)', String(data.vkDuong), frac(data.vkDuong, N)],
+        ['Cấy âm tính (không mọc VK)', String(data.khongMoc), frac(data.khongMoc, N)],
+        ['Chưa có kết quả cấy / chưa nhập', String(data.chuaNhap), frac(data.chuaNhap, N)],
         ['Nhiễm phối hợp (≥ 2 tác nhân)', String(data.dongNhiem), frac(data.dongNhiem, N)],
         ['Tổng chủng VK phân lập', String(totalVK), ''],
         ['VK ĐIỂN HÌNH', '', ''],
@@ -1098,6 +1105,120 @@ function Table316({ patients }: { patients: Patient[] }) {
                 headers={['Căn nguyên vi sinh', 'n', '%']}
                 rows={rows}
             />
+        </SectionCard>
+    );
+}
+
+// ════════════════════════════════════════════════════════════
+// 3.1.6b: LIÊN QUAN KHÔNG MỌC VI KHUẨN
+// ════════════════════════════════════════════════════════════
+function Table316b({ patients }: { patients: Patient[] }) {
+    const [computed, computeVer, triggerCompute] = useComputeP();
+    const N = patients.length;
+
+    const data = useMemo(() => {
+        const khongMocGroup = patients.filter(p => p.khongMocViKhuan === true);
+        const coVkGroup = patients.filter(p => p.viKhuan?.some(vk => vk.coKhong));
+
+        const extract = (group: Patient[], key: string) => {
+            const vals = group.map(p => p.xetNghiem[key as keyof typeof p.xetNghiem] as number | null).filter(num) as number[];
+            return {
+                n: vals.length,
+                vals,
+                median: vals.length > 0 ? median(vals).toFixed(2) : '—',
+                q1q3: vals.length > 0 ? `${q1(vals).toFixed(2)}–${q3(vals).toFixed(2)}` : '—',
+            };
+        };
+
+        const allMarkerKeys = ['sTREM1', 'tIMP1', 'il6', 'il10', 'il17', 'crp', 'procalcitonin'];
+        const labels: Record<string, string> = {
+            sTREM1: 'sTREM-1', tIMP1: 'TIMP-1', il6: 'IL-6', il10: 'IL-10',
+            il17: 'IL-17', crp: 'CRP (mg/L)', procalcitonin: 'PCT (ng/mL)',
+        };
+
+        const tuVongKhongMoc = khongMocGroup.filter(p => p.ketCuc?.tuVong).length;
+        const tuVongCoVK = coVkGroup.filter(p => p.ketCuc?.tuVong).length;
+        const nangPSIKhongMoc = khongMocGroup.filter(p => p.psi.tongDiem > 0 && ['III', 'IV', 'V'].includes(psiClass(p.psi.tongDiem))).length;
+        const nangPSICoVK = coVkGroup.filter(p => p.psi.tongDiem > 0 && ['III', 'IV', 'V'].includes(psiClass(p.psi.tongDiem))).length;
+        const nangCURBKhongMoc = khongMocGroup.filter(p => getCurb65(p).tongDiem >= 2).length;
+        const nangCURBCoVK = coVkGroup.filter(p => getCurb65(p).tongDiem >= 2).length;
+        const thoMayKhongMoc = khongMocGroup.filter(p => p.ketCuc?.thoMay || p.ketCuc?.dienBienDieuTri?.includes('Thở máy')).length;
+        const thoMayCoVK = coVkGroup.filter(p => p.ketCuc?.thoMay || p.ketCuc?.dienBienDieuTri?.includes('Thở máy')).length;
+
+        return {
+            nKhongMoc: khongMocGroup.length,
+            nCoVK: coVkGroup.length,
+            tuVongKhongMoc, tuVongCoVK,
+            nangPSIKhongMoc, nangPSICoVK,
+            nangCURBKhongMoc, nangCURBCoVK,
+            thoMayKhongMoc, thoMayCoVK,
+            markers: allMarkerKeys.map(key => ({
+                label: labels[key],
+                khongMoc: extract(khongMocGroup, key),
+                coVK: extract(coVkGroup, key),
+                pValue: computed
+                    ? mannWhitneyU(extract(khongMocGroup, key).vals, extract(coVkGroup, key).vals)?.p ?? null
+                    : null,
+            })),
+        };
+    }, [patients, computeVer]);
+
+    if (data.nKhongMoc === 0) {
+        return (
+            <SectionCard
+                id="table-316b"
+                title="Bảng 3.6b — Đặc điểm nhóm không mọc vi khuẩn"
+                subtitle="Mục 3.1.3: Chưa có bệnh nhân được ghi nhận không mọc vi khuẩn"
+            >
+                <p className="text-sm text-gray-400 italic">
+                    Chưa có bệnh nhân nào được xác nhận &quot;Không mọc vi khuẩn&quot;. Cập nhật thông tin trong phần Vi khuẩn của bệnh nhân.
+                </p>
+            </SectionCard>
+        );
+    }
+
+    const clinicalRows: (string | React.ReactNode)[][] = [
+        ['Số bệnh nhân', String(data.nKhongMoc), `${pct(data.nKhongMoc, N)}`, String(data.nCoVK), `${pct(data.nCoVK, N)}`],
+        ['Tử vong', String(data.tuVongKhongMoc), frac(data.tuVongKhongMoc, data.nKhongMoc || 1), String(data.tuVongCoVK), frac(data.tuVongCoVK, data.nCoVK || 1)],
+        ['PSI nặng (III–V)', String(data.nangPSIKhongMoc), frac(data.nangPSIKhongMoc, data.nKhongMoc || 1), String(data.nangPSICoVK), frac(data.nangPSICoVK, data.nCoVK || 1)],
+        ['CURB-65 nặng (≥2)', String(data.nangCURBKhongMoc), frac(data.nangCURBKhongMoc, data.nKhongMoc || 1), String(data.nangCURBCoVK), frac(data.nangCURBCoVK, data.nCoVK || 1)],
+        ['Thở máy', String(data.thoMayKhongMoc), frac(data.thoMayKhongMoc, data.nKhongMoc || 1), String(data.thoMayCoVK), frac(data.thoMayCoVK, data.nCoVK || 1)],
+    ];
+
+    const markerRows = data.markers.map(d => [
+        d.label,
+        `${d.khongMoc.median} (${d.khongMoc.q1q3})`,
+        String(d.khongMoc.n),
+        `${d.coVK.median} (${d.coVK.q1q3})`,
+        String(d.coVK.n),
+        computed ? <PCell p={d.pValue} /> : <span className="text-gray-400 italic text-xs">—</span>,
+    ]);
+
+    return (
+        <SectionCard
+            id="table-316b"
+            title={`Bảng 3.6b — Đặc điểm nhóm không mọc vi khuẩn (n = ${data.nKhongMoc})`}
+            subtitle={`Mục 3.1.3: So sánh đặc điểm giữa nhóm không mọc VK (n=${data.nKhongMoc}) và nhóm có VK (n=${data.nCoVK})`}
+            note="Không mọc vi khuẩn: kết quả cấy âm tính được xác nhận rõ ràng (không bao gồm trường hợp chưa cấy hoặc chưa nhập liệu)."
+        >
+            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">So sánh lâm sàng</h4>
+            <DataTable
+                headers={['Đặc điểm', 'Không mọc VK — n', '%', 'Có VK — n', '%']}
+                rows={clinicalRows}
+            />
+
+            <div className="mt-4">
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">So sánh biomarker</h4>
+                <div className="flex items-center gap-3 mb-3">
+                    <CalcButton onClick={triggerCompute} computed={computed} />
+                    {computed && <span className="text-xs text-gray-500">Kiểm định: Mann-Whitney U (two-tailed)</span>}
+                </div>
+                <DataTable
+                    headers={['Biomarker', 'Không mọc VK — Median (Q1–Q3)', 'n₁', 'Có VK — Median (Q1–Q3)', 'n₂', 'p']}
+                    rows={markerRows}
+                />
+                {computed && <PValueDisclaimer />}
+            </div>
         </SectionCard>
     );
 }
@@ -1206,8 +1327,12 @@ function Table321({ patients }: { patients: Patient[] }) {
     const [computed, computeVer, triggerCompute] = useComputeP();
 
     const data = useMemo(() => {
+        // Có VK: cấy dương tính (coKhong = true)
         const hasVK = patients.filter(p => p.viKhuan?.some(vk => vk.coKhong));
-        const noVK = patients.filter(p => !p.viKhuan?.some(vk => vk.coKhong));
+        // Không mọc: xác nhận âm tính
+        const khongMoc = patients.filter(p => p.khongMocViKhuan === true);
+        // Chưa rõ: không thuộc 2 nhóm trên
+        const noVK = patients.filter(p => !p.viKhuan?.some(vk => vk.coKhong) && !p.khongMocViKhuan);
 
         const extract = (group: Patient[], key: 'sTREM1' | 'tIMP1' | 'il6' | 'il10' | 'il17') => {
             const vals = group.map(p => p.xetNghiem[key]).filter(num) as number[];
@@ -1223,18 +1348,26 @@ function Table321({ patients }: { patients: Patient[] }) {
         const markers: ('sTREM1' | 'tIMP1' | 'il6' | 'il10' | 'il17')[] = ['sTREM1', 'tIMP1', 'il6', 'il10', 'il17'];
         const labels: Record<string, string> = { sTREM1: 'sTREM-1', tIMP1: 'TIMP-1', il6: 'IL-6', il10: 'IL-10', il17: 'IL-17' };
 
-        return markers.map(key => ({
-            label: labels[key],
-            hasVK: extract(hasVK, key),
-            noVK: extract(noVK, key),
-            pValue: computed ? mannWhitneyU(extract(hasVK, key).vals, extract(noVK, key).vals)?.p ?? null : null,
-        }));
+        return {
+            nHasVK: hasVK.length,
+            nKhongMoc: khongMoc.length,
+            nNoVK: noVK.length,
+            markers: markers.map(key => ({
+                label: labels[key],
+                hasVK: extract(hasVK, key),
+                khongMoc: extract(khongMoc, key),
+                noVK: extract(noVK, key),
+                pValue: computed ? mannWhitneyU(extract(hasVK, key).vals, extract(khongMoc, key).vals)?.p ?? null : null,
+            })),
+        };
     }, [patients, computeVer]);
 
-    const rows = data.map(d => [
+    const rows = data.markers.map(d => [
         d.label,
         `${d.hasVK.median} (${d.hasVK.q1q3})`,
         String(d.hasVK.n),
+        `${d.khongMoc.median} (${d.khongMoc.q1q3})`,
+        String(d.khongMoc.n),
         `${d.noVK.median} (${d.noVK.q1q3})`,
         String(d.noVK.n),
         computed ? <PCell p={d.pValue} /> : <span className="text-gray-400 italic text-xs">—</span>,
@@ -1244,14 +1377,14 @@ function Table321({ patients }: { patients: Patient[] }) {
         <SectionCard
             id="table-321"
             title="Bảng 3.8 — Biomarker theo nhóm căn nguyên vi sinh"
-            subtitle="Mục 3.1.4: So sánh nồng độ biomarker giữa nhóm có VK và không phát hiện VK"
+            subtitle={`Mục 3.1.4: So sánh nồng độ biomarker — có VK (n=${data.nHasVK}) / không mọc VK (n=${data.nKhongMoc}) / chưa rõ (n=${data.nNoVK})`}
         >
             <div className="flex items-center gap-3 mb-3">
                 <CalcButton onClick={triggerCompute} computed={computed} />
-                {computed && <span className="text-xs text-gray-500">Kiểm định: Mann-Whitney U (two-tailed)</span>}
+                {computed && <span className="text-xs text-gray-500">Kiểm định: Mann-Whitney U (two-tailed) — Có VK vs Không mọc</span>}
             </div>
             <DataTable
-                headers={['Biomarker', 'Có VK — Median (Q1–Q3)', 'n₁', 'Không VK — Median (Q1–Q3)', 'n₂', 'p']}
+                headers={['Biomarker', 'Có VK — Median (Q1–Q3)', 'n₁', 'Không mọc — Median (Q1–Q3)', 'n₂', 'Chưa rõ — Median (Q1–Q3)', 'n₃', 'p (Có vs KM)']}
                 rows={rows}
             />
             {computed && <PValueDisclaimer />}

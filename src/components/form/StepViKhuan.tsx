@@ -1,19 +1,22 @@
 import type { ViKhuan, KhangSinhResult } from '../../types/patient';
 import { DEFAULT_BACTERIA, DEFAULT_ANTIBIOTICS, MUC_DO_KHANG_SINH } from '../../data/formOptions';
-import { Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronUp, FlaskConical } from 'lucide-react';
 import { useState, useMemo } from 'react';
 
 interface Props {
     data: ViKhuan[];
+    khongMocViKhuan: boolean;
     onChange: (data: ViKhuan[]) => void;
+    onKhongMocChange: (value: boolean) => void;
 }
 
-export default function StepViKhuan({ data, onChange }: Props) {
+export default function StepViKhuan({ data, khongMocViKhuan, onChange, onKhongMocChange }: Props) {
     // Default: all bacteria with coKhong=true start expanded
     const defaultExpanded = useMemo(() => new Set(data.filter(v => v.coKhong).map(v => v.id)), []);
     const [expandedIds, setExpandedIds] = useState<Set<string>>(defaultExpanded);
 
     const addBacteria = () => {
+        if (khongMocViKhuan) return;
         const usedNames = data.map((v) => v.tenViKhuan);
         const available = DEFAULT_BACTERIA.filter((b) => !usedNames.includes(b));
         const newVk: ViKhuan = {
@@ -49,19 +52,64 @@ export default function StepViKhuan({ data, onChange }: Props) {
         );
     };
 
+    const handleKhongMocToggle = (checked: boolean) => {
+        onKhongMocChange(checked);
+        // Nếu bật "không mọc", xóa toàn bộ vi khuẩn đã thêm để tránh mâu thuẫn dữ liệu
+        if (checked && data.length > 0) {
+            onChange([]);
+            setExpandedIds(new Set());
+        }
+    };
+
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h2 className="font-heading font-semibold text-lg text-gray-900">F. Vi khuẩn & Kháng sinh đồ</h2>
-                <button onClick={addBacteria}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors">
-                    <Plus className="w-3.5 h-3.5" /> Thêm vi khuẩn mọc
-                </button>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+                <h2 className="font-heading font-semibold text-lg text-gray-900">F. Vi khuẩn &amp; Kháng sinh đồ</h2>
+                <div className="flex items-center gap-3 flex-wrap">
+                    {/* Toggle: Không mọc vi khuẩn */}
+                    <label
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer transition-all select-none
+                            ${khongMocViKhuan
+                                ? 'bg-amber-50 border-amber-300 text-amber-700 shadow-sm'
+                                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                            }`}
+                        title="Xác nhận kết quả cấy không mọc vi khuẩn"
+                    >
+                        <input
+                            type="checkbox"
+                            checked={khongMocViKhuan}
+                            onChange={(e) => handleKhongMocToggle(e.target.checked)}
+                            className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-400 accent-amber-500"
+                        />
+                        <FlaskConical className="w-3.5 h-3.5 shrink-0" />
+                        <span className="text-xs font-medium whitespace-nowrap">Không mọc vi khuẩn</span>
+                    </label>
+
+                    {/* Nút Thêm vi khuẩn mọc */}
+                    <button
+                        onClick={addBacteria}
+                        disabled={khongMocViKhuan}
+                        title={khongMocViKhuan ? 'Đã chọn "Không mọc vi khuẩn" — bỏ chọn để thêm vi khuẩn' : 'Thêm vi khuẩn mọc'}
+                        className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors
+                            ${khongMocViKhuan
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'text-primary-600 bg-primary-50 hover:bg-primary-100'
+                            }`}
+                    >
+                        <Plus className="w-3.5 h-3.5" /> Thêm vi khuẩn mọc
+                    </button>
+                </div>
             </div>
 
-            {data.length === 0 ? (
+            {/* Thông báo trạng thái */}
+            {khongMocViKhuan ? (
+                <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700">
+                    <FlaskConical className="w-4 h-4 shrink-0" />
+                    <p className="text-sm font-medium">Kết quả cấy: Không mọc vi khuẩn</p>
+                </div>
+            ) : data.length === 0 ? (
                 <p className="text-sm text-gray-400 italic text-center py-8">
-                    Chưa có vi khuẩn. Nhấn "+ Thêm vi khuẩn mọc" để bắt đầu.
+                    Chưa có vi khuẩn. Nhấn &quot;+ Thêm vi khuẩn mọc&quot; để bắt đầu hoặc chọn &quot;Không mọc vi khuẩn&quot;.
                 </p>
             ) : (
                 <div className="space-y-3">

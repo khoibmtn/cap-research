@@ -247,6 +247,7 @@ export interface Patient {
     chiSoTinhToan: ChiSoTinhToan;
     hinhAnh: HinhAnh;
     viKhuan: ViKhuan[];
+    khongMocViKhuan?: boolean; // true = cấy không mọc vi khuẩn (xác nhận rõ ràng); undefined/false = chưa xác nhận
     psi: PSIData;
     curb65?: CURB65Data;
     ketCuc: KetCuc;
@@ -337,6 +338,7 @@ export const createDefaultPatient = (): Omit<Patient, 'id' | 'createdAt' | 'upda
         ctTranKhiMangPhoi: false,
     },
     viKhuan: [],
+    khongMocViKhuan: false,
     psi: {
         criteria: createDefaultPSICriteria(),
         tongDiem: 0,

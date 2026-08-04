@@ -164,6 +164,7 @@ function rowToPatient(row: Record<string, unknown>): Omit<Patient, 'id' | 'creat
             ctTranKhiMangPhoi: false,
         },
         viKhuan: [],
+        khongMocViKhuan: false,
         psi: {
             criteria: createDefaultPSICriteria(),
             tongDiem: num(row['PSI Tổng điểm']) ?? 0,
