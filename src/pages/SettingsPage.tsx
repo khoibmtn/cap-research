@@ -609,6 +609,53 @@ function SpssSettingsTab({ config, loading, patients, onChange, onReset, onExpor
     );
 }
 
+// ─── SPSS Config Encoding Migration ─────────────────────────────────
+// Clinical/risk factor binary vars should use 0=Có, 1=Không (for OR 2x2 analysis)
+// This function detects old config (0=Không, 1=Có) and migrates automatically
+
+/** Prefixes/names of clinical binary vars that need reversed encoding */
+const CLINICAL_VAR_PREFIXES = [
+    'ts_dtd', 'ts_tha', 'ts_vdd', 'ts_vgm', 'ts_btnm', 'ts_gut',
+    'ts_ung_thu', 'ts_suy_tim', 'ts_mach_nao', 'ts_hut_thuoc',
+    'ls_ho_khan', 'ls_ho_mau', 'ls_ho_dom', 'ls_dau_nguc', 'ls_kho_tho',
+    'ls_ran_am', 'ls_ran_no', 'ls_ran_rit', 'ls_ran_ngay',
+    'ls_tdmp_co', 'ls_dongdac_co', 'ls_tkmp_co',
+    'ha_xq_tran_dich', 'ha_xq_tran_khi', 'ha_ct_tran_dich', 'ha_ct_tran_khi',
+    'psi_nha_duong_lao', 'psi_ung_thu', 'psi_benh_gan', 'psi_suy_tim',
+    'psi_mach_nao', 'psi_benh_than', 'psi_thay_doi_tri_giac',
+    'psi_tan_so_tho30', 'psi_ha_tam_thu90', 'psi_than_nhiet_3540',
+    'psi_mach125', 'psi_ph735', 'psi_bun30', 'psi_hematocrit30',
+    'psi_na_mau130', 'psi_glucose250', 'psi_pao2_60', 'psi_tran_dich_mp',
+    'curb_c', 'curb_u', 'curb_r', 'curb_b', 'curb_age65',
+    'kc_tho_may', 'kc_soc_nk', 'kc_loc_mau', 'kc_tu_vong', 'kc_xin_ve',
+];
+
+function migrateSpssConfigEncoding(config: SpssVarConfig): SpssVarConfig {
+    let needsMigration = false;
+
+    const updatedVars = config.vars.map((v) => {
+        if (!CLINICAL_VAR_PREFIXES.includes(v.name)) return v;
+        if (!v.valueLabels) return v;
+
+        // Check if still old encoding: 0='Không', 1='Có'
+        if (v.valueLabels[0] === 'Không' && v.valueLabels[1] === 'Có') {
+            needsMigration = true;
+            const newLabel = v.label
+                .replace('(0=Không, 1=Có)', '(0=Có, 1=Không)')
+                .replace('(0=Không,1=Có)', '(0=Có, 1=Không)');
+            return {
+                ...v,
+                label: newLabel !== v.label ? newLabel : v.label,
+                valueLabels: { 0: 'Có', 1: 'Không' },
+            };
+        }
+        return v;
+    });
+
+    if (!needsMigration) return config;
+    return { ...config, vars: updatedVars };
+}
+
 // ─── Settings Page ───────────────────────────────────────────────────
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<TabKey>('hanhchinh');
@@ -785,8 +832,17 @@ export default function SettingsPage() {
 
         // SPSS config
         settingsService.getSpssConfig().then((data) => {
-            if (data) setSpssConfig(data);
-            else setSpssConfig(buildDefaultSpssConfig());
+            if (data) {
+                // Auto-migrate: if clinical vars still have old encoding (0='Không', 1='Có'),
+                // update them to new encoding (0='Có', 1='Không') for OR 2x2 analysis
+                const migrated = migrateSpssConfigEncoding(data);
+                setSpssConfig(migrated);
+                if (migrated !== data) {
+                    settingsService.saveSpssConfig(migrated).catch(() => {});
+                }
+            } else {
+                setSpssConfig(buildDefaultSpssConfig());
+            }
         }).catch(() => {
             setSpssConfig(buildDefaultSpssConfig());
         });
@@ -926,11 +982,11 @@ export default function SettingsPage() {
     // const emptySet = new Set<string>();
 
     return (
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-5xl mx-auto">
             <h1 className="font-heading text-2xl font-bold text-gray-900 mb-6">Cài đặt</h1>
 
             {/* ── Tab bar ── */}
-            <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
+            <div className="flex flex-wrap border-b border-gray-200 mb-6">
                 {TABS.map(({ key, label, icon: Icon }) => (
                     <button key={key} onClick={() => setActiveTab(key)}
                         className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeTab === key
