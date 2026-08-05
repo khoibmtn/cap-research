@@ -1,7 +1,7 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { AddressEntry } from './exportService';
-import type { SpssVarConfig } from '../types/spssTypes';
+import type { SpssVarConfig, SpssProfile } from '../types/spssTypes';
 
 const SETTINGS_DOC = 'app_settings/addresses';
 
@@ -125,5 +125,34 @@ export const settingsService = {
             ...config,
             lastModified: new Date().toISOString(),
         });
+    },
+
+    /** SPSS Profiles */
+    async getSpssProfiles(): Promise<SpssProfile[] | null> {
+        try {
+            const snap = await getDoc(doc(db, 'app_settings/spss_profiles'));
+            if (snap.exists()) return snap.data().profiles as SpssProfile[];
+        } catch (e) {
+            console.warn('Failed to load SPSS profiles from Firestore', e);
+        }
+        return null;
+    },
+
+    async saveSpssProfiles(profiles: SpssProfile[]): Promise<void> {
+        await setDoc(doc(db, 'app_settings/spss_profiles'), { profiles });
+    },
+
+    async getActiveSpssProfileId(): Promise<string | null> {
+        try {
+            const snap = await getDoc(doc(db, 'app_settings/spss_active_profile'));
+            if (snap.exists()) return snap.data().activeId as string;
+        } catch (e) {
+            console.warn('Failed to load active SPSS profile ID from Firestore', e);
+        }
+        return null;
+    },
+
+    async saveActiveSpssProfileId(activeId: string): Promise<void> {
+        await setDoc(doc(db, 'app_settings/spss_active_profile'), { activeId });
     },
 };

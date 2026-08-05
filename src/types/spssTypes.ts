@@ -109,3 +109,11 @@ export interface SpssVarConfig {
     /** ISO timestamp of last user edit */
     lastModified?: string;
 }
+
+export interface SpssProfile {
+    id: string;
+    name: string;
+    isDefault: boolean;
+    config: SpssVarConfig;
+    createdAt: string;
+}

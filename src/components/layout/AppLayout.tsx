@@ -7,7 +7,7 @@ import {
 import { useState } from 'react';
 
 const NAV_ITEMS = [
-    { to: '/', icon: Users, label: 'Bệnh nhân' },
+    { to: '/', icon: Users, label: 'Danh sách nghiên cứu' },
     { to: '/analytics', icon: BarChart3, label: 'Thống kê' },
     { to: '/settings', icon: Settings, label: 'Cài đặt' },
 ];

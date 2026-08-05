@@ -14,8 +14,8 @@ import {
     DEFAULT_NOI_O, DEFAULT_DIEN_BIEN_DIEU_TRI, DEFAULT_TINH_TRANG_RA_VIEN,
     DEFAULT_DRUG_GROUP_1,
 } from '../data/formOptions';
-import type { DrugGenericName } from '../types/patient';
-import type { SpssVarConfig, SpssVarDef, SpssSlotConfig, SpssVarGroup } from '../types/spssTypes';
+import type { DrugGenericName } from '../types/drugTypes';
+import type { SpssVarConfig, SpssVarDef, SpssSlotConfig, SpssVarGroup, SpssProfile } from '../types/spssTypes';
 import { SPSS_VAR_GROUP_LABELS } from '../types/spssTypes';
 
 import { buildDefaultSpssConfig } from '../utils/spssDefaultConfig';
@@ -225,12 +225,16 @@ const DEFAULT_PRINT_SETTINGS: PrintSettings = {
 // ─── SpssSettingsTab Component ────────────────────────────────────────────────
 
 interface SpssSettingsTabProps {
-    config: SpssVarConfig;
+    profiles: SpssProfile[];
+    activeProfileId: string;
     loading: boolean;
     patients: import('../types/patient').Patient[];
-    onChange: (updated: SpssVarConfig) => void;
-    onReset: () => void;
+    onChangeProfile: (id: string) => void;
+    onUpdateActiveProfile: (config: SpssVarConfig) => void;
+    onCreateProfile: (name: string) => void;
+    onDeleteProfile: (id: string) => void;
     onExport: () => void;
+    isAdmin: boolean;
 }
 
 function ValueLabelEditorModal({
@@ -313,19 +317,24 @@ function ValueLabelEditorModal({
     );
 }
 
-function SpssSettingsTab({ config, loading, patients, onChange, onReset, onExport }: SpssSettingsTabProps) {
+function SpssSettingsTab({ profiles, activeProfileId, loading, patients, onChangeProfile, onUpdateActiveProfile, onCreateProfile, onDeleteProfile, onExport, isAdmin }: SpssSettingsTabProps) {
+    const activeProfile = profiles.find(p => p.id === activeProfileId) || profiles[0];
+    const config = activeProfile?.config;
+    
     const [search, setSearch] = useState('');
     const [filterGroup, setFilterGroup] = useState<SpssVarGroup | 'all'>('all');
     const [editingIdx, setEditingIdx] = useState<number | null>(null);
     const [editName, setEditName] = useState('');
     const [editLabel, setEditLabel] = useState('');
     const [valueLabelVar, setValueLabelVar] = useState<{ varDef: SpssVarDef; index: number } | null>(null);
-    const [slots, setSlots] = useState<SpssSlotConfig>(config.slotConfig);
+    const [slots, setSlots] = useState<SpssSlotConfig>(config?.slotConfig || { xquang: 5, ct: 5, viKhuan: 5, khangSinhPerVK: 15, thuoc: 10 });
+
+    const canEdit = activeProfileId !== 'default' || isAdmin;
 
     // Sync slots from config on mount
-    useEffect(() => { setSlots(config.slotConfig); }, [config.slotConfig]);
+    useEffect(() => { if (config?.slotConfig) setSlots(config.slotConfig); }, [config?.slotConfig]);
 
-    const vars = config.vars;
+    const vars = config?.vars || [];
 
     // Filter non-template vars for display (templates shown as group summary)
     const displayVars = vars.filter(v => {
@@ -341,50 +350,89 @@ function SpssSettingsTab({ config, loading, patients, onChange, onReset, onExpor
     };
 
     const saveEdit = (idx: number) => {
+        if (!config || !canEdit) return;
         const updated = vars.map((v, i) =>
             i === idx ? { ...v, name: editName.trim() || v.name, label: editLabel.trim() || v.label } : v
         );
-        onChange({ ...config, vars: updated });
+        onUpdateActiveProfile({ ...config, vars: updated });
         setEditingIdx(null);
     };
 
     const saveValueLabels = (idx: number, labels: Record<number, string>) => {
+        if (!config || !canEdit) return;
         const updated = vars.map((v, i) => i === idx ? { ...v, valueLabels: labels } : v);
-        onChange({ ...config, vars: updated });
+        onUpdateActiveProfile({ ...config, vars: updated });
         setValueLabelVar(null);
     };
 
     const saveSlots = () => {
-        onChange({ ...config, slotConfig: slots });
+        if (!config || !canEdit) return;
+        onUpdateActiveProfile({ ...config, slotConfig: slots });
     };
 
     const groups = Object.entries(SPSS_VAR_GROUP_LABELS) as [SpssVarGroup, string][];
 
     return (
         <div className="space-y-6">
+            {/* ── Profiles Manager ── */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                    <div>
+                        <h3 className="font-heading font-semibold text-gray-900">Profiles cấu hình SPSS</h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                            Chọn hoặc tạo profile để tùy chỉnh cấu trúc file SPSS. <br/>
+                            <span className="text-xs text-gray-400">Chỉ admin mới có quyền sửa profile Mặc định.</span>
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => {
+                                const name = prompt('Nhập tên cho Profile mới (sẽ copy từ profile hiện tại):');
+                                if (name?.trim()) {
+                                    onCreateProfile(name.trim());
+                                }
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-primary-700 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors"
+                        >
+                            <Plus className="w-4 h-4" /> Tạo Profile từ cấu hình hiện tại
+                        </button>
+                    </div>
+                </div>
+                
+                <div className="flex flex-wrap gap-2">
+                    {profiles.map(p => (
+                        <div key={p.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition-colors ${p.id === activeProfileId ? 'border-primary-500 bg-primary-50 text-primary-900' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'}`}>
+                            <button onClick={() => onChangeProfile(p.id)} className="font-medium">
+                                {p.name}
+                            </button>
+                            {p.id === activeProfileId && <CircleCheck className="w-4 h-4 text-primary-600" />}
+                            {p.id !== 'default' && (
+                                <button onClick={() => { if (window.confirm('Xóa profile này?')) onDeleteProfile(p.id); }} className="ml-1 p-0.5 text-gray-400 hover:text-red-600 rounded">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
             {/* ── Header actions ── */}
             <div className="bg-white rounded-xl border border-gray-200 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <h3 className="font-heading font-semibold text-gray-900">Cấu hình SPSS Variables</h3>
+                        <h3 className="font-heading font-semibold text-gray-900">Chi tiết biến: {activeProfile?.name}</h3>
                         <p className="text-sm text-gray-500 mt-1">
-                            Chỉnh sửa tên biến (SPSS name), nhãn (label), và bảng mã giá trị trước khi xuất file <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">.sav</span>.
-                            {patients.length > 0 && (
-                                <span className="ml-2 text-primary-600 font-medium">{patients.length} bệnh nhân sẵn sàng</span>
+                            {patients.length > 0 ? (
+                                <span><strong className="text-primary-600">{patients.filter(p => !p.disabled).length} case</strong> sẵn sàng xuất theo cấu hình này.</span>
+                            ) : (
+                                <span>Chưa có case nào để xuất.</span>
                             )}
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <button
-                            onClick={onReset}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 border border-gray-200 transition-colors"
-                        >
-                            <RefreshCcw className="w-3.5 h-3.5" />
-                            Khôi phục mặc định
-                        </button>
-                        <button
                             onClick={onExport}
-                            disabled={loading || patients.length === 0}
+                            disabled={loading || patients.filter(p => !p.disabled).length === 0}
                             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
@@ -427,7 +475,8 @@ function SpssSettingsTab({ config, loading, patients, onChange, onReset, onExpor
                 </div>
                 <button
                     onClick={saveSlots}
-                    className="mt-4 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
+                    disabled={!canEdit}
+                    className="mt-4 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
                 >
                     Áp dụng slot config
                 </button>
@@ -541,8 +590,9 @@ function SpssSettingsTab({ config, loading, patients, onChange, onReset, onExpor
                                         <td className="px-4 py-2 text-center">
                                             {hasLabels ? (
                                                 <button
-                                                    onClick={() => setValueLabelVar({ varDef: v, index: actualIdx })}
-                                                    className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 transition-colors font-medium"
+                                                    onClick={() => canEdit && setValueLabelVar({ varDef: v, index: actualIdx })}
+                                                    disabled={!canEdit}
+                                                    className={`inline-flex items-center gap-1 text-xs transition-colors font-medium ${canEdit ? 'text-primary-600 hover:text-primary-800' : 'text-gray-400 cursor-not-allowed'}`}
                                                 >
                                                     <Tag className="w-3 h-3" />
                                                     {Object.keys(v.valueLabels!).length}
@@ -563,7 +613,12 @@ function SpssSettingsTab({ config, loading, patients, onChange, onReset, onExpor
                                                         </button>
                                                     </>
                                                 ) : (
-                                                    <button onClick={() => startEdit(actualIdx, v)} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="Sửa">
+                                                    <button 
+                                                        onClick={() => startEdit(actualIdx, v)} 
+                                                        disabled={!canEdit}
+                                                        className={`p-1.5 rounded-lg transition-colors ${canEdit ? 'text-gray-400 hover:text-primary-600 hover:bg-primary-50' : 'text-gray-300 cursor-not-allowed'}`} 
+                                                        title={canEdit ? 'Sửa' : 'Không có quyền sửa'}
+                                                    >
                                                         <Pencil className="w-3.5 h-3.5" />
                                                     </button>
                                                 )}
@@ -719,7 +774,8 @@ export default function SettingsPage() {
     const [printSettings, setPrintSettings] = useState<PrintSettings>(DEFAULT_PRINT_SETTINGS);
 
     // SPSS tab
-    const [spssConfig, setSpssConfig] = useState<SpssVarConfig | null>(null);
+    const [spssProfiles, setSpssProfiles] = useState<SpssProfile[]>([]);
+    const [activeProfileId, setActiveProfileId] = useState<string>('default');
     const [spssLoading, setSpssLoading] = useState(false);
     const [allPatients, setAllPatients] = useState<import('../types/patient').Patient[]>([]);
 
@@ -853,22 +909,45 @@ export default function SettingsPage() {
             if (data?.glasgowThreshold) setGlasgowThreshold(data.glasgowThreshold);
         }).catch(() => { /* use default */ });
 
-        // SPSS config
-        settingsService.getSpssConfig().then((data) => {
-            if (data) {
-                // Auto-migrate: if clinical vars still have old encoding (0='Không', 1='Có'),
-                // update them to new encoding (0='Có', 1='Không') for OR 2x2 analysis
-                const migrated = migrateSpssConfigEncoding(data);
-                setSpssConfig(migrated);
-                if (migrated !== data) {
-                    settingsService.saveSpssConfig(migrated).catch(() => {});
+        // SPSS profiles
+        settingsService.getSpssProfiles().then((profiles) => {
+            if (profiles && profiles.length > 0) {
+                const migratedProfiles = profiles.map(p => {
+                    const migratedConfig = migrateSpssConfigEncoding(p.config);
+                    return migratedConfig !== p.config ? { ...p, config: migratedConfig } : p;
+                });
+                setSpssProfiles(migratedProfiles);
+                if (JSON.stringify(profiles) !== JSON.stringify(migratedProfiles)) {
+                    settingsService.saveSpssProfiles(migratedProfiles).catch(() => {});
                 }
             } else {
-                setSpssConfig(buildDefaultSpssConfig());
+                settingsService.getSpssConfig().then((data) => {
+                    const baseConfig = data ? migrateSpssConfigEncoding(data) : buildDefaultSpssConfig();
+                    const defaultProfile: SpssProfile = {
+                        id: 'default',
+                        name: 'Mặc định',
+                        isDefault: true,
+                        config: baseConfig,
+                        createdAt: new Date().toISOString(),
+                    };
+                    setSpssProfiles([defaultProfile]);
+                    settingsService.saveSpssProfiles([defaultProfile]).catch(() => {});
+                }).catch(() => {
+                    const defaultProfile: SpssProfile = {
+                        id: 'default',
+                        name: 'Mặc định',
+                        isDefault: true,
+                        config: buildDefaultSpssConfig(),
+                        createdAt: new Date().toISOString(),
+                    };
+                    setSpssProfiles([defaultProfile]);
+                });
             }
-        }).catch(() => {
-            setSpssConfig(buildDefaultSpssConfig());
-        });
+        }).catch(() => {});
+
+        settingsService.getActiveSpssProfileId().then((id) => {
+            if (id) setActiveProfileId(id);
+        }).catch(() => {});
 
         // Load all patients for SAV export
         patientService.getAll().then(setAllPatients).catch(() => {});

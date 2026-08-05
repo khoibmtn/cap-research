@@ -616,11 +616,15 @@ export default function DashboardPage() {
         toast.success('Đã xuất file Excel');
     };
 
-    const handleExportSAV = () => {
-        if (patients.length === 0) { toast.error('Không có dữ liệu để xuất'); return; }
+    const handleExportSAV = async () => {
+        const statsPatients = patients.filter(p => !p.disabled);
+        if (statsPatients.length === 0) { toast.error('Không có dữ liệu thống kê để xuất'); return; }
         try {
-            exportPatientsToSAV(patients, null);
-            toast.success(`Đã xuất ${patients.length} bệnh nhân ra file SPSS (.sav)`);
+            const profiles = await settingsService.getSpssProfiles();
+            const activeId = await settingsService.getActiveSpssProfileId();
+            const activeProfile = profiles?.find(p => p.id === (activeId || 'default'));
+            exportPatientsToSAV(statsPatients, activeProfile?.config || null);
+            toast.success(`Đã xuất ${statsPatients.length} case thống kê ra file SPSS (.sav)`);
         } catch (e) {
             console.error(e);
             toast.error('Lỗi khi tạo file SPSS');
