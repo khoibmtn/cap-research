@@ -150,11 +150,11 @@ const LAM_SANG: SpssVarDef[] = [
     binClinical('ls_ran_rit', 'Lâm sàng: Ran rít', 'lam_sang'),
     binClinical('ls_ran_ngay', 'Lâm sàng: Ran ngáy', 'lam_sang'),
     binClinical('ls_tdmp_co', 'Lâm sàng: Hội chứng TĐMP', 'lam_sang'),
-    str('ls_tdmp_ben', 'Lâm sàng: Hội chứng TĐMP - Bên', 'lam_sang', { width: 16 }),
+    { name: 'ls_tdmp_vitri', label: 'Lâm sàng: Hội chứng TĐMP - Vị trí (0=Phải, 1=Trái, 2=Hai bên)', type: 'numeric', decimals: 0, measureLevel: 'nominal', valueLabels: VL_XQ_BEN, group: 'lam_sang' },
     binClinical('ls_dongdac_co', 'Lâm sàng: Hội chứng Đông đặc', 'lam_sang'),
-    str('ls_dongdac_ben', 'Lâm sàng: Hội chứng Đông đặc - Bên', 'lam_sang', { width: 16 }),
+    { name: 'ls_dongdac_vitri', label: 'Lâm sàng: Hội chứng Đông đặc - Vị trí (0=Phải, 1=Trái, 2=Hai bên)', type: 'numeric', decimals: 0, measureLevel: 'nominal', valueLabels: VL_XQ_BEN, group: 'lam_sang' },
     binClinical('ls_tkmp_co', 'Lâm sàng: Hội chứng TKMP', 'lam_sang'),
-    str('ls_tkmp_ben', 'Lâm sàng: Hội chứng TKMP - Bên', 'lam_sang', { width: 16 }),
+    { name: 'ls_tkmp_vitri', label: 'Lâm sàng: Hội chứng TKMP - Vị trí (0=Phải, 1=Trái, 2=Hai bên)', type: 'numeric', decimals: 0, measureLevel: 'nominal', valueLabels: VL_XQ_BEN, group: 'lam_sang' },
 ];
 
 // ─── GROUP 4: Xét nghiệm ─────────────────────────────────────────────────────

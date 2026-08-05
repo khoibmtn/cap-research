@@ -30,6 +30,17 @@ const b = (v: boolean | undefined | null): number | null =>
 const bClinical = (v: boolean | undefined | null): number | null =>
     v === true ? 0 : v === false ? 1 : null;
 
+/** Syndrome location dropdown → numeric code.
+ *  Matches BEN_OPTIONS = ['Phải', 'Trái', 'Hai bên']
+ *  0 = Phải, 1 = Trái, 2 = Hai bên, null = chưa chọn */
+const benVitri = (v: string | undefined | null): number | null => {
+    if (!v) return null;
+    if (v === 'Phải') return 0;
+    if (v === 'Trái') return 1;
+    if (v === 'Hai bên') return 2;
+    return null;
+};
+
 const n = (v: number | null | undefined): number | null =>
     v === null || v === undefined ? null : v;
 
@@ -189,11 +200,11 @@ export function patientToSpssRow(patient: Patient, slots: SpssSlotConfig): SpssR
     row['ls_ran_rit'] = bClinical(p.lamSang.ranRit);
     row['ls_ran_ngay'] = bClinical(p.lamSang.ranNgay);
     row['ls_tdmp_co'] = bClinical(p.lamSang.hoiChungTDMP?.co);
-    row['ls_tdmp_ben'] = s(p.lamSang.hoiChungTDMP?.ben);
+    row['ls_tdmp_vitri'] = benVitri(p.lamSang.hoiChungTDMP?.ben);
     row['ls_dongdac_co'] = bClinical(p.lamSang.hoiChungDongDac?.co);
-    row['ls_dongdac_ben'] = s(p.lamSang.hoiChungDongDac?.ben);
+    row['ls_dongdac_vitri'] = benVitri(p.lamSang.hoiChungDongDac?.ben);
     row['ls_tkmp_co'] = bClinical(p.lamSang.hoiChungTKMP?.co);
-    row['ls_tkmp_ben'] = s(p.lamSang.hoiChungTKMP?.ben);
+    row['ls_tkmp_vitri'] = benVitri(p.lamSang.hoiChungTKMP?.ben);
 
     // ── Xét nghiệm ──────────────────────────────────────────────────────────
     const xn = p.xetNghiem;

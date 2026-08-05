@@ -633,11 +633,34 @@ const CLINICAL_VAR_PREFIXES = [
 function migrateSpssConfigEncoding(config: SpssVarConfig): SpssVarConfig {
     let needsMigration = false;
 
+    // Mapping: old _ben name → new _vitri var definition
+    const BEN_TO_VITRI: Record<string, { name: string; label: string }> = {
+        'ls_tdmp_ben': { name: 'ls_tdmp_vitri', label: 'Lâm sàng: Hội chứng TĐMP - Vị trí (0=Phải, 1=Trái, 2=Hai bên)' },
+        'ls_dongdac_ben': { name: 'ls_dongdac_vitri', label: 'Lâm sàng: Hội chứng Đông đặc - Vị trí (0=Phải, 1=Trái, 2=Hai bên)' },
+        'ls_tkmp_ben': { name: 'ls_tkmp_vitri', label: 'Lâm sàng: Hội chứng TKMP - Vị trí (0=Phải, 1=Trái, 2=Hai bên)' },
+    };
+    const VL_VITRI = { 0: 'Phải', 1: 'Trái', 2: 'Hai bên' };
+
     const updatedVars = config.vars.map((v) => {
+        // Migrate _ben Text → _vitri Numeric
+        if (BEN_TO_VITRI[v.name]) {
+            needsMigration = true;
+            const mapped = BEN_TO_VITRI[v.name];
+            return {
+                ...v,
+                name: mapped.name,
+                label: mapped.label,
+                type: 'numeric' as const,
+                decimals: 0,
+                measureLevel: 'nominal' as const,
+                valueLabels: VL_VITRI,
+                width: undefined,
+            };
+        }
+
+        // Migrate clinical binary encoding: 0='Không' → 0='Có'
         if (!CLINICAL_VAR_PREFIXES.includes(v.name)) return v;
         if (!v.valueLabels) return v;
-
-        // Check if still old encoding: 0='Không', 1='Có'
         if (v.valueLabels[0] === 'Không' && v.valueLabels[1] === 'Có') {
             needsMigration = true;
             const newLabel = v.label
