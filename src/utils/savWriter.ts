@@ -12,8 +12,9 @@
  *   5. Machine Float Info (rec_type=7 subtype=4)
  *   6. Variable Display Param (rec_type=7 subtype=11)
  *   7. Long Variable Names (rec_type=7 subtype=13)
- *   8. End of Dictionary (rec_type=999)
- *   9. Data Records (row-major)
+ *   8. Character Encoding (rec_type=7 subtype=20) — UTF-8
+ *   9. End of Dictionary (rec_type=999)
+ *   10. Data Records (row-major)
  */
 
 import type { SpssVarDef } from '../types/spssTypes';
@@ -334,7 +335,7 @@ function writeMachineIntegerInfo(buf: SavBuffer) {
     buf.writeI32(1); // floating_point_rep (1=IEEE 754)
     buf.writeI32(0); // compression_code
     buf.writeI32(1); // endianness (1=little)
-    buf.writeI32(1252); // character_code (Windows Latin-1, use 65001 for UTF-8 if desired)
+    buf.writeI32(65001); // character_code (65001 = UTF-8 for Vietnamese support)
 }
 
 /** Write Machine Float Info Record (rec_type=7 subtype=4) */
@@ -379,6 +380,17 @@ function writeLongVarNames(buf: SavBuffer, vars: ExpandedVar[]) {
     buf.writeI32(1); // element size (1 byte each)
     buf.writeI32(data.length);
     buf.writeBytes(data);
+}
+
+/** Write Character Encoding Record (rec_type=7 subtype=20) — declares file encoding as UTF-8 */
+function writeCharacterEncoding(buf: SavBuffer) {
+    const encoder = new TextEncoder();
+    const encoding = encoder.encode('UTF-8');
+    buf.writeI32(7);
+    buf.writeI32(20); // subtype 20 = character encoding
+    buf.writeI32(1);  // element size (1 byte)
+    buf.writeI32(encoding.length);
+    buf.writeBytes(encoding);
 }
 
 /** Write End of Dictionary Record (rec_type=999) */
@@ -547,6 +559,7 @@ export function writeSAV(
     writeMachineFloatInfo(buf);
     writeVarDisplayParams(buf, expandedVars);
     writeLongVarNames(buf, expandedVars);
+    writeCharacterEncoding(buf);
     writeEndOfDictionary(buf);
 
     // Data
