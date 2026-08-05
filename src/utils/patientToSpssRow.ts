@@ -8,7 +8,9 @@
  * Slot templates are expanded with concrete indices (1-based).
  *
  * Conventions:
- *   - boolean fields  → 1 (Có) / 0 (Không), or null if undefined
+ *   - Clinical/risk factor boolean fields → 0 (Có) / 1 (Không)
+ *     → For 2×2 table OR analysis: cell (0,0) = disease + exposure
+ *   - Non-clinical boolean fields → 1 (Có) / 0 (Không)
  *   - null / undefined numeric fields → null (written as SYSMIS in SAV)
  *   - Date strings → kept as-is (string vars in SPSS)
  *   - "huyetAp" "120/80" → ls_ha_tam_thu=120, ls_ha_tam_truong=80
@@ -19,8 +21,14 @@ import type { SpssSlotConfig } from '../types/spssTypes';
 
 type SpssRow = Record<string, number | string | null>;
 
+/** Non-clinical boolean: true=1 (Có), false=0 (Không) */
 const b = (v: boolean | undefined | null): number | null =>
     v === true ? 1 : v === false ? 0 : null;
+
+/** Clinical/risk factor boolean: true=0 (Có/exposed), false=1 (Không/not exposed)
+ *  → For 2×2 OR analysis: cell (0,0) = disease + exposure */
+const bClinical = (v: boolean | undefined | null): number | null =>
+    v === true ? 0 : v === false ? 1 : null;
 
 const n = (v: number | null | undefined): number | null =>
     v === null || v === undefined ? null : v;
@@ -146,17 +154,17 @@ export function patientToSpssRow(patient: Patient, slots: SpssSlotConfig): SpssR
     row['ghi_chu'] = s(p.hanhChinh.ghiChu);
 
     // ── Tiền sử ─────────────────────────────────────────────────────────────
-    row['ts_dtd'] = b(p.tienSu.daiThaoDuong);
-    row['ts_tha'] = b(p.tienSu.tangHuyetAp);
-    row['ts_vdd'] = b(p.tienSu.viemDaDay);
-    row['ts_vgm'] = b(p.tienSu.viemGanMan);
-    row['ts_btnm'] = b(p.tienSu.benhThanMan);
-    row['ts_gut'] = b(p.tienSu.gut);
-    row['ts_ung_thu'] = b(p.tienSu.ungThu);
-    row['ts_suy_tim'] = b(p.tienSu.suyTimUHuyet);
-    row['ts_mach_nao'] = b(p.tienSu.benhMachMauNao);
+    row['ts_dtd'] = bClinical(p.tienSu.daiThaoDuong);
+    row['ts_tha'] = bClinical(p.tienSu.tangHuyetAp);
+    row['ts_vdd'] = bClinical(p.tienSu.viemDaDay);
+    row['ts_vgm'] = bClinical(p.tienSu.viemGanMan);
+    row['ts_btnm'] = bClinical(p.tienSu.benhThanMan);
+    row['ts_gut'] = bClinical(p.tienSu.gut);
+    row['ts_ung_thu'] = bClinical(p.tienSu.ungThu);
+    row['ts_suy_tim'] = bClinical(p.tienSu.suyTimUHuyet);
+    row['ts_mach_nao'] = bClinical(p.tienSu.benhMachMauNao);
     row['ts_khac'] = s(p.tienSu.khac);
-    row['ts_hut_thuoc'] = b(p.tienSu.hutThuocLa);
+    row['ts_hut_thuoc'] = bClinical(p.tienSu.hutThuocLa);
     row['ts_bao_nam'] = n(p.tienSu.soBaoNam);
 
     // ── Lâm sàng ────────────────────────────────────────────────────────────
@@ -170,21 +178,21 @@ export function patientToSpssRow(patient: Patient, slots: SpssSlotConfig): SpssR
     row['ls_spo2'] = n(p.lamSang.spO2);
     row['ls_bmi'] = n(p.lamSang.bmi);
     row['ls_glasgow'] = n(p.lamSang.diemGlasgow);
-    row['ls_ho_khan'] = b(p.lamSang.hoKhan);
-    row['ls_ho_mau'] = b(p.lamSang.hoMau);
-    row['ls_ho_dom'] = b(p.lamSang.hoKhacDom);
+    row['ls_ho_khan'] = bClinical(p.lamSang.hoKhan);
+    row['ls_ho_mau'] = bClinical(p.lamSang.hoMau);
+    row['ls_ho_dom'] = bClinical(p.lamSang.hoKhacDom);
     row['ls_dom_mau_sac'] = s(p.lamSang.domMauSac);
-    row['ls_dau_nguc'] = b(p.lamSang.dauNguc);
-    row['ls_kho_tho'] = b(p.lamSang.khoTho);
-    row['ls_ran_am'] = b(p.lamSang.ranAm);
-    row['ls_ran_no'] = b(p.lamSang.ranNo);
-    row['ls_ran_rit'] = b(p.lamSang.ranRit);
-    row['ls_ran_ngay'] = b(p.lamSang.ranNgay);
-    row['ls_tdmp_co'] = b(p.lamSang.hoiChungTDMP?.co);
+    row['ls_dau_nguc'] = bClinical(p.lamSang.dauNguc);
+    row['ls_kho_tho'] = bClinical(p.lamSang.khoTho);
+    row['ls_ran_am'] = bClinical(p.lamSang.ranAm);
+    row['ls_ran_no'] = bClinical(p.lamSang.ranNo);
+    row['ls_ran_rit'] = bClinical(p.lamSang.ranRit);
+    row['ls_ran_ngay'] = bClinical(p.lamSang.ranNgay);
+    row['ls_tdmp_co'] = bClinical(p.lamSang.hoiChungTDMP?.co);
     row['ls_tdmp_ben'] = s(p.lamSang.hoiChungTDMP?.ben);
-    row['ls_dongdac_co'] = b(p.lamSang.hoiChungDongDac?.co);
+    row['ls_dongdac_co'] = bClinical(p.lamSang.hoiChungDongDac?.co);
     row['ls_dongdac_ben'] = s(p.lamSang.hoiChungDongDac?.ben);
-    row['ls_tkmp_co'] = b(p.lamSang.hoiChungTKMP?.co);
+    row['ls_tkmp_co'] = bClinical(p.lamSang.hoiChungTKMP?.co);
     row['ls_tkmp_ben'] = s(p.lamSang.hoiChungTKMP?.ben);
 
     // ── Xét nghiệm ──────────────────────────────────────────────────────────
@@ -229,10 +237,10 @@ export function patientToSpssRow(patient: Patient, slots: SpssSlotConfig): SpssR
 
     // ── Hình ảnh static ─────────────────────────────────────────────────────
     const ha = p.hinhAnh;
-    row['ha_xq_tran_dich'] = b(ha?.xquangTranDichMangPhoi);
-    row['ha_xq_tran_khi'] = b(ha?.xquangTranKhiMangPhoi);
-    row['ha_ct_tran_dich'] = b(ha?.ctTranDichMangPhoi);
-    row['ha_ct_tran_khi'] = b(ha?.ctTranKhiMangPhoi);
+    row['ha_xq_tran_dich'] = bClinical(ha?.xquangTranDichMangPhoi);
+    row['ha_xq_tran_khi'] = bClinical(ha?.xquangTranKhiMangPhoi);
+    row['ha_ct_tran_dich'] = bClinical(ha?.ctTranDichMangPhoi);
+    row['ha_ct_tran_khi'] = bClinical(ha?.ctTranKhiMangPhoi);
 
     // ── X-quang tổn thương (slots) ──────────────────────────────────────────
     for (let i = 1; i <= slots.xquang; i++) {
@@ -283,35 +291,35 @@ export function patientToSpssRow(patient: Patient, slots: SpssSlotConfig): SpssR
     // ── PSI ─────────────────────────────────────────────────────────────────
     const psi = p.psi;
     const pc = psi?.criteria;
-    row['psi_nha_duong_lao'] = b(pc?.nhaDuongLao);
-    row['psi_ung_thu'] = b(pc?.ungThu);
-    row['psi_benh_gan'] = b(pc?.benhGan);
-    row['psi_suy_tim'] = b(pc?.suyTimUHuyet);
-    row['psi_mach_nao'] = b(pc?.benhMachMauNao);
-    row['psi_benh_than'] = b(pc?.benhThan);
-    row['psi_thay_doi_tri_giac'] = b(pc?.thayDoiTriGiac);
-    row['psi_tan_so_tho30'] = b(pc?.tanSoTho30);
-    row['psi_ha_tam_thu90'] = b(pc?.huyetApTamThu90);
-    row['psi_than_nhiet_3540'] = b(pc?.thanNhiet3540);
-    row['psi_mach125'] = b(pc?.mach125);
-    row['psi_ph735'] = b(pc?.ph735);
-    row['psi_bun30'] = b(pc?.bun30);
-    row['psi_hematocrit30'] = b(pc?.hematocrit30);
-    row['psi_na_mau130'] = b(pc?.naMau130);
-    row['psi_glucose250'] = b(pc?.glucoseMau250);
-    row['psi_pao2_60'] = b(pc?.paO2_60);
-    row['psi_tran_dich_mp'] = b(pc?.tranDichMangPhoi);
+    row['psi_nha_duong_lao'] = bClinical(pc?.nhaDuongLao);
+    row['psi_ung_thu'] = bClinical(pc?.ungThu);
+    row['psi_benh_gan'] = bClinical(pc?.benhGan);
+    row['psi_suy_tim'] = bClinical(pc?.suyTimUHuyet);
+    row['psi_mach_nao'] = bClinical(pc?.benhMachMauNao);
+    row['psi_benh_than'] = bClinical(pc?.benhThan);
+    row['psi_thay_doi_tri_giac'] = bClinical(pc?.thayDoiTriGiac);
+    row['psi_tan_so_tho30'] = bClinical(pc?.tanSoTho30);
+    row['psi_ha_tam_thu90'] = bClinical(pc?.huyetApTamThu90);
+    row['psi_than_nhiet_3540'] = bClinical(pc?.thanNhiet3540);
+    row['psi_mach125'] = bClinical(pc?.mach125);
+    row['psi_ph735'] = bClinical(pc?.ph735);
+    row['psi_bun30'] = bClinical(pc?.bun30);
+    row['psi_hematocrit30'] = bClinical(pc?.hematocrit30);
+    row['psi_na_mau130'] = bClinical(pc?.naMau130);
+    row['psi_glucose250'] = bClinical(pc?.glucoseMau250);
+    row['psi_pao2_60'] = bClinical(pc?.paO2_60);
+    row['psi_tran_dich_mp'] = bClinical(pc?.tranDichMangPhoi);
     row['psi_tong_diem'] = n(psi?.tongDiem);
     row['psi_phan_tang'] = mapPsiPhanTang(psi?.phanTang);
 
     // ── CURB-65 ─────────────────────────────────────────────────────────────
     const curb = p.curb65;
     const cc = curb?.chiTiet;
-    row['curb_c'] = cc?.c === null || cc?.c === undefined ? null : b(cc.c);
-    row['curb_u'] = cc?.u === null || cc?.u === undefined ? null : b(cc.u);
-    row['curb_r'] = cc?.r === null || cc?.r === undefined ? null : b(cc.r);
-    row['curb_b'] = cc?.b === null || cc?.b === undefined ? null : b(cc.b);
-    row['curb_age65'] = cc?.age65 === null || cc?.age65 === undefined ? null : b(cc.age65);
+    row['curb_c'] = cc?.c === null || cc?.c === undefined ? null : bClinical(cc.c);
+    row['curb_u'] = cc?.u === null || cc?.u === undefined ? null : bClinical(cc.u);
+    row['curb_r'] = cc?.r === null || cc?.r === undefined ? null : bClinical(cc.r);
+    row['curb_b'] = cc?.b === null || cc?.b === undefined ? null : bClinical(cc.b);
+    row['curb_age65'] = cc?.age65 === null || cc?.age65 === undefined ? null : bClinical(cc.age65);
     row['curb_tong_diem'] = n(curb?.tongDiem);
     row['curb_phan_nhom'] = mapCurb65Nhom(curb?.phanNhom);
     row['curb_du_du_lieu'] = b(curb?.duDuLieu);
@@ -319,13 +327,13 @@ export function patientToSpssRow(patient: Patient, slots: SpssSlotConfig): SpssR
     // ── Kết cục ─────────────────────────────────────────────────────────────
     const kc = p.ketCuc;
     // Dynamic diễn biến → binary per known field
-    row['kc_tho_may'] = b(kc.thoMay || kc.dienBienDieuTri?.includes('Thở máy'));
-    row['kc_soc_nk'] = b(kc.socNhiemKhuan || kc.dienBienDieuTri?.includes('Sốc nhiễm khuẩn'));
-    row['kc_loc_mau'] = b(kc.locMau || kc.dienBienDieuTri?.includes('Lọc máu'));
+    row['kc_tho_may'] = bClinical(kc.thoMay || kc.dienBienDieuTri?.includes('Thở máy'));
+    row['kc_soc_nk'] = bClinical(kc.socNhiemKhuan || kc.dienBienDieuTri?.includes('Sốc nhiễm khuẩn'));
+    row['kc_loc_mau'] = bClinical(kc.locMau || kc.dienBienDieuTri?.includes('Lọc máu'));
     row['kc_ngay_loc_mau'] = n(kc.soNgayLocMau);
     row['kc_tinh_trang_ra_vien'] = s(kc.tinhTrangRaVien);
-    row['kc_tu_vong'] = b(kc.tuVong);
-    row['kc_xin_ve'] = b(kc.xinVe);
+    row['kc_tu_vong'] = bClinical(kc.tuVong);
+    row['kc_xin_ve'] = bClinical(kc.xinVe);
     row['kc_tien_trien_tot'] = b(kc.tienTrienTotXuatVien);
     row['kc_ngay_dieu_tri'] = n(kc.tongSoNgayDieuTri);
     row['kc_ngay_bat_dau_ks'] = s(kc.ngayBatDauKhangSinh);

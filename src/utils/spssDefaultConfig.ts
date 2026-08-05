@@ -3,7 +3,9 @@
  * Default SPSS variable definitions for the CAP Research dataset.
  *
  * Convention:
- *   - Binary (checkbox) vars: valueLabels = { 0: 'Không', 1: 'Có' }, decimals = 0
+ *   - Binary clinical vars (bệnh lý/yếu tố nguy cơ): { 0: 'Có', 1: 'Không' }
+ *     → For 2×2 table OR analysis: cell (0,0) = disease + exposure
+ *   - Binary non-clinical vars: { 0: 'Không', 1: 'Có' }
  *   - Categorical vars: numeric codes, valueLabels defined inline
  *   - Continuous vars: type 'numeric', decimals = 2 (or as appropriate)
  *   - Free-text vars: type 'string', no valueLabels
@@ -16,6 +18,8 @@ import type { SpssVarDef, SpssVarConfig, SpssSlotConfig } from '../types/spssTyp
 
 // ─── Reusable value label sets ──────────────────────────────────────────────
 const VL_CO_KHONG: Record<number, string> = { 0: 'Không', 1: 'Có' };
+/** Reversed coding for clinical/risk factor binary vars: 0=Có (exposed), 1=Không (not exposed) */
+const VL_CO_KHONG_BENH: Record<number, string> = { 0: 'Có', 1: 'Không' };
 const VL_GIOI_TINH: Record<number, string> = { 0: 'Nam', 1: 'Nữ' };
 const VL_NOI_O: Record<number, string> = {
     0: 'Nông thôn',
@@ -75,10 +79,16 @@ const str = (name: string, label: string, group: SpssVarDef['group'], opts: Part
     name, label, type: 'string', width: 64, group, measureLevel: 'nominal', ...opts,
 });
 
-/** Binary checkbox variable — numeric 0/1 */
+/** Binary checkbox variable — numeric 0/1 (non-clinical: 0=Không, 1=Có) */
 const bin = (name: string, label: string, group: SpssVarDef['group']): SpssVarDef => ({
     name, label: `${label} (0=Không, 1=Có)`, type: 'numeric',
     decimals: 0, measureLevel: 'nominal', valueLabels: VL_CO_KHONG, group,
+});
+
+/** Binary clinical/risk factor variable — reversed: 0=Có (exposed/disease), 1=Không */
+const binClinical = (name: string, label: string, group: SpssVarDef['group']): SpssVarDef => ({
+    name, label: `${label} (0=Có, 1=Không)`, type: 'numeric',
+    decimals: 0, measureLevel: 'nominal', valueLabels: VL_CO_KHONG_BENH, group,
 });
 
 /** Categorical numeric variable */
@@ -104,17 +114,17 @@ const HANH_CHINH: SpssVarDef[] = [
 
 // ─── GROUP 2: Tiền sử ────────────────────────────────────────────────────────
 const TIEN_SU: SpssVarDef[] = [
-    bin('ts_dtd', 'Tiền sử: Đái tháo đường', 'tien_su'),
-    bin('ts_tha', 'Tiền sử: Tăng huyết áp', 'tien_su'),
-    bin('ts_vdd', 'Tiền sử: Viêm dạ dày', 'tien_su'),
-    bin('ts_vgm', 'Tiền sử: Viêm gan mạn', 'tien_su'),
-    bin('ts_btnm', 'Tiền sử: Bệnh thận mạn', 'tien_su'),
-    bin('ts_gut', 'Tiền sử: Gút', 'tien_su'),
-    bin('ts_ung_thu', 'Tiền sử: Ung thư', 'tien_su'),
-    bin('ts_suy_tim', 'Tiền sử: Suy tim ứ huyết', 'tien_su'),
-    bin('ts_mach_nao', 'Tiền sử: Bệnh mạch máu não', 'tien_su'),
+    binClinical('ts_dtd', 'Tiền sử: Đái tháo đường', 'tien_su'),
+    binClinical('ts_tha', 'Tiền sử: Tăng huyết áp', 'tien_su'),
+    binClinical('ts_vdd', 'Tiền sử: Viêm dạ dày', 'tien_su'),
+    binClinical('ts_vgm', 'Tiền sử: Viêm gan mạn', 'tien_su'),
+    binClinical('ts_btnm', 'Tiền sử: Bệnh thận mạn', 'tien_su'),
+    binClinical('ts_gut', 'Tiền sử: Gút', 'tien_su'),
+    binClinical('ts_ung_thu', 'Tiền sử: Ung thư', 'tien_su'),
+    binClinical('ts_suy_tim', 'Tiền sử: Suy tim ứ huyết', 'tien_su'),
+    binClinical('ts_mach_nao', 'Tiền sử: Bệnh mạch máu não', 'tien_su'),
     str('ts_khac', 'Tiền sử: Khác (mô tả)', 'tien_su', { width: 128 }),
-    bin('ts_hut_thuoc', 'Tiền sử: Hút thuốc lá (0=Không, 1=Có)', 'tien_su'),
+    binClinical('ts_hut_thuoc', 'Tiền sử: Hút thuốc lá', 'tien_su'),
     num('ts_bao_nam', 'Tiền sử: Số bao-năm hút thuốc', 'tien_su', { decimals: 1, measureLevel: 'scale' }),
 ];
 
@@ -129,21 +139,21 @@ const LAM_SANG: SpssVarDef[] = [
     num('ls_spo2', 'Lâm sàng: SpO2 (%)', 'lam_sang', { decimals: 1, measureLevel: 'scale' }),
     num('ls_bmi', 'Lâm sàng: BMI (kg/m²)', 'lam_sang', { decimals: 2, measureLevel: 'scale' }),
     num('ls_glasgow', 'Lâm sàng: Điểm Glasgow', 'lam_sang', { decimals: 0, measureLevel: 'ordinal' }),
-    bin('ls_ho_khan', 'Lâm sàng: Ho khan', 'lam_sang'),
-    bin('ls_ho_mau', 'Lâm sàng: Ho máu', 'lam_sang'),
-    bin('ls_ho_dom', 'Lâm sàng: Ho khạc đờm', 'lam_sang'),
+    binClinical('ls_ho_khan', 'Lâm sàng: Ho khan', 'lam_sang'),
+    binClinical('ls_ho_mau', 'Lâm sàng: Ho máu', 'lam_sang'),
+    binClinical('ls_ho_dom', 'Lâm sàng: Ho khạc đờm', 'lam_sang'),
     str('ls_dom_mau_sac', 'Lâm sàng: Màu sắc đờm', 'lam_sang', { width: 64 }),
-    bin('ls_dau_nguc', 'Lâm sàng: Đau ngực', 'lam_sang'),
-    bin('ls_kho_tho', 'Lâm sàng: Khó thở', 'lam_sang'),
-    bin('ls_ran_am', 'Lâm sàng: Ran ẩm', 'lam_sang'),
-    bin('ls_ran_no', 'Lâm sàng: Ran nổ', 'lam_sang'),
-    bin('ls_ran_rit', 'Lâm sàng: Ran rít', 'lam_sang'),
-    bin('ls_ran_ngay', 'Lâm sàng: Ran ngáy', 'lam_sang'),
-    bin('ls_tdmp_co', 'Lâm sàng: Hội chứng TĐMP (Có)', 'lam_sang'),
+    binClinical('ls_dau_nguc', 'Lâm sàng: Đau ngực', 'lam_sang'),
+    binClinical('ls_kho_tho', 'Lâm sàng: Khó thở', 'lam_sang'),
+    binClinical('ls_ran_am', 'Lâm sàng: Ran ẩm', 'lam_sang'),
+    binClinical('ls_ran_no', 'Lâm sàng: Ran nổ', 'lam_sang'),
+    binClinical('ls_ran_rit', 'Lâm sàng: Ran rít', 'lam_sang'),
+    binClinical('ls_ran_ngay', 'Lâm sàng: Ran ngáy', 'lam_sang'),
+    binClinical('ls_tdmp_co', 'Lâm sàng: Hội chứng TĐMP', 'lam_sang'),
     str('ls_tdmp_ben', 'Lâm sàng: Hội chứng TĐMP - Bên', 'lam_sang', { width: 16 }),
-    bin('ls_dongdac_co', 'Lâm sàng: Hội chứng Đông đặc (Có)', 'lam_sang'),
+    binClinical('ls_dongdac_co', 'Lâm sàng: Hội chứng Đông đặc', 'lam_sang'),
     str('ls_dongdac_ben', 'Lâm sàng: Hội chứng Đông đặc - Bên', 'lam_sang', { width: 16 }),
-    bin('ls_tkmp_co', 'Lâm sàng: Hội chứng TKMP (Có)', 'lam_sang'),
+    binClinical('ls_tkmp_co', 'Lâm sàng: Hội chứng TKMP', 'lam_sang'),
     str('ls_tkmp_ben', 'Lâm sàng: Hội chứng TKMP - Bên', 'lam_sang', { width: 16 }),
 ];
 
@@ -196,10 +206,10 @@ const CHI_SO: SpssVarDef[] = [
 
 // ─── GROUP 6: Hình ảnh — static boolean fields ────────────────────────────────
 const HINH_ANH_STATIC: SpssVarDef[] = [
-    bin('ha_xq_tran_dich', 'XQ: Tràn dịch màng phổi', 'hinh_anh'),
-    bin('ha_xq_tran_khi', 'XQ: Tràn khí màng phổi', 'hinh_anh'),
-    bin('ha_ct_tran_dich', 'CT: Tràn dịch màng phổi', 'hinh_anh'),
-    bin('ha_ct_tran_khi', 'CT: Tràn khí màng phổi', 'hinh_anh'),
+    binClinical('ha_xq_tran_dich', 'XQ: Tràn dịch màng phổi', 'hinh_anh'),
+    binClinical('ha_xq_tran_khi', 'XQ: Tràn khí màng phổi', 'hinh_anh'),
+    binClinical('ha_ct_tran_dich', 'CT: Tràn dịch màng phổi', 'hinh_anh'),
+    binClinical('ha_ct_tran_khi', 'CT: Tràn khí màng phổi', 'hinh_anh'),
 ];
 
 /**
@@ -253,24 +263,24 @@ const THUOC_TEMPLATE: SpssVarDef[] = [
 // ─── GROUP 9: PSI ─────────────────────────────────────────────────────────────
 const PSI: SpssVarDef[] = [
     // Criteria — all numeric 0/1 (boolean flags)
-    bin('psi_nha_duong_lao', 'PSI: Nhà dưỡng lão', 'psi'),
-    bin('psi_ung_thu', 'PSI: Ung thư', 'psi'),
-    bin('psi_benh_gan', 'PSI: Bệnh gan', 'psi'),
-    bin('psi_suy_tim', 'PSI: Suy tim ứ huyết', 'psi'),
-    bin('psi_mach_nao', 'PSI: Bệnh mạch máu não', 'psi'),
-    bin('psi_benh_than', 'PSI: Bệnh thận', 'psi'),
-    bin('psi_thay_doi_tri_giac', 'PSI: Thay đổi tri giác', 'psi'),
-    bin('psi_tan_so_tho30', 'PSI: Tần số thở ≥ 30 lần/phút', 'psi'),
-    bin('psi_ha_tam_thu90', 'PSI: Huyết áp tâm thu < 90 mmHg', 'psi'),
-    bin('psi_than_nhiet_3540', 'PSI: Thân nhiệt < 35°C hoặc ≥ 40°C', 'psi'),
-    bin('psi_mach125', 'PSI: Mạch ≥ 125 lần/phút', 'psi'),
-    bin('psi_ph735', 'PSI: pH máu < 7.35', 'psi'),
-    bin('psi_bun30', 'PSI: BUN ≥ 30 mg/dl (Ure ≥ 10.7 mmol/l)', 'psi'),
-    bin('psi_hematocrit30', 'PSI: Hematocrit < 30%', 'psi'),
-    bin('psi_na_mau130', 'PSI: Na+ < 130 mEq/l', 'psi'),
-    bin('psi_glucose250', 'PSI: Glucose ≥ 250 mg/dl (13.9 mmol/l)', 'psi'),
-    bin('psi_pao2_60', 'PSI: PaO2 < 60 mmHg', 'psi'),
-    bin('psi_tran_dich_mp', 'PSI: Tràn dịch màng phổi', 'psi'),
+    binClinical('psi_nha_duong_lao', 'PSI: Nhà dưỡng lão', 'psi'),
+    binClinical('psi_ung_thu', 'PSI: Ung thư', 'psi'),
+    binClinical('psi_benh_gan', 'PSI: Bệnh gan', 'psi'),
+    binClinical('psi_suy_tim', 'PSI: Suy tim ứ huyết', 'psi'),
+    binClinical('psi_mach_nao', 'PSI: Bệnh mạch máu não', 'psi'),
+    binClinical('psi_benh_than', 'PSI: Bệnh thận', 'psi'),
+    binClinical('psi_thay_doi_tri_giac', 'PSI: Thay đổi tri giác', 'psi'),
+    binClinical('psi_tan_so_tho30', 'PSI: Tần số thở ≥ 30 lần/phút', 'psi'),
+    binClinical('psi_ha_tam_thu90', 'PSI: Huyết áp tâm thu < 90 mmHg', 'psi'),
+    binClinical('psi_than_nhiet_3540', 'PSI: Thân nhiệt < 35°C hoặc ≥ 40°C', 'psi'),
+    binClinical('psi_mach125', 'PSI: Mạch ≥ 125 lần/phút', 'psi'),
+    binClinical('psi_ph735', 'PSI: pH máu < 7.35', 'psi'),
+    binClinical('psi_bun30', 'PSI: BUN ≥ 30 mg/dl (Ure ≥ 10.7 mmol/l)', 'psi'),
+    binClinical('psi_hematocrit30', 'PSI: Hematocrit < 30%', 'psi'),
+    binClinical('psi_na_mau130', 'PSI: Na+ < 130 mEq/l', 'psi'),
+    binClinical('psi_glucose250', 'PSI: Glucose ≥ 250 mg/dl (13.9 mmol/l)', 'psi'),
+    binClinical('psi_pao2_60', 'PSI: PaO2 < 60 mmHg', 'psi'),
+    binClinical('psi_tran_dich_mp', 'PSI: Tràn dịch màng phổi', 'psi'),
     // Summary
     num('psi_tong_diem', 'PSI: Tổng điểm', 'psi', { decimals: 0, measureLevel: 'scale' }),
     cat('psi_phan_tang', 'PSI: Phân tầng nguy cơ', 'psi', VL_PSI_PHAN_TANG, { measureLevel: 'ordinal' }),
@@ -278,11 +288,11 @@ const PSI: SpssVarDef[] = [
 
 // ─── GROUP 10: CURB-65 ────────────────────────────────────────────────────────
 const CURB65: SpssVarDef[] = [
-    bin('curb_c', 'CURB-65: C — Rối loạn ý thức (Confusion)', 'curb65'),
-    bin('curb_u', 'CURB-65: U — Ure > 7 mmol/l', 'curb65'),
-    bin('curb_r', 'CURB-65: R — Nhịp thở ≥ 30 lần/phút', 'curb65'),
-    bin('curb_b', 'CURB-65: B — Huyết áp tâm thu < 90 hoặc tâm trương ≤ 60 mmHg', 'curb65'),
-    bin('curb_age65', 'CURB-65: 65 — Tuổi ≥ 65', 'curb65'),
+    binClinical('curb_c', 'CURB-65: C — Rối loạn ý thức (Confusion)', 'curb65'),
+    binClinical('curb_u', 'CURB-65: U — Ure > 7 mmol/l', 'curb65'),
+    binClinical('curb_r', 'CURB-65: R — Nhịp thở ≥ 30 lần/phút', 'curb65'),
+    binClinical('curb_b', 'CURB-65: B — Huyết áp tâm thu < 90 hoặc tâm trương ≤ 60 mmHg', 'curb65'),
+    binClinical('curb_age65', 'CURB-65: 65 — Tuổi ≥ 65', 'curb65'),
     num('curb_tong_diem', 'CURB-65: Tổng điểm (0-5)', 'curb65', { decimals: 0, measureLevel: 'ordinal' }),
     cat('curb_phan_nhom', 'CURB-65: Phân nhóm nguy cơ', 'curb65', VL_CURB65_NHOM, { measureLevel: 'ordinal' }),
     bin('curb_du_du_lieu', 'CURB-65: Đủ dữ liệu để tính điểm', 'curb65'),
@@ -291,15 +301,15 @@ const CURB65: SpssVarDef[] = [
 // ─── GROUP 11: Kết cục ───────────────────────────────────────────────────────
 const KET_CUC: SpssVarDef[] = [
     // Diễn biến điều trị — mỗi mục là 1 biến nhị phân riêng
-    bin('kc_tho_may', 'Kết cục: Thở máy', 'ket_cuc'),
-    bin('kc_soc_nk', 'Kết cục: Sốc nhiễm khuẩn', 'ket_cuc'),
-    bin('kc_loc_mau', 'Kết cục: Lọc máu', 'ket_cuc'),
+    binClinical('kc_tho_may', 'Kết cục: Thở máy', 'ket_cuc'),
+    binClinical('kc_soc_nk', 'Kết cục: Sốc nhiễm khuẩn', 'ket_cuc'),
+    binClinical('kc_loc_mau', 'Kết cục: Lọc máu', 'ket_cuc'),
     num('kc_ngay_loc_mau', 'Kết cục: Số ngày lọc máu', 'ket_cuc', { decimals: 0, measureLevel: 'scale' }),
     // Tình trạng ra viện — chuỗi (text từ dropdown)
     str('kc_tinh_trang_ra_vien', 'Kết cục: Tình trạng ra viện', 'ket_cuc', { width: 64 }),
     // Legacy binary outcomes
-    bin('kc_tu_vong', 'Kết cục: Tử vong', 'ket_cuc'),
-    bin('kc_xin_ve', 'Kết cục: Xin về', 'ket_cuc'),
+    binClinical('kc_tu_vong', 'Kết cục: Tử vong', 'ket_cuc'),
+    binClinical('kc_xin_ve', 'Kết cục: Xin về', 'ket_cuc'),
     bin('kc_tien_trien_tot', 'Kết cục: Tiến triển tốt — xuất viện', 'ket_cuc'),
     // Thời gian
     num('kc_ngay_dieu_tri', 'Kết cục: Tổng số ngày điều trị', 'ket_cuc', { decimals: 0, measureLevel: 'scale' }),
@@ -347,6 +357,7 @@ export function buildDefaultSpssConfig(slotConfig?: Partial<SpssSlotConfig>): Sp
 
 export {
     VL_CO_KHONG,
+    VL_CO_KHONG_BENH,
     VL_GIOI_TINH,
     VL_NOI_O,
     VL_THOIDIEM_DIEU_TRI,
