@@ -14,7 +14,7 @@ import {
     DEFAULT_NOI_O, DEFAULT_DIEN_BIEN_DIEU_TRI, DEFAULT_TINH_TRANG_RA_VIEN,
     DEFAULT_DRUG_GROUP_1,
 } from '../data/formOptions';
-import type { DrugGenericName } from '../types/drugTypes';
+import type { DrugGenericName } from '../types/patient';
 import type { SpssVarConfig, SpssVarDef, SpssSlotConfig, SpssVarGroup, SpssProfile } from '../types/spssTypes';
 import { SPSS_VAR_GROUP_LABELS } from '../types/spssTypes';
 
@@ -23,7 +23,7 @@ import {
     Upload, Download, Info, Plus, Trash2, Pencil, Check, X,
     ShieldAlert, MapPin, Stethoscope, Bug, Printer, HardDrive,
     Loader2, Eye, RotateCcw, FileSpreadsheet, ChevronUp, Search, Settings2, Pill,
-    Database, RefreshCcw, Tag,
+    Database, Tag, CircleCheck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -736,6 +736,7 @@ function migrateSpssConfigEncoding(config: SpssVarConfig): SpssVarConfig {
 
 // ─── Settings Page ───────────────────────────────────────────────────
 export default function SettingsPage() {
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<TabKey>('hanhchinh');
 
     // Hành chính tab
@@ -1402,34 +1403,66 @@ export default function SettingsPage() {
                 </div>
             )}
             {/* ════════════ TAB 6: SPSS Variables ════════════ */}
-            {activeTab === 'spss' && spssConfig && (
+            {activeTab === 'spss' && spssProfiles.length > 0 && (
                 <SpssSettingsTab
-                    config={spssConfig}
+                    profiles={spssProfiles}
+                    activeProfileId={activeProfileId}
                     loading={spssLoading}
                     patients={allPatients}
-                    onChange={(updated) => {
-                        setSpssConfig(updated);
+                    isAdmin={user?.email === 'khoibm.tn@gmail.com'}
+                    onChangeProfile={(id) => {
+                        setActiveProfileId(id);
+                        settingsService.saveActiveSpssProfileId(id).catch(() => {});
+                    }}
+                    onUpdateActiveProfile={(updatedConfig) => {
+                        const updatedProfiles = spssProfiles.map(p => 
+                            p.id === activeProfileId ? { ...p, config: updatedConfig } : p
+                        );
+                        setSpssProfiles(updatedProfiles);
                         setSpssLoading(true);
-                        settingsService.saveSpssConfig(updated)
-                            .then(() => toast.success('Đã lưu cấu hình SPSS'))
-                            .catch(() => toast.error('Lỗi khi lưu cấu hình SPSS'))
+                        settingsService.saveSpssProfiles(updatedProfiles)
+                            .then(() => toast.success('Đã lưu cấu hình profile SPSS'))
+                            .catch(() => toast.error('Lỗi khi lưu cấu hình'))
                             .finally(() => setSpssLoading(false));
                     }}
-                    onReset={() => {
-                        const def = buildDefaultSpssConfig();
-                        setSpssConfig(def);
-                        settingsService.saveSpssConfig(def)
-                            .then(() => toast.success('Đã khôi phục cấu hình mặc định'))
-                            .catch(() => toast.error('Lỗi khi lưu'));
+                    onCreateProfile={(name) => {
+                        const activeProfile = spssProfiles.find(p => p.id === activeProfileId);
+                        if (!activeProfile) return;
+                        const newProfile: SpssProfile = {
+                            id: crypto.randomUUID(),
+                            name,
+                            isDefault: false,
+                            config: activeProfile.config,
+                            createdAt: new Date().toISOString(),
+                        };
+                        const updatedProfiles = [...spssProfiles, newProfile];
+                        setSpssProfiles(updatedProfiles);
+                        setActiveProfileId(newProfile.id);
+                        settingsService.saveSpssProfiles(updatedProfiles).catch(() => {});
+                        settingsService.saveActiveSpssProfileId(newProfile.id).catch(() => {});
+                        toast.success('Đã tạo profile mới');
+                    }}
+                    onDeleteProfile={(id) => {
+                        const updatedProfiles = spssProfiles.filter(p => p.id !== id);
+                        setSpssProfiles(updatedProfiles);
+                        if (activeProfileId === id) {
+                            setActiveProfileId('default');
+                            settingsService.saveActiveSpssProfileId('default').catch(() => {});
+                        }
+                        settingsService.saveSpssProfiles(updatedProfiles)
+                            .then(() => toast.success('Đã xóa profile'))
+                            .catch(() => toast.error('Lỗi khi xóa profile'));
                     }}
                     onExport={() => {
-                        if (allPatients.length === 0) {
-                            toast.error('Không có bệnh nhân để xuất');
+                        const statsPatients = allPatients.filter(p => !p.disabled);
+                        if (statsPatients.length === 0) {
+                            toast.error('Không có dữ liệu thống kê để xuất');
                             return;
                         }
                         try {
-                            exportPatientsToSAV(allPatients, spssConfig);
-                            toast.success(`Đã xuất ${allPatients.length} bệnh nhân ra file .sav`);
+                            const activeProfile = spssProfiles.find(p => p.id === (activeProfileId || 'default'));
+                            exportPatientsToSAV(statsPatients, activeProfile?.config || null);
+                            toast.success(`Đã xuất ${statsPatients.length} case thống kê ra file SPSS (.sav)`);
                         } catch (e) {
                             console.error(e);
                             toast.error('Lỗi khi tạo file SPSS');
