@@ -712,6 +712,48 @@ export default function DashboardPage() {
                             </>
                         )}
                     </p>
+                    {(() => {
+                        const enabled = patients.filter(p => !p.disabled);
+                        const dangDieuTri = enabled.filter(p => !p.ketCuc?.tinhTrangRaVien).length;
+                        const tuVong = enabled.filter(p => p.ketCuc?.tuVong).length;
+                        const xinVe = enabled.filter(p => p.ketCuc?.xinVe).length;
+                        const raVien = enabled.filter(p => p.ketCuc?.tienTrienTotXuatVien).length;
+                        const ketThuc = tuVong + xinVe + raVien;
+                        const sTREM = enabled.filter(p => p.xetNghiem.sTREM1 !== null).length;
+                        const tIMP = enabled.filter(p => p.xetNghiem.tIMP1 !== null).length;
+                        const il6 = enabled.filter(p => p.xetNghiem.il6 !== null).length;
+                        const il10 = enabled.filter(p => p.xetNghiem.il10 !== null).length;
+                        const il17 = enabled.filter(p => p.xetNghiem.il17 !== null).length;
+                        return (
+                            <>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                    <span className="text-amber-600 font-medium">Đang điều trị ({dangDieuTri})</span>
+                                    {' · '}
+                                    <span className="text-gray-500">Kết thúc ({ketThuc}):</span>
+                                    {' '}
+                                    {raVien > 0 && <span className="text-green-600">Ra viện {raVien}</span>}
+                                    {raVien > 0 && (tuVong > 0 || xinVe > 0) && <span className="text-gray-300"> · </span>}
+                                    {tuVong > 0 && <span className="text-red-500">Tử vong {tuVong}</span>}
+                                    {tuVong > 0 && xinVe > 0 && <span className="text-gray-300"> · </span>}
+                                    {xinVe > 0 && <span className="text-orange-500">Xin về {xinVe}</span>}
+                                    {ketThuc === 0 && <span className="text-gray-400">—</span>}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                    Dấu ấn sinh học:
+                                    {' '}
+                                    <span className="text-gray-600">sTREM-1 <span className="font-medium">{sTREM}</span></span>
+                                    {' · '}
+                                    <span className="text-gray-600">TIMP-1 <span className="font-medium">{tIMP}</span></span>
+                                    {' · '}
+                                    <span className="text-gray-600">IL-6 <span className="font-medium">{il6}</span></span>
+                                    {' · '}
+                                    <span className="text-gray-600">IL-10 <span className="font-medium">{il10}</span></span>
+                                    {' · '}
+                                    <span className="text-gray-600">IL-17 <span className="font-medium">{il17}</span></span>
+                                </p>
+                            </>
+                        );
+                    })()}
                 </div>
                 <div className="flex gap-1.5">
                     {selectedIds.size > 0 && (
