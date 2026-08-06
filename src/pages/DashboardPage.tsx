@@ -741,6 +741,10 @@ export default function DashboardPage() {
                                 <p className="text-xs text-gray-400 mt-0.5">
                                     Dấu ấn sinh học:
                                     {' '}
+                                    <span className="text-gray-500">Chưa làm <span className="font-semibold">{enabled.filter(p => !p.xetNghiem.biomarkerBarcode).length}</span></span>
+                                    {' · '}
+                                    <span className="text-green-600 font-medium">Đã làm <span className="font-semibold">{enabled.filter(p => !!p.xetNghiem.biomarkerBarcode).length}</span></span>
+                                    {' — '}
                                     <span className="text-rose-500">sTREM-1 <span className="font-semibold">{sTREM}</span></span>
                                     {' · '}
                                     <span className="text-violet-500">TIMP-1 <span className="font-semibold">{tIMP}</span></span>
