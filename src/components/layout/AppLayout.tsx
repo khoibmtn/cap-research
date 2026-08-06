@@ -55,17 +55,22 @@ export default function AppLayout() {
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
             >
-                <div className="flex items-center justify-between h-16 px-6 border-b border-gray-100">
-                    <div className="flex items-center gap-2">
-                        <FileSpreadsheet className="w-6 h-6 text-primary-600" />
-                        <h1 className="font-heading font-bold text-lg text-gray-900">CAP Research</h1>
+                <div className="border-b border-gray-100">
+                    <div className="flex items-center justify-between h-16 px-6">
+                        <div className="flex items-center gap-2">
+                            <FileSpreadsheet className="w-6 h-6 text-primary-600" />
+                            <h1 className="font-heading font-bold text-lg text-gray-900">CAP Research</h1>
+                        </div>
+                        <button
+                            onClick={() => setSidebarOpen(false)}
+                            className="lg:hidden p-1 rounded hover:bg-gray-100"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
                     </div>
-                    <button
-                        onClick={() => setSidebarOpen(false)}
-                        className="lg:hidden p-1 rounded hover:bg-gray-100"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
+                    <p className="px-6 pb-2 text-[10px] text-gray-400 leading-tight truncate">
+                        Cập nhật 06/08/2026 07:49 — Sync PSI realtime
+                    </p>
                 </div>
 
                 <nav className="flex-1 px-3 py-4 space-y-1">

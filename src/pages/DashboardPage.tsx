@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, FileDown, Trash2, Eye, Edit, Printer, HardDrive, Loader2, Settings2, ChevronDown, ChevronRight, ChevronLeft, CircleCheck, CircleAlert, SlidersHorizontal, X, ToggleLeft, ToggleRight, Database } from 'lucide-react';
+import { Plus, Search, Trash2, Eye, Edit, Printer, HardDrive, Loader2, Settings2, ChevronDown, ChevronRight, ChevronLeft, CircleCheck, CircleAlert, SlidersHorizontal, X, ToggleLeft, ToggleRight } from 'lucide-react';
 
 import { patientService } from '../services/patientService';
 import { settingsService } from '../services/settingsService';
@@ -713,59 +713,96 @@ export default function DashboardPage() {
                         )}
                     </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                     {selectedIds.size > 0 && (
+                        <div className="relative group">
+                            <button
+                                onClick={handlePrintBatch}
+                                className="inline-flex items-center justify-center w-9 h-9 rounded-xl
+                                    text-teal-700 bg-teal-50 border border-teal-200 hover:bg-teal-100
+                                    transition-colors"
+                            >
+                                <Printer className="w-4 h-4" />
+                            </button>
+                            <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-150 z-50">
+                                In {selectedIds.size} BN
+                            </span>
+                        </div>
+                    )}
+                    <div className="relative group">
                         <button
-                            onClick={handlePrintBatch}
-                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium
-                                text-teal-700 bg-teal-50 border border-teal-200 rounded-xl hover:bg-teal-100
+                            onClick={handleBackup}
+                            disabled={backingUp}
+                            className="inline-flex items-center justify-center w-9 h-9 rounded-xl
+                                text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100
+                                disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {backingUp
+                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                : <HardDrive className="w-4 h-4" />
+                            }
+                        </button>
+                        <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-150 z-50">
+                            {backingUp ? 'Đang backup...' : 'Backup dữ liệu'}
+                        </span>
+                    </div>
+                    {/* Excel export — green X file icon */}
+                    <div className="relative group">
+                        <button
+                            onClick={handleExport}
+                            className="inline-flex items-center justify-center w-9 h-9 rounded-xl
+                                bg-white border border-gray-200 hover:bg-green-50
                                 transition-colors"
                         >
-                            <Printer className="w-4 h-4" />
-                            <span className="hidden sm:inline">In {selectedIds.size} BN</span>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <path d="M6 2h9l5 5v15a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z" fill="#E8F5E9" stroke="#4CAF50" strokeWidth="1.2"/>
+                                <path d="M14 2v5h5" fill="none" stroke="#4CAF50" strokeWidth="1.2" strokeLinejoin="round"/>
+                                <text x="10" y="17" textAnchor="middle" fontSize="8" fontWeight="800" fill="#2E7D32" fontFamily="Arial,sans-serif">X</text>
+                                <path d="M17 20l3 3m0-3l-3 3" stroke="#2E7D32" strokeWidth="1.5" strokeLinecap="round"/>
+                            </svg>
                         </button>
-                    )}
-                    <button
-                        onClick={handleBackup}
-                        disabled={backingUp}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium
-              text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100
-              disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                        {backingUp
-                            ? <Loader2 className="w-4 h-4 animate-spin" />
-                            : <HardDrive className="w-4 h-4" />
-                        }
-                        <span className="hidden sm:inline">{backingUp ? 'Đang backup...' : 'Backup'}</span>
-                    </button>
-                    <button
-                        onClick={handleExport}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium
-              text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50
-              transition-colors"
-                    >
-                        <FileDown className="w-4 h-4" />
-                        <span className="hidden sm:inline">Xuất Excel</span>
-                    </button>
-                    <button
-                        onClick={handleExportSAV}
-                        title="Xuất SPSS (.sav) với cấu hình mặc định. Để tùy chỉnh biến SPSS, vào Cài đặt → SPSS Variables"
-                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium
-              text-blue-700 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100
-              transition-colors"
-                    >
-                        <Database className="w-4 h-4" />
-                        <span className="hidden sm:inline">Xuất SPSS</span>
-                    </button>
-                    <Link
-                        to="/patient/new"
-                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium
-              text-white bg-primary-600 rounded-xl hover:bg-primary-700 transition-colors
-              shadow-sm shadow-primary-200"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Thêm BN
-                    </Link>
+                        <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-150 z-50">
+                            Xuất Excel
+                        </span>
+                    </div>
+                    {/* SPSS export — file icon with red SPSS badge */}
+                    <div className="relative group">
+                        <button
+                            onClick={handleExportSAV}
+                            className="inline-flex items-center justify-center w-9 h-9 rounded-xl
+                                bg-white border border-gray-200 hover:bg-red-50
+                                transition-colors"
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <path d="M6 2h9l5 5v15a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z" fill="#FFF3F3" stroke="#D32F2F" strokeWidth="1.2"/>
+                                <path d="M14 2v5h5" fill="none" stroke="#D32F2F" strokeWidth="1.2" strokeLinejoin="round"/>
+                                <rect x="3" y="12" width="16" height="8" rx="1.5" fill="#D32F2F"/>
+                                <text x="11" y="18" textAnchor="middle" fontSize="5.5" fontWeight="800" fill="white" fontFamily="Arial,sans-serif">SPSS</text>
+                            </svg>
+                        </button>
+                        <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-150 z-50">
+                            Xuất SPSS (.sav)
+                        </span>
+                    </div>
+                    {/* Add patient — person silhouette with + */}
+                    <div className="relative group">
+                        <Link
+                            to="/patient/new"
+                            className="inline-flex items-center justify-center w-9 h-9 rounded-xl
+                                text-white bg-primary-600 hover:bg-primary-700 transition-colors
+                                shadow-sm shadow-primary-200"
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="8" r="4" fill="white"/>
+                                <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" fill="white"/>
+                                <circle cx="19" cy="8" r="4.5" fill="#16a34a"/>
+                                <path d="M19 6v4M17 8h4" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                            </svg>
+                        </Link>
+                        <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-150 z-50">
+                            Thêm bệnh nhân
+                        </span>
+                    </div>
                 </div>
             </div>
 
@@ -1051,11 +1088,11 @@ export default function DashboardPage() {
                 ) : (
                     <>
                         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                            <div className="overflow-x-auto">
+                            <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)]">
                                 <table className="w-full text-sm" style={{ minWidth: activeColumns.length * 100 + 180 }}>
-                                    <thead className="bg-primary-600 border-b border-primary-700">
+                                    <thead className="bg-primary-600 border-b border-primary-700 sticky top-0 z-20">
                                         <tr>
-                                            <th className="px-3 py-3 text-left w-10 sticky left-0 bg-primary-600 z-10">
+                                            <th className="px-3 py-3 text-left w-10 sticky left-0 bg-primary-600 z-30">
                                                 <input
                                                     type="checkbox"
                                                     checked={allSelected}
@@ -1072,7 +1109,7 @@ export default function DashboardPage() {
                                                     {col.label}
                                                 </th>
                                             ))}
-                                            <th className="px-4 py-3 text-right font-medium text-white sticky right-0 bg-primary-600 z-10 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
+                                            <th className="px-4 py-3 text-right font-medium text-white sticky right-0 bg-primary-600 z-30 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
                                                 Thao tác
                                             </th>
                                         </tr>
@@ -1092,7 +1129,15 @@ export default function DashboardPage() {
                                                     ? 'bg-amber-50'
                                                     : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50';
                                             return (
-                                                <tr key={p.id} className={`hover:bg-gray-100/60 transition-colors ${rowBg}`}>
+                                                <tr
+                                                    key={p.id}
+                                                    className={`hover:bg-gray-100/60 transition-colors cursor-pointer ${rowBg}`}
+                                                    onClick={(e) => {
+                                                        const tag = (e.target as HTMLElement).closest('button, a, input, svg');
+                                                        if (tag) return;
+                                                        navigate(`/patient/${p.id}`);
+                                                    }}
+                                                >
                                                     <td className={`px-3 py-3 sticky left-0 z-10 ${stickyBg}`}>
                                                         <input
                                                             type="checkbox"
