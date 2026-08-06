@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+
 import type { PSIData, LamSang, XetNghiem, TienSu, HinhAnh } from '../../types/patient';
 import { PSI_LABELS } from '../../data/formOptions';
 import toast from 'react-hot-toast';
@@ -18,73 +18,9 @@ interface Props {
     onChange: (data: PSIData) => void;
 }
 
-// Parse huyetAp "120/80" → { tamThu: 120, tamTruong: 80 }
-function parseHuyetAp(s: string): { tamThu: number | null } {
-    if (!s) return { tamThu: null };
-    const parts = s.split('/');
-    const tamThu = Number(parts[0]);
-    return { tamThu: isNaN(tamThu) ? null : tamThu };
-}
+export default function StepPSI({ data, tuoi, gioiTinh, psiResult, confusion, confusionAsked, onChange }: Props) {
 
-export default function StepPSI({ data, tuoi, gioiTinh, lamSang, xetNghiem, tienSu, hinhAnh, psiResult, confusion, confusionAsked, onChange }: Props) {
-
-    // Reactive auto-sync: always derive checkboxes from source data
-
-
-    useEffect(() => {
-        const auto: Record<string, boolean> = {};
-
-        // ── From Tiền sử ──
-        auto['ungThu'] = !!tienSu.ungThu;
-        auto['suyTimUHuyet'] = !!tienSu.suyTimUHuyet;
-        auto['benhMachMauNao'] = !!tienSu.benhMachMauNao;
-        auto['benhThan'] = !!tienSu.benhThanMan;
-
-        // ── From Lâm sàng ──
-        auto['tanSoTho30'] = lamSang.nhipTho !== null && lamSang.nhipTho >= 30;
-        const { tamThu } = parseHuyetAp(lamSang.huyetAp);
-        auto['huyetApTamThu90'] = tamThu !== null && tamThu < 90;
-        auto['thanNhiet3540'] = lamSang.nhietDo !== null && (lamSang.nhietDo < 35 || lamSang.nhietDo >= 40);
-        auto['mach125'] = lamSang.mach !== null && lamSang.mach >= 125;
-        // thayDoiTriGiac: use confusion answer if asked, otherwise check Glasgow < 15
-        if (confusionAsked && confusion !== undefined) {
-            auto['thayDoiTriGiac'] = confusion;
-        } else {
-            auto['thayDoiTriGiac'] = lamSang.diemGlasgow !== null && lamSang.diemGlasgow < 15;
-        }
-
-        // ── From Xét nghiệm ──
-        auto['ph735'] = xetNghiem.ph !== null && xetNghiem.ph < 7.35;
-        auto['bun30'] = xetNghiem.ure !== null && xetNghiem.ure >= 11;
-        auto['hematocrit30'] = xetNghiem.hct !== null && xetNghiem.hct < 30;
-        auto['naMau130'] = xetNghiem.na !== null && xetNghiem.na < 130;
-        auto['glucoseMau250'] = xetNghiem.glucose !== null && xetNghiem.glucose >= 14;
-        auto['paO2_60'] = lamSang.spO2 !== null && lamSang.spO2 < 90;
-
-        // ── From Hình ảnh ──
-        auto['tranDichMangPhoi'] = !!(hinhAnh.xquangTranDichMangPhoi || hinhAnh.ctTranDichMangPhoi);
-
-        // Compare with current criteria — only update if something changed
-        const newCriteria = { ...data.criteria };
-        let changed = false;
-        for (const [key, val] of Object.entries(auto)) {
-            const current = newCriteria[key as keyof typeof newCriteria] as boolean;
-            if (current !== val) {
-                (newCriteria as unknown as Record<string, boolean>)[key] = val;
-                changed = true;
-            }
-        }
-        if (changed) {
-            onChange({ ...data, criteria: newCriteria });
-        }
-    }, [
-        // Source data dependencies
-        tienSu.ungThu, tienSu.suyTimUHuyet, tienSu.benhMachMauNao, tienSu.benhThanMan,
-        lamSang.nhipTho, lamSang.huyetAp, lamSang.nhietDo, lamSang.mach, lamSang.diemGlasgow, lamSang.spO2,
-        xetNghiem.ph, xetNghiem.ure, xetNghiem.hct, xetNghiem.na, xetNghiem.glucose,
-        hinhAnh.xquangTranDichMangPhoi, hinhAnh.ctTranDichMangPhoi,
-        confusion, confusionAsked,
-    ]);
+    // Auto-sync logic has been moved to PatientFormPage to ensure it runs even when this tab is not active.
 
     const toggleCriteria = (key: string) => {
         const newValue = !data.criteria[key as keyof typeof data.criteria];

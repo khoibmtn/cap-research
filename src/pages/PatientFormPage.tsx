@@ -93,6 +93,67 @@ export default function PatientFormPage() {
     // NOTE: Calculated values (indices, PSI) are injected at save time
     // to avoid cascading re-renders that steal input focus.
 
+    // Sync PSI criteria from source data when they change
+    useEffect(() => {
+        if (readOnly) return;
+        const auto: Record<string, boolean> = {};
+        const { tienSu, lamSang, xetNghiem, hinhAnh, curb65 } = formData;
+        
+        auto['ungThu'] = !!tienSu.ungThu;
+        auto['suyTimUHuyet'] = !!tienSu.suyTimUHuyet;
+        auto['benhMachMauNao'] = !!tienSu.benhMachMauNao;
+        auto['benhThan'] = !!tienSu.benhThanMan;
+        auto['benhGan'] = !!tienSu.viemGanMan;
+
+        auto['tanSoTho30'] = lamSang.nhipTho !== null && lamSang.nhipTho >= 30;
+        
+        const parseHuyetAp = (s: string) => {
+            if (!s) return null;
+            const t = Number(s.split('/')[0]);
+            return isNaN(t) ? null : t;
+        };
+        const tamThu = parseHuyetAp(lamSang.huyetAp);
+        auto['huyetApTamThu90'] = tamThu !== null && tamThu < 90;
+        auto['thanNhiet3540'] = lamSang.nhietDo !== null && (lamSang.nhietDo < 35 || lamSang.nhietDo >= 40);
+        auto['mach125'] = lamSang.mach !== null && lamSang.mach >= 125;
+        
+        if (curb65?.confusionAsked && curb65?.confusion !== undefined) {
+            auto['thayDoiTriGiac'] = curb65.confusion;
+        } else {
+            auto['thayDoiTriGiac'] = lamSang.diemGlasgow !== null && lamSang.diemGlasgow < 15;
+        }
+
+        auto['ph735'] = xetNghiem.ph !== null && xetNghiem.ph < 7.35;
+        auto['bun30'] = xetNghiem.ure !== null && xetNghiem.ure >= 11;
+        auto['hematocrit30'] = xetNghiem.hct !== null && xetNghiem.hct < 30;
+        auto['naMau130'] = xetNghiem.na !== null && xetNghiem.na < 130;
+        auto['glucoseMau250'] = xetNghiem.glucose !== null && xetNghiem.glucose >= 14;
+        auto['paO2_60'] = lamSang.spO2 !== null && lamSang.spO2 < 90;
+        auto['tranDichMangPhoi'] = !!(hinhAnh.xquangTranDichMangPhoi || hinhAnh.ctTranDichMangPhoi);
+
+        setFormData(prev => {
+            const newCriteria = { ...prev.psi.criteria };
+            let changed = false;
+            for (const [key, val] of Object.entries(auto)) {
+                if ((newCriteria as any)[key] !== val) {
+                    (newCriteria as any)[key] = val;
+                    changed = true;
+                }
+            }
+            if (changed) {
+                return { ...prev, psi: { ...prev.psi, criteria: newCriteria } };
+            }
+            return prev;
+        });
+    }, [
+        formData.tienSu.ungThu, formData.tienSu.suyTimUHuyet, formData.tienSu.benhMachMauNao, formData.tienSu.benhThanMan, formData.tienSu.viemGanMan,
+        formData.lamSang.nhipTho, formData.lamSang.huyetAp, formData.lamSang.nhietDo, formData.lamSang.mach, formData.lamSang.diemGlasgow, formData.lamSang.spO2,
+        formData.xetNghiem.ph, formData.xetNghiem.ure, formData.xetNghiem.hct, formData.xetNghiem.na, formData.xetNghiem.glucose,
+        formData.hinhAnh.xquangTranDichMangPhoi, formData.hinhAnh.ctTranDichMangPhoi,
+        formData.curb65?.confusion, formData.curb65?.confusionAsked,
+        readOnly
+    ]);
+
     // Load existing patient for edit, AND fetch all codes for auto-generation
     useEffect(() => {
         const init = async () => {
