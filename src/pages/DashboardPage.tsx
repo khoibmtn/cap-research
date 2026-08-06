@@ -741,15 +741,15 @@ export default function DashboardPage() {
                                 <p className="text-xs text-gray-400 mt-0.5">
                                     Dấu ấn sinh học:
                                     {' '}
-                                    <span className="text-gray-600">sTREM-1 <span className="font-medium">{sTREM}</span></span>
+                                    <span className="text-rose-500">sTREM-1 <span className="font-semibold">{sTREM}</span></span>
                                     {' · '}
-                                    <span className="text-gray-600">TIMP-1 <span className="font-medium">{tIMP}</span></span>
+                                    <span className="text-violet-500">TIMP-1 <span className="font-semibold">{tIMP}</span></span>
                                     {' · '}
-                                    <span className="text-gray-600">IL-6 <span className="font-medium">{il6}</span></span>
+                                    <span className="text-blue-500">IL-6 <span className="font-semibold">{il6}</span></span>
                                     {' · '}
-                                    <span className="text-gray-600">IL-10 <span className="font-medium">{il10}</span></span>
+                                    <span className="text-teal-500">IL-10 <span className="font-semibold">{il10}</span></span>
                                     {' · '}
-                                    <span className="text-gray-600">IL-17 <span className="font-medium">{il17}</span></span>
+                                    <span className="text-amber-500">IL-17 <span className="font-semibold">{il17}</span></span>
                                 </p>
                             </>
                         );
