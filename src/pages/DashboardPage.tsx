@@ -655,6 +655,38 @@ export default function DashboardPage() {
         }
     };
 
+    // ─── Auto-reassign mã BNNC when patient list changes ───
+    const isReassigningRef = useRef(false);
+    useEffect(() => {
+        if (isReassigningRef.current || loading || patients.length === 0) return;
+
+        const enabled = patients.filter(p => !p.disabled);
+        const sorted = [...enabled].sort((a, b) => {
+            const numA = parseInt(a.maBenhNhanNghienCuu?.match(/^CAP(\d+)$/i)?.[1] || '0', 10);
+            const numB = parseInt(b.maBenhNhanNghienCuu?.match(/^CAP(\d+)$/i)?.[1] || '0', 10);
+            return numA - numB;
+        });
+        const needsReassign = sorted.some((p, i) =>
+            p.maBenhNhanNghienCuu !== `CAP${String(i + 1).padStart(3, '0')}`
+        );
+        if (!needsReassign) return;
+
+        const timer = setTimeout(async () => {
+            isReassigningRef.current = true;
+            try {
+                const result = await patientService.reassignMaBNNC(patients, { skipBackup: true });
+                if (result.updated > 0) {
+                    console.log(`[Auto-reassign] Updated ${result.updated} codes`);
+                }
+            } catch (err) {
+                console.error('[Auto-reassign] Error:', err);
+            } finally {
+                setTimeout(() => { isReassigningRef.current = false; }, 2000);
+            }
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [patients, loading]);
+
     const toggleSelect = (id: string) => {
         const next = new Set(selectedIds);
         if (next.has(id)) next.delete(id); else next.add(id);
@@ -792,6 +824,7 @@ export default function DashboardPage() {
                             {backingUp ? 'Đang backup...' : 'Backup dữ liệu'}
                         </span>
                     </div>
+
                     {/* Excel export — green X file icon */}
                     <div className="relative group">
                         <button

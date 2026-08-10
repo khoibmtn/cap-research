@@ -68,4 +68,57 @@ export const patientService = {
             callback(patients);
         });
     },
+
+    /**
+     * Reassign maBenhNhanNghienCuu for all enabled patients sequentially.
+     * Sorts by current CAP number, then assigns CAP001, CAP002, ... with no gaps.
+     * Creates a backup before making changes.
+     * Returns the number of patients updated.
+     */
+    async reassignMaBNNC(patients: Patient[], { skipBackup = false }: { skipBackup?: boolean } = {}): Promise<{ updated: number; mapping: { old: string; new: string; name: string }[] }> {
+        const enabled = patients
+            .filter((p) => !p.disabled)
+            .sort((a, b) => {
+                const numA = parseInt(a.maBenhNhanNghienCuu?.match(/^CAP(\d+)$/i)?.[1] || '0', 10);
+                const numB = parseInt(b.maBenhNhanNghienCuu?.match(/^CAP(\d+)$/i)?.[1] || '0', 10);
+                return numA - numB;
+            });
+
+        // Build mapping
+        const mapping: { old: string; new: string; name: string }[] = [];
+        let updated = 0;
+
+        for (let i = 0; i < enabled.length; i++) {
+            const newCode = `CAP${String(i + 1).padStart(3, '0')}`;
+            const oldCode = enabled[i].maBenhNhanNghienCuu || '';
+            if (oldCode !== newCode) {
+                mapping.push({ old: oldCode, new: newCode, name: enabled[i].hanhChinh.hoTen });
+            }
+        }
+
+        if (mapping.length === 0) return { updated: 0, mapping: [] };
+
+        // Auto-backup before reassignment (skip for auto-triggered reassigns)
+        if (!skipBackup) {
+            try {
+                const { backupService } = await import('./backupService');
+                await backupService.createAutoBackup(`trước khi gán lại mã BNNC (${mapping.length} thay đổi)`);
+            } catch { /* silent */ }
+        }
+
+        // Apply updates
+        for (let i = 0; i < enabled.length; i++) {
+            const newCode = `CAP${String(i + 1).padStart(3, '0')}`;
+            if (enabled[i].maBenhNhanNghienCuu !== newCode) {
+                const docRef = doc(db, COLLECTION, enabled[i].id);
+                await updateDoc(docRef, {
+                    maBenhNhanNghienCuu: newCode,
+                    updatedAt: serverTimestamp(),
+                });
+                updated++;
+            }
+        }
+
+        return { updated, mapping };
+    },
 };

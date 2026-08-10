@@ -392,19 +392,21 @@ function sortKeys(obj: unknown): unknown {
 
 // ─── Auto-assign next maBenhNhanNghienCuu ────────────────────────────
 export function nextMaBNNC(existingCodes: string[], count = 1): string[] {
-    // Parse "CAPxxx" → number, find max
-    let max = 0;
+    // Parse "CAPxxx" → number, collect all used numbers
+    const usedNums = new Set<number>();
     for (const code of existingCodes) {
         const match = code.match(/^CAP(\d+)$/i);
-        if (match) {
-            const n = parseInt(match[1], 10);
-            if (n > max) max = n;
-        }
+        if (match) usedNums.add(parseInt(match[1], 10));
     }
+    // Find the smallest available gaps
     const results: string[] = [];
-    for (let i = 0; i < count; i++) {
-        max++;
-        results.push(`CAP${String(max).padStart(3, '0')}`);
+    let candidate = 1;
+    while (results.length < count) {
+        if (!usedNums.has(candidate)) {
+            results.push(`CAP${String(candidate).padStart(3, '0')}`);
+            usedNums.add(candidate); // prevent duplicates within this batch
+        }
+        candidate++;
     }
     return results;
 }

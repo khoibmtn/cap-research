@@ -160,7 +160,9 @@ export default function PatientFormPage() {
             try {
                 const patients = await patientService.getAll();
                 setAllPatients(patients);
-                const codes = new Set(patients.map((p) => p.maBenhNhanNghienCuu).filter(Boolean));
+                // Only track enabled patients' codes — disabled patients' codes can be reused
+                const enabledPatients = patients.filter((p) => !p.disabled);
+                const codes = new Set(enabledPatients.map((p) => p.maBenhNhanNghienCuu).filter(Boolean));
                 setExistingCodes(codes);
 
                 if (isEdit) {
@@ -173,15 +175,16 @@ export default function PatientFormPage() {
                     }
                 } else {
                     // Auto-generate next CAPxxx for new patient
-                    let maxNum = 0;
-                    codes.forEach((c) => {
-                        const match = c.match(/^CAP(\d+)$/i);
-                        if (match) {
-                            const num = parseInt(match[1], 10);
-                            if (num > maxNum) maxNum = num;
-                        }
+                    // Collect all enabled CAP numbers, then find the smallest gap
+                    const enabledNums: number[] = [];
+                    enabledPatients.forEach((p) => {
+                        const match = p.maBenhNhanNghienCuu?.match(/^CAP(\d+)$/i);
+                        if (match) enabledNums.push(parseInt(match[1], 10));
                     });
-                    const nextCode = `CAP${String(maxNum + 1).padStart(3, '0')}`;
+                    const usedSet = new Set(enabledNums);
+                    let nextNum = 1;
+                    while (usedSet.has(nextNum)) nextNum++;
+                    const nextCode = `CAP${String(nextNum).padStart(3, '0')}`;
                     const newData = { ...createDefaultPatient(), maBenhNhanNghienCuu: nextCode };
                     setFormData(newData);
                     // Save initial snapshot for dirty detection on new patient

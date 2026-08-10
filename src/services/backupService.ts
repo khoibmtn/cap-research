@@ -226,8 +226,10 @@ export const backupService = {
             if (p.maBenhAnNoiTru) existingMap.set(p.maBenhAnNoiTru, p);
         });
 
-        // Collect all existing maBNNC codes for auto-assignment
-        const allCodes = existingPatients.map((p) => p.maBenhNhanNghienCuu);
+        // Collect existing maBNNC codes from enabled (non-disabled) patients only
+        const allCodes = existingPatients
+            .filter((p) => !p.disabled)
+            .map((p) => p.maBenhNhanNghienCuu);
 
         // Pre-compute new codes for all new patients
         const newPatients = patientsToRestore.filter(
