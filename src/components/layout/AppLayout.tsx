@@ -69,7 +69,7 @@ export default function AppLayout() {
                         </button>
                     </div>
                     <p className="px-6 pb-2 text-[10px] text-gray-400 leading-tight truncate">
-                        Cập nhật 06/08/2026 07:49 — Sync PSI realtime
+                        Cập nhật 10/08/2026 18:05 — Auto-reassign mã BNNC
                     </p>
                 </div>
 
