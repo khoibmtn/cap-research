@@ -166,7 +166,7 @@ export default function AppLayout() {
                         </button>
                     </div>
                     <p className="px-6 pb-2 text-[10px] text-gray-400 leading-tight truncate">
-                        Cập nhật 12/08/2026 02:54 — Advisor read-only fix
+                        Cập nhật 12/08/2026 03:10 — Regression tab
                     </p>
                 </div>
 
