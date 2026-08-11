@@ -202,9 +202,9 @@ export default function CrosstabTab({ patients }: { patients: Patient[] }) {
                 </div>
             </div>
 
-            {/* Variable selection */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+            {/* Variable selection + manage button — single row */}
+            <div className="flex items-end gap-3">
+                <div className="flex-1 min-w-0">
                     <label className="block text-xs font-semibold text-gray-700 mb-1">Biến hàng (Row)</label>
                     <select
                         value={rowVarId}
@@ -221,7 +221,7 @@ export default function CrosstabTab({ patients }: { patients: Patient[] }) {
                         ))}
                     </select>
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                     <label className="block text-xs font-semibold text-gray-700 mb-1">Biến cột (Column)</label>
                     <select
                         value={colVarId}
@@ -238,23 +238,21 @@ export default function CrosstabTab({ patients }: { patients: Patient[] }) {
                         ))}
                     </select>
                 </div>
-            </div>
-
-            {/* Manage variable pool — compact */}
-            <div className="relative inline-block">
-                <button
-                    onClick={() => setShowAddMenu(!showAddMenu)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
-                >
-                    <Plus className="w-3.5 h-3.5" />
-                    Quản lý biến
-                    <span className="text-gray-400">({selectableVars.length})</span>
-                </button>
+                {/* Manage variable pool */}
+                <div className="relative shrink-0">
+                    <button
+                        onClick={() => setShowAddMenu(!showAddMenu)}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 transition-colors shadow-sm"
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                        Quản lý biến
+                        <span className="text-primary-200">({selectableVars.length})</span>
+                    </button>
                 {showAddMenu && (
                     <>
                         {/* Backdrop */}
                         <div className="fixed inset-0 z-40" onClick={() => setShowAddMenu(false)} />
-                        <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-96 overflow-auto">
+                        <div className="absolute top-full right-0 mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-96 overflow-auto">
                             {/* Active variables */}
                             <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
                                 Đang sử dụng ({selectableVars.length})
@@ -314,6 +312,7 @@ export default function CrosstabTab({ patients }: { patients: Patient[] }) {
                         </div>
                     </>
                 )}
+                </div>
             </div>
 
             {/* Prompt if not selected */}
