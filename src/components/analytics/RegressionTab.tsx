@@ -11,8 +11,8 @@ import {
     type LinearRegressionResult, type LogisticRegressionResult,
 } from '../../utils/regressionEngine';
 import {
-    ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis,
-    CartesianGrid, Tooltip, Line, ComposedChart, Area, Legend,
+    ResponsiveContainer, Scatter, XAxis, YAxis,
+    CartesianGrid, Tooltip, ComposedChart, Area, Legend, Line,
 } from 'recharts';
 import {
     Plus, X, AlertTriangle, CheckCircle, Info, TrendingUp, Loader2,
@@ -452,7 +452,7 @@ function LinearResultView({ result, depName, patients, depId, indepIds }: {
                                     label={{ value: indepVar!.label, position: 'bottom', offset: -5, fontSize: 12 }} />
                                 <YAxis type="number" name={depVar!.label} tick={{ fontSize: 11 }}
                                     label={{ value: depVar!.label, angle: -90, position: 'insideLeft', fontSize: 12 }} />
-                                <Tooltip formatter={(v: number) => v.toFixed(3)} />
+                                <Tooltip formatter={(v: number | undefined) => v?.toFixed(3) ?? '—'} />
                                 <Legend />
                                 {/* 95% CI Band */}
                                 <Area dataKey="ciHigh" stroke="none" fill="#0d948822" name="95% CI Upper" legendType="none" />
@@ -885,7 +885,7 @@ export default function RegressionTab({ patients }: { patients: Patient[] }) {
                 <div className="space-y-6">
                     <h3 className="text-lg font-bold text-gray-800">Kết quả phân tích đơn biến ({univariateResults.length} mô hình)</h3>
                     {/* Summary table first */}
-                    <UnivariateSummaryTable results={univariateResults} regType={regType} depName={depVar?.label ?? ''} />
+                    <UnivariateSummaryTable results={univariateResults} regType={regType} />
                     {/* Detailed per variable */}
                     {univariateResults.map(({ varId, result: r }) => {
                         const xVar = ALL_VARIABLES.find(v => v.id === varId);
@@ -923,12 +923,10 @@ export default function RegressionTab({ patients }: { patients: Patient[] }) {
 // UNIVARIATE SUMMARY TABLE
 // ═══════════════════════════════════════════════════════════
 
-function UnivariateSummaryTable({ results, regType, depName }: {
+function UnivariateSummaryTable({ results, regType }: {
     results: { varId: string; result: LinearRegressionResult | LogisticRegressionResult | { error: string } }[];
     regType: RegressionType;
-    depName: string;
 }) {
-    const validResults = results.filter(r => !('error' in r.result));
 
     return (
         <div className="overflow-x-auto">

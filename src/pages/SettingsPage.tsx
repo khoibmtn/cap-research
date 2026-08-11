@@ -1511,6 +1511,7 @@ export default function SettingsPage() {
                     setConflicts={setConflicts}
                 />
             )}
+            </div>{/* end advisor read-only wrapper */}
         </div>
     );
 }
@@ -2677,7 +2678,6 @@ function BackupTab({
                 />
             )}
 
-            </div>{/* end advisor read-only wrapper */}
         </div>
     );
 }
