@@ -759,45 +759,99 @@ function BiomarkerTab({ patients }: { patients: Patient[] }) {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     {curb65BoxData.map(({ key, label, groups, pValue }) => {
                         const hasData = groups.some(g => g.n > 0);
-                        const barData = groups.filter(g => g.n > 0);
                         const fmtP = (p: number | null) => p === null ? '—' : p < 0.001 ? '< 0.001' : p.toFixed(3);
                         const sigColor = pValue !== null && pValue < 0.05 ? 'text-green-600' : 'text-gray-500';
+                        const boxColors = ['#0d948880', '#ef444480'];
+                        const borderColors = ['#0d9488', '#ef4444'];
+
+                        // Calculate Y-axis range
+                        const allVals = groups.flatMap(g => g.values);
+                        const yMin = allVals.length > 0 ? Math.floor(Math.min(...allVals)) : 0;
+                        const yMax = allVals.length > 0 ? Math.ceil(Math.max(...allVals) * 1.1) : 10;
+                        const yRange = yMax - yMin || 1;
+
+                        // SVG dimensions
+                        const svgW = 300, svgH = 240;
+                        const padL = 45, padR = 20, padT = 15, padB = 55;
+                        const plotW = svgW - padL - padR;
+                        const plotH = svgH - padT - padB;
+                        const boxW = 70;
+
+                        const toY = (v: number) => padT + plotH - ((v - yMin) / yRange) * plotH;
+
+                        // Y-axis ticks
+                        const tickCount = 6;
+                        const yTicks = Array.from({ length: tickCount }, (_, i) => {
+                            const v = yMin + (yRange * i) / (tickCount - 1);
+                            return Math.round(v * 10) / 10;
+                        });
+
+                        // Box positions
+                        const groupsWithData = groups.filter(g => g.n > 0);
+                        const totalGroups = groupsWithData.length;
+                        const getX = (i: number) => padL + (plotW / (totalGroups + 1)) * (i + 1);
+
                         return (
                             <ChartCard key={key} title={`${label} theo CURB-65`}>
                                 {!hasData ? <EmptyChart msg="Chưa đủ dữ liệu CURB-65" /> : (
                                     <>
-                                        {/* Box plot approximation: bar = median, lines = Q1/Q3, whiskers shown in tooltip */}
-                                        <ResponsiveContainer width="100%" height={220}>
-                                            <ComposedChart data={barData} margin={{ left: 10, right: 10, top: 25, bottom: 5 }}>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                                                <XAxis dataKey="group" tick={{ fontSize: 11 }} />
-                                                <YAxis tick={{ fontSize: 11 }} label={{ value: label, angle: -90, position: 'insideLeft', fontSize: 10 }} />
-                                                <Tooltip
-                                                    content={({ active, payload }) => {
-                                                        if (!active || !payload?.[0]) return null;
-                                                        const d = payload[0].payload;
-                                                        return (
-                                                            <div className="bg-white border border-gray-200 rounded-lg p-2.5 shadow text-xs space-y-0.5">
-                                                                <p className="font-semibold text-gray-800">{d.group} (n={d.n})</p>
-                                                                <p>Mean ± SD: {d.mean?.toFixed(2)} ± {d.sd?.toFixed(2)}</p>
-                                                                <p>Median: {d.median?.toFixed(2)}</p>
-                                                                <p>IQR: {d.q1?.toFixed(2)}–{d.q3?.toFixed(2)}</p>
-                                                                <p>Min–Max: {d.min?.toFixed(2)}–{d.max?.toFixed(2)}</p>
-                                                            </div>
-                                                        );
-                                                    }}
-                                                />
-                                                <Bar dataKey="median" fill="#0ea5e9" radius={[4, 4, 0, 0]} name="Median">
-                                                    {barData.map((_, i) => <Cell key={i} fill={i === 0 ? '#0d9488' : '#ef4444'} />)}
-                                                    <LabelList dataKey="n" position="top" fontSize={10} formatter={(v: unknown) => `n=${v}`} />
-                                                </Bar>
-                                                <Line type="monotone" dataKey="q3" stroke="#94a3b8" strokeDasharray="4 2" dot={{ r: 3, fill: '#94a3b8' }} name="Q3" />
-                                                <Line type="monotone" dataKey="q1" stroke="#94a3b8" strokeDasharray="4 2" dot={{ r: 3, fill: '#94a3b8' }} name="Q1" />
-                                                {/* Error bars: min and max as reference */}
-                                                <Line type="monotone" dataKey="max" stroke="#d1d5db" strokeDasharray="2 2" dot={{ r: 2, fill: '#d1d5db' }} name="Max" />
-                                                <Line type="monotone" dataKey="min" stroke="#d1d5db" strokeDasharray="2 2" dot={{ r: 2, fill: '#d1d5db' }} name="Min" />
-                                            </ComposedChart>
-                                        </ResponsiveContainer>
+                                        <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full" style={{ maxHeight: 260 }}>
+                                            {/* Grid lines */}
+                                            {yTicks.map(v => (
+                                                <g key={v}>
+                                                    <line x1={padL} y1={toY(v)} x2={svgW - padR} y2={toY(v)} stroke="#f3f4f6" strokeDasharray="3 3" />
+                                                    <text x={padL - 6} y={toY(v)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#6b7280">{v}</text>
+                                                </g>
+                                            ))}
+                                            {/* Y-axis label */}
+                                            <text x={12} y={padT + plotH / 2} textAnchor="middle" dominantBaseline="middle" fontSize={11} fill="#374151" fontWeight={600} transform={`rotate(-90, 12, ${padT + plotH / 2})`}>{label}</text>
+                                            {/* Y-axis line */}
+                                            <line x1={padL} y1={padT} x2={padL} y2={padT + plotH} stroke="#d1d5db" />
+                                            {/* X-axis line */}
+                                            <line x1={padL} y1={padT + plotH} x2={svgW - padR} y2={padT + plotH} stroke="#d1d5db" />
+
+                                            {/* Box plots */}
+                                            {groupsWithData.map((g, i) => {
+                                                if (g.q1 === null || g.q3 === null || g.median === null || g.min === null || g.max === null) return null;
+                                                const cx = getX(i);
+                                                const halfBox = boxW / 2;
+
+                                                // Whisker limits: 1.5 * IQR
+                                                const iqr = g.q3 - g.q1;
+                                                const whiskerLow = Math.max(g.min, g.q1 - 1.5 * iqr);
+                                                const whiskerHigh = Math.min(g.max, g.q3 + 1.5 * iqr);
+
+                                                // Outliers
+                                                const outliers = g.values.filter(v => v < whiskerLow || v > whiskerHigh);
+
+                                                return (
+                                                    <g key={g.group}>
+                                                        {/* Whisker vertical line */}
+                                                        <line x1={cx} y1={toY(whiskerHigh)} x2={cx} y2={toY(whiskerLow)} stroke={borderColors[i]} strokeWidth={1.5} />
+                                                        {/* Whisker caps */}
+                                                        <line x1={cx - 12} y1={toY(whiskerHigh)} x2={cx + 12} y2={toY(whiskerHigh)} stroke={borderColors[i]} strokeWidth={1.5} />
+                                                        <line x1={cx - 12} y1={toY(whiskerLow)} x2={cx + 12} y2={toY(whiskerLow)} stroke={borderColors[i]} strokeWidth={1.5} />
+                                                        {/* Box (Q1 to Q3) */}
+                                                        <rect
+                                                            x={cx - halfBox} y={toY(g.q3)}
+                                                            width={boxW} height={toY(g.q1) - toY(g.q3)}
+                                                            fill={boxColors[i]} stroke={borderColors[i]} strokeWidth={1.5} rx={2}
+                                                        />
+                                                        {/* Median line */}
+                                                        <line x1={cx - halfBox} y1={toY(g.median)} x2={cx + halfBox} y2={toY(g.median)} stroke={borderColors[i]} strokeWidth={2.5} />
+                                                        {/* Outlier dots */}
+                                                        {outliers.map((v, oi) => (
+                                                            <circle key={oi} cx={cx} cy={toY(v)} r={3.5} fill={borderColors[i]} />
+                                                        ))}
+                                                        {/* X-axis label */}
+                                                        <text x={cx} y={padT + plotH + 16} textAnchor="middle" fontSize={10} fill="#374151" fontWeight={500}>{g.group}</text>
+                                                        <text x={cx} y={padT + plotH + 28} textAnchor="middle" fontSize={9} fill="#6b7280">(n = {g.n})</text>
+                                                    </g>
+                                                );
+                                            })}
+                                            {/* X-axis title */}
+                                            <text x={padL + plotW / 2} y={svgH - 4} textAnchor="middle" fontSize={10} fill="#6b7280">CURB-65 nhóm</text>
+                                        </svg>
                                         {/* Summary table */}
                                         <div className="mt-2 overflow-x-auto">
                                             <table className="w-full text-xs border-collapse">
@@ -811,9 +865,9 @@ function BiomarkerTab({ patients }: { patients: Patient[] }) {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {groups.map(g => (
+                                                    {groups.map((g, i) => (
                                                         <tr key={g.group} className="hover:bg-gray-50">
-                                                            <td className="p-1.5 border border-gray-200 font-medium">{g.group}</td>
+                                                            <td className="p-1.5 border border-gray-200 font-medium" style={{ color: borderColors[i] }}>{g.group}</td>
                                                             <td className="p-1.5 border border-gray-200 text-center">{g.n}</td>
                                                             <td className="p-1.5 border border-gray-200 text-center">
                                                                 {g.mean !== null ? `${g.mean.toFixed(2)} ± ${g.sd?.toFixed(2)}` : '—'}
