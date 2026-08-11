@@ -2,9 +2,10 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEditGuardCheck } from '@/contexts/EditGuardContext';
 import {
-    Users, BarChart3, Settings, LogOut, Menu, X, FileSpreadsheet,
+    Users, BarChart3, Settings, LogOut, Menu, X, FileSpreadsheet, KeyRound, Loader2,
 } from 'lucide-react';
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 
 const NAV_ITEMS = [
     { to: '/', icon: Users, label: 'Danh sách nghiên cứu' },
@@ -12,12 +13,111 @@ const NAV_ITEMS = [
     { to: '/settings', icon: Settings, label: 'Cài đặt' },
 ];
 
+// ─── Password Change Modal ──────────────────────────────────
+function PasswordChangeModal({
+    onClose,
+    onSubmit,
+    isAdmin,
+}: {
+    onClose: () => void;
+    onSubmit: (currentPw: string, newPw: string) => Promise<void>;
+    isAdmin: boolean;
+}) {
+    const [currentPw, setCurrentPw] = useState('');
+    const [newPw, setNewPw] = useState('');
+    const [confirmPw, setConfirmPw] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newPw.length < 6) { toast.error('Mật khẩu mới tối thiểu 6 ký tự'); return; }
+        if (newPw !== confirmPw) { toast.error('Xác nhận mật khẩu không khớp'); return; }
+        setLoading(true);
+        try {
+            await onSubmit(currentPw, newPw);
+            toast.success('Đã đổi mật khẩu thành công!');
+            onClose();
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Lỗi không xác định';
+            if (msg.includes('wrong-password') || msg.includes('invalid-credential')) {
+                toast.error('Mật khẩu hiện tại không đúng');
+            } else {
+                toast.error(`Lỗi: ${msg}`);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                    <h3 className="font-semibold text-gray-900 text-sm">Đổi mật khẩu</h3>
+                    <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                        <X className="w-4 h-4 text-gray-500" />
+                    </button>
+                </div>
+                <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Mật khẩu hiện tại</label>
+                        <input
+                            type="password"
+                            value={currentPw}
+                            onChange={e => setCurrentPw(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Mật khẩu mới</label>
+                        <input
+                            type="password"
+                            value={newPw}
+                            onChange={e => setNewPw(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            required
+                            minLength={6}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Xác nhận mật khẩu mới</label>
+                        <input
+                            type="password"
+                            value={confirmPw}
+                            onChange={e => setConfirmPw(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            required
+                        />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Hủy</button>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                        >
+                            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Đổi mật khẩu'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+// ─── Main Layout ─────────────────────────────────────────────
 export default function AppLayout() {
-    const { user, logout } = useAuth();
+    const { user, role, logout, changePassword } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const checkGuard = useEditGuardCheck();
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [showPwModal, setShowPwModal] = useState(false);
+
+    const navItems = role === 'advisor'
+        ? NAV_ITEMS.filter(item => item.to !== '/settings')
+        : NAV_ITEMS;
 
     const handleLogout = async () => {
         await logout();
@@ -69,12 +169,12 @@ export default function AppLayout() {
                         </button>
                     </div>
                     <p className="px-6 pb-2 text-[10px] text-gray-400 leading-tight truncate">
-                        Cập nhật 10/08/2026 18:05 — Auto-reassign mã BNNC
+                        Cập nhật 11/08/2026 22:33 — Advisor account
                     </p>
                 </div>
 
                 <nav className="flex-1 px-3 py-4 space-y-1">
-                    {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
+                    {navItems.map(({ to, icon: Icon, label }) => (
                         <button
                             key={to}
                             onClick={() => handleNavClick(to)}
@@ -102,7 +202,17 @@ export default function AppLayout() {
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-xs text-gray-600 truncate">{user?.email}</p>
+                            <p className={`text-[10px] font-medium ${role === 'admin' ? 'text-primary-600' : 'text-amber-600'}`}>
+                                {role === 'admin' ? '👑 Admin' : '🔒 Advisor'}
+                            </p>
                         </div>
+                        <button
+                            onClick={() => setShowPwModal(true)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                            title="Đổi mật khẩu"
+                        >
+                            <KeyRound className="w-4 h-4" />
+                        </button>
                         <button
                             onClick={handleLogout}
                             className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
@@ -134,6 +244,15 @@ export default function AppLayout() {
                     <Outlet />
                 </main>
             </div>
+
+            {/* Password change modal */}
+            {showPwModal && (
+                <PasswordChangeModal
+                    onClose={() => setShowPwModal(false)}
+                    onSubmit={changePassword}
+                    isAdmin={role === 'admin'}
+                />
+            )}
         </div>
     );
 }

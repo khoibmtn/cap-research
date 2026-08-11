@@ -736,7 +736,7 @@ function migrateSpssConfigEncoding(config: SpssVarConfig): SpssVarConfig {
 
 // ─── Settings Page ───────────────────────────────────────────────────
 export default function SettingsPage() {
-    const { user } = useAuth();
+    const { user, role } = useAuth();
     const [activeTab, setActiveTab] = useState<TabKey>('hanhchinh');
 
     // Hành chính tab
@@ -1409,7 +1409,7 @@ export default function SettingsPage() {
                     activeProfileId={activeProfileId}
                     loading={spssLoading}
                     patients={allPatients}
-                    isAdmin={user?.email === 'khoibm.tn@gmail.com'}
+                    isAdmin={role === 'admin'}
                     onChangeProfile={(id) => {
                         setActiveProfileId(id);
                         settingsService.saveActiveSpssProfileId(id).catch(() => {});

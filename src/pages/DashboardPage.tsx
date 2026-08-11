@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { Plus, Search, Trash2, Eye, Edit, Printer, HardDrive, Loader2, Settings2, ChevronDown, ChevronRight, ChevronLeft, CircleCheck, CircleAlert, SlidersHorizontal, X, ToggleLeft, ToggleRight } from 'lucide-react';
 
 import { patientService } from '../services/patientService';
@@ -417,6 +418,8 @@ export default function DashboardPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const navigate = useNavigate();
+    const { role } = useAuth();
+    const isAdvisor = role === 'advisor';
     const showConfirm = useEditGuardConfirm();
     const { printPatients } = usePrintRecord();
 
@@ -807,6 +810,8 @@ export default function DashboardPage() {
                             </span>
                         </div>
                     )}
+                    {/* Backup — hide for advisor */}
+                    {!isAdvisor && (
                     <div className="relative group">
                         <button
                             onClick={handleBackup}
@@ -824,6 +829,7 @@ export default function DashboardPage() {
                             {backingUp ? 'Đang backup...' : 'Backup dữ liệu'}
                         </span>
                     </div>
+                    )}
 
                     {/* Excel export — green X file icon */}
                     <div className="relative group">
@@ -863,7 +869,8 @@ export default function DashboardPage() {
                             Xuất SPSS (.sav)
                         </span>
                     </div>
-                    {/* Add patient — person silhouette with + */}
+                    {/* Add patient — hide for advisor */}
+                    {!isAdvisor && (
                     <div className="relative group">
                         <Link
                             to="/patient/new"
@@ -882,6 +889,7 @@ export default function DashboardPage() {
                             Thêm bệnh nhân
                         </span>
                     </div>
+                    )}
                 </div>
             </div>
 
@@ -1237,6 +1245,7 @@ export default function DashboardPage() {
                                                     ))}
                                                     <td className={`px-4 py-3 sticky right-0 z-10 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.06)] ${stickyBg}`}>
                                                         <div className="flex items-center justify-end gap-1">
+                                                            {!isAdvisor && (
                                                             <button
                                                                 onClick={() => handleToggleDisabled(p)}
                                                                 className={`p-1.5 rounded-lg transition-colors ${
@@ -1251,6 +1260,7 @@ export default function DashboardPage() {
                                                                     : <ToggleRight className="w-5 h-5" />
                                                                 }
                                                             </button>
+                                                            )}
                                                             <button
                                                                 onClick={() => navigate(`/patient/${p.id}`)}
                                                                 className="p-1.5 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
@@ -1258,6 +1268,7 @@ export default function DashboardPage() {
                                                             >
                                                                 <Eye className="w-4 h-4" />
                                                             </button>
+                                                            {!isAdvisor && (
                                                             <button
                                                                 onClick={() => navigate(`/patient/${p.id}/edit`)}
                                                                 className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
@@ -1265,6 +1276,7 @@ export default function DashboardPage() {
                                                             >
                                                                 <Edit className="w-4 h-4" />
                                                             </button>
+                                                            )}
                                                             <button
                                                                 onClick={() => handlePrintSingle(p)}
                                                                 className="p-1.5 rounded-lg text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
@@ -1272,6 +1284,7 @@ export default function DashboardPage() {
                                                             >
                                                                 <Printer className="w-4 h-4" />
                                                             </button>
+                                                            {!isAdvisor && (
                                                             <button
                                                                 onClick={() => handleDelete(p.id, p.hanhChinh.hoTen)}
                                                                 className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
@@ -1279,6 +1292,7 @@ export default function DashboardPage() {
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
                                                             </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
