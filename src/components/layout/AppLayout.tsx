@@ -17,11 +17,9 @@ const NAV_ITEMS = [
 function PasswordChangeModal({
     onClose,
     onSubmit,
-    isAdmin,
 }: {
     onClose: () => void;
     onSubmit: (currentPw: string, newPw: string) => Promise<void>;
-    isAdmin: boolean;
 }) {
     const [currentPw, setCurrentPw] = useState('');
     const [newPw, setNewPw] = useState('');
@@ -250,7 +248,6 @@ export default function AppLayout() {
                 <PasswordChangeModal
                     onClose={() => setShowPwModal(false)}
                     onSubmit={changePassword}
-                    isAdmin={role === 'admin'}
                 />
             )}
         </div>

@@ -736,7 +736,7 @@ function migrateSpssConfigEncoding(config: SpssVarConfig): SpssVarConfig {
 
 // ─── Settings Page ───────────────────────────────────────────────────
 export default function SettingsPage() {
-    const { user, role } = useAuth();
+    const { role } = useAuth();
     const [activeTab, setActiveTab] = useState<TabKey>('hanhchinh');
 
     // Hành chính tab
