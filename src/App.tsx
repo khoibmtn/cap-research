@@ -27,8 +27,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { role } = useAuth();
+  if (role === 'advisor') return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 function AppRoutes() {
-  const { user, loading } = useAuth();
+  const { user, role, loading } = useAuth();
 
   if (loading) {
     return (
@@ -49,11 +55,11 @@ function AppRoutes() {
         }
       >
         <Route index element={<DashboardPage />} />
-        <Route path="/patient/new" element={<PatientFormPage />} />
+        <Route path="/patient/new" element={<AdminRoute><PatientFormPage /></AdminRoute>} />
         <Route path="/patient/:id" element={<PatientFormPage />} />
-        <Route path="/patient/:id/edit" element={<PatientFormPage />} />
+        <Route path="/patient/:id/edit" element={role === 'advisor' ? <Navigate to="/" replace /> : <PatientFormPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -4,6 +4,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { FileSpreadsheet, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+// Shortcut: typing "admin" or "advisor" auto-completes to full email
+const EMAIL_SHORTCUTS: Record<string, string> = {
+    'admin': 'admin@capresearch.com',
+    'advisor': 'advisor@capresearch.com',
+};
+
 export default function LoginPage() {
     const { login } = useAuth();
     const navigate = useNavigate();
@@ -13,11 +19,24 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setEmail(val);
+    };
+
+    const handleEmailBlur = () => {
+        const lower = email.trim().toLowerCase();
+        if (EMAIL_SHORTCUTS[lower]) {
+            setEmail(EMAIL_SHORTCUTS[lower]);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         try {
-            await login(email, password, rememberMe);
+            const finalEmail = EMAIL_SHORTCUTS[email.trim().toLowerCase()] || email;
+            await login(finalEmail, password, rememberMe);
             toast.success('Đăng nhập thành công!');
             navigate('/');
         } catch {
@@ -48,14 +67,16 @@ export default function LoginPage() {
                             </label>
                             <input
                                 id="email"
-                                type="email"
+                                type="text"
                                 value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                onChange={handleEmailChange}
+                                onBlur={handleEmailBlur}
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm
                   focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
                   transition-shadow"
-                                placeholder="email@example.com"
+                                placeholder="admin / advisor"
                                 required
+                                autoComplete="username"
                             />
                         </div>
 
