@@ -14,7 +14,7 @@ import {
     Bug, FlaskConical, Droplets, ThermometerSun,
     Clock, Pill, AlertTriangle,
 } from 'lucide-react';
-import { mean, sd, median, q1, q3, meanSd, frac, psiClass } from '../utils/statsHelpers';
+import { mean, sd, median, q1, q3, meanSd, frac, psiClass, linearRegression } from '../utils/statsHelpers';
 import ExpectedResultsTab from '../components/analytics/ExpectedResultsTab';
 
 const COLORS = ['#0d9488', '#0ea5e9', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#10b981', '#f97316'];
@@ -424,6 +424,58 @@ function MicroTab({ patients }: { patients: Patient[] }) {
 }
 
 // ====================================================================
+// Mann-Whitney U test (normal approximation)
+// ====================================================================
+function mannWhitneyP(a: number[], b: number[]): number | null {
+    const n1 = a.length, n2 = b.length;
+    if (n1 < 2 || n2 < 2) return null;
+
+    // Rank all values combined
+    const combined = [
+        ...a.map(v => ({ v, g: 0 })),
+        ...b.map(v => ({ v, g: 1 })),
+    ].sort((x, y) => x.v - y.v);
+
+    // Assign ranks with tie correction
+    const ranks = new Array(combined.length);
+    let i = 0;
+    while (i < combined.length) {
+        let j = i;
+        while (j < combined.length && combined[j].v === combined[i].v) j++;
+        const avgRank = (i + j + 1) / 2; // 1-indexed average
+        for (let k = i; k < j; k++) ranks[k] = avgRank;
+        i = j;
+    }
+
+    // Sum of ranks for group a
+    let R1 = 0;
+    for (let k = 0; k < combined.length; k++) {
+        if (combined[k].g === 0) R1 += ranks[k];
+    }
+
+    const U1 = R1 - (n1 * (n1 + 1)) / 2;
+    const mU = (n1 * n2) / 2;
+    const sU = Math.sqrt((n1 * n2 * (n1 + n2 + 1)) / 12);
+    if (sU === 0) return 1;
+
+    const z = Math.abs(U1 - mU) / sU;
+    // Two-tailed p-value from standard normal
+    const p = 2 * (1 - normalCDF(z));
+    return Math.max(0, Math.min(1, p));
+}
+
+function normalCDF(z: number): number {
+    // Abramowitz & Stegun approximation
+    const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
+    const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+    const sign = z < 0 ? -1 : 1;
+    z = Math.abs(z) / Math.sqrt(2);
+    const t = 1 / (1 + p * z);
+    const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-z * z);
+    return 0.5 * (1 + sign * y);
+}
+
+// ====================================================================
 // TAB 3: BIOMARKER (MT2)
 // ====================================================================
 function BiomarkerTab({ patients }: { patients: Patient[] }) {
@@ -468,6 +520,56 @@ function BiomarkerTab({ patients }: { patients: Patient[] }) {
                 car: p.chiSoTinhToan?.car ?? null,
                 name: p.maBenhNhanNghienCuu || p.hanhChinh.hoTen,
             }));
+    }, [patients]);
+
+    // Regression models for scatter plots
+    const regressionModels = useMemo(() => {
+        const calc = (key: 'nlr' | 'plr' | 'car') => {
+            const valid = scatterData.filter(d => d[key] !== null);
+            if (valid.length < 3) return null;
+            const xs = valid.map(d => d.psi);
+            const ys = valid.map(d => d[key] as number);
+            const reg = linearRegression(xs, ys);
+            if (!reg) return null;
+            const minX = Math.min(...xs);
+            const maxX = Math.max(...xs);
+            return { ...reg, minX, maxX };
+        };
+        return { nlr: calc('nlr'), plr: calc('plr'), car: calc('car') };
+    }, [scatterData]);
+
+    // CURB-65 boxplot data: 2 groups (0-1 vs ≥2)
+    const curb65BoxData = useMemo(() => {
+        const groups = [
+            { label: 'CURB-65: 0–1', filter: (p: Patient) => (p.curb65?.tongDiem ?? 0) <= 1 },
+            { label: 'CURB-65: ≥2', filter: (p: Patient) => (p.curb65?.tongDiem ?? 0) >= 2 },
+        ];
+        const keys = ['nlr', 'plr', 'car'] as const;
+        const keyLabels = { nlr: 'NLR', plr: 'PLR', car: 'CAR' };
+
+        return keys.map(key => {
+            const groupData = groups.map(g => {
+                const pts = patients.filter(p => p.curb65 && p.curb65.duDuLieu && g.filter(p));
+                const vals = pts.map(p => p.chiSoTinhToan?.[key]).filter((v): v is number => v !== null);
+                return {
+                    group: g.label,
+                    n: vals.length,
+                    mean: vals.length > 0 ? mean(vals) : null,
+                    sd: vals.length > 0 ? sd(vals) : null,
+                    median: vals.length > 0 ? median(vals) : null,
+                    q1: vals.length > 0 ? q1(vals) : null,
+                    q3: vals.length > 0 ? q3(vals) : null,
+                    min: vals.length > 0 ? Math.min(...vals) : null,
+                    max: vals.length > 0 ? Math.max(...vals) : null,
+                    values: vals,
+                };
+            });
+
+            // Mann-Whitney U approximation for p-value
+            const pVal = mannWhitneyP(groupData[0].values, groupData[1].values);
+
+            return { key, label: keyLabels[key], groups: groupData, pValue: pVal };
+        });
     }, [patients]);
 
     // Tử vong theo PSI Class
@@ -577,8 +679,8 @@ function BiomarkerTab({ patients }: { patients: Patient[] }) {
                 </div>
             </Section>
 
-            {/* Scatter: NLR vs PSI */}
-            <Section title="Chỉ số viêm vs PSI Score">
+            {/* Scatter: NLR/PLR/CAR vs PSI with Regression Line */}
+            <Section title="Hồi quy tuyến tính: Chỉ số viêm vs PSI Score">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     {([
                         { key: 'nlr' as const, label: 'NLR', color: '#0d9488' },
@@ -586,31 +688,153 @@ function BiomarkerTab({ patients }: { patients: Patient[] }) {
                         { key: 'car' as const, label: 'CAR', color: '#f59e0b' },
                     ]).map(({ key, label, color }) => {
                         const filtered = scatterData.filter(d => d[key] !== null).map(d => ({ ...d, val: d[key] as number }));
+                        const reg = regressionModels[key];
+                        // Generate regression line data points
+                        const regLineData = reg ? [
+                            { psi: reg.minX, val: reg.slope * reg.minX + reg.intercept },
+                            { psi: reg.maxX, val: reg.slope * reg.maxX + reg.intercept },
+                        ] : [];
+                        const fmtP = (p: number) => p < 0.001 ? '< 0.001' : p.toFixed(3);
+                        const sigIcon = reg && reg.pValue < 0.05 ? '✓' : '✗';
+                        const sigColor = reg && reg.pValue < 0.05 ? 'text-green-600' : 'text-red-500';
                         return (
                             <ChartCard key={key} title={`${label} vs PSI Score`}>
                                 {filtered.length === 0 ? <EmptyChart msg="Chưa đủ dữ liệu" /> : (
-                                    <ResponsiveContainer width="100%" height={220}>
-                                        <ScatterChart margin={{ left: 0, right: 10, bottom: 5 }}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                                            <XAxis dataKey="psi" name="PSI Score" tick={{ fontSize: 11 }} label={{ value: 'PSI', position: 'bottom', fontSize: 10 }} />
-                                            <YAxis dataKey="val" name={label} tick={{ fontSize: 11 }} label={{ value: label, angle: -90, position: 'insideLeft', fontSize: 10 }} />
-                                            <Tooltip
-                                                cursor={{ strokeDasharray: '3 3' }}
-                                                content={({ active, payload }) => {
-                                                    if (!active || !payload?.[0]) return null;
-                                                    const d = payload[0].payload;
-                                                    return (
-                                                        <div className="bg-white border border-gray-200 rounded-lg p-2 shadow text-xs">
-                                                            <p className="font-semibold">{d.name}</p>
-                                                            <p>PSI: {d.psi}</p>
-                                                            <p>{label}: {d.val?.toFixed(2)}</p>
-                                                        </div>
-                                                    );
-                                                }}
-                                            />
-                                            <Scatter data={filtered} fill={color} />
-                                        </ScatterChart>
-                                    </ResponsiveContainer>
+                                    <>
+                                        <ResponsiveContainer width="100%" height={220}>
+                                            <ScatterChart margin={{ left: 0, right: 10, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                                                <XAxis dataKey="psi" type="number" name="PSI Score" domain={['auto', 'auto']} tick={{ fontSize: 11 }} label={{ value: 'PSI Score', position: 'bottom', fontSize: 10 }} />
+                                                <YAxis dataKey="val" name={label} tick={{ fontSize: 11 }} label={{ value: label, angle: -90, position: 'insideLeft', fontSize: 10 }} />
+                                                <Tooltip
+                                                    cursor={{ strokeDasharray: '3 3' }}
+                                                    content={({ active, payload }) => {
+                                                        if (!active || !payload?.[0]) return null;
+                                                        const d = payload[0].payload;
+                                                        return (
+                                                            <div className="bg-white border border-gray-200 rounded-lg p-2 shadow text-xs">
+                                                                <p className="font-semibold">{d.name}</p>
+                                                                <p>PSI: {d.psi}</p>
+                                                                <p>{label}: {d.val?.toFixed(2)}</p>
+                                                            </div>
+                                                        );
+                                                    }}
+                                                />
+                                                <Scatter data={filtered} fill={color} />
+                                                {/* Regression line */}
+                                                {reg && (
+                                                    <Scatter
+                                                        data={regLineData}
+                                                        fill="none"
+                                                        line={{ stroke: '#ef4444', strokeWidth: 2, strokeDasharray: '6 3' }}
+                                                        shape={() => null}
+                                                        legendType="none"
+                                                        isAnimationActive={false}
+                                                    />
+                                                )}
+                                            </ScatterChart>
+                                        </ResponsiveContainer>
+                                        {/* Regression equation & stats */}
+                                        {reg && (
+                                            <div className="mt-2 px-2 py-1.5 bg-gray-50 rounded-lg text-xs space-y-0.5">
+                                                <p className="font-mono text-gray-700">
+                                                    <span className="font-semibold">{label}</span> = {reg.slope >= 0 ? '' : '−'}{Math.abs(reg.slope).toFixed(4)} × PSI {reg.intercept >= 0 ? '+' : '−'} {Math.abs(reg.intercept).toFixed(2)}
+                                                </p>
+                                                <p className="text-gray-500">
+                                                    R² = {reg.r2.toFixed(4)} | <span className={`font-semibold ${sigColor}`}>p = {fmtP(reg.pValue)} {sigIcon}</span>
+                                                    <span className="text-gray-400 ml-1">(n = {filtered.length})</span>
+                                                </p>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </ChartCard>
+                        );
+                    })}
+                </div>
+            </Section>
+
+            {/* Boxplot: NLR/PLR/CAR vs CURB-65 (0-1 vs ≥2) */}
+            <Section title="Chỉ số viêm theo nhóm CURB-65">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {curb65BoxData.map(({ key, label, groups, pValue }) => {
+                        const hasData = groups.some(g => g.n > 0);
+                        const barData = groups.filter(g => g.n > 0);
+                        const fmtP = (p: number | null) => p === null ? '—' : p < 0.001 ? '< 0.001' : p.toFixed(3);
+                        const sigColor = pValue !== null && pValue < 0.05 ? 'text-green-600' : 'text-gray-500';
+                        return (
+                            <ChartCard key={key} title={`${label} theo CURB-65`}>
+                                {!hasData ? <EmptyChart msg="Chưa đủ dữ liệu CURB-65" /> : (
+                                    <>
+                                        {/* Box plot approximation: bar = median, lines = Q1/Q3, whiskers shown in tooltip */}
+                                        <ResponsiveContainer width="100%" height={220}>
+                                            <ComposedChart data={barData} margin={{ left: 10, right: 10, top: 25, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                                                <XAxis dataKey="group" tick={{ fontSize: 11 }} />
+                                                <YAxis tick={{ fontSize: 11 }} label={{ value: label, angle: -90, position: 'insideLeft', fontSize: 10 }} />
+                                                <Tooltip
+                                                    content={({ active, payload }) => {
+                                                        if (!active || !payload?.[0]) return null;
+                                                        const d = payload[0].payload;
+                                                        return (
+                                                            <div className="bg-white border border-gray-200 rounded-lg p-2.5 shadow text-xs space-y-0.5">
+                                                                <p className="font-semibold text-gray-800">{d.group} (n={d.n})</p>
+                                                                <p>Mean ± SD: {d.mean?.toFixed(2)} ± {d.sd?.toFixed(2)}</p>
+                                                                <p>Median: {d.median?.toFixed(2)}</p>
+                                                                <p>IQR: {d.q1?.toFixed(2)}–{d.q3?.toFixed(2)}</p>
+                                                                <p>Min–Max: {d.min?.toFixed(2)}–{d.max?.toFixed(2)}</p>
+                                                            </div>
+                                                        );
+                                                    }}
+                                                />
+                                                <Bar dataKey="median" fill="#0ea5e9" radius={[4, 4, 0, 0]} name="Median">
+                                                    {barData.map((_, i) => <Cell key={i} fill={i === 0 ? '#0d9488' : '#ef4444'} />)}
+                                                    <LabelList dataKey="n" position="top" fontSize={10} formatter={(v: unknown) => `n=${v}`} />
+                                                </Bar>
+                                                <Line type="monotone" dataKey="q3" stroke="#94a3b8" strokeDasharray="4 2" dot={{ r: 3, fill: '#94a3b8' }} name="Q3" />
+                                                <Line type="monotone" dataKey="q1" stroke="#94a3b8" strokeDasharray="4 2" dot={{ r: 3, fill: '#94a3b8' }} name="Q1" />
+                                                {/* Error bars: min and max as reference */}
+                                                <Line type="monotone" dataKey="max" stroke="#d1d5db" strokeDasharray="2 2" dot={{ r: 2, fill: '#d1d5db' }} name="Max" />
+                                                <Line type="monotone" dataKey="min" stroke="#d1d5db" strokeDasharray="2 2" dot={{ r: 2, fill: '#d1d5db' }} name="Min" />
+                                            </ComposedChart>
+                                        </ResponsiveContainer>
+                                        {/* Summary table */}
+                                        <div className="mt-2 overflow-x-auto">
+                                            <table className="w-full text-xs border-collapse">
+                                                <thead>
+                                                    <tr className="bg-gray-50">
+                                                        <th className="text-left p-1.5 border border-gray-200 font-semibold">Nhóm</th>
+                                                        <th className="text-center p-1.5 border border-gray-200 font-medium">n</th>
+                                                        <th className="text-center p-1.5 border border-gray-200 font-medium">Mean ± SD</th>
+                                                        <th className="text-center p-1.5 border border-gray-200 font-medium">Median (IQR)</th>
+                                                        <th className="text-center p-1.5 border border-gray-200 font-medium">Min–Max</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {groups.map(g => (
+                                                        <tr key={g.group} className="hover:bg-gray-50">
+                                                            <td className="p-1.5 border border-gray-200 font-medium">{g.group}</td>
+                                                            <td className="p-1.5 border border-gray-200 text-center">{g.n}</td>
+                                                            <td className="p-1.5 border border-gray-200 text-center">
+                                                                {g.mean !== null ? `${g.mean.toFixed(2)} ± ${g.sd?.toFixed(2)}` : '—'}
+                                                            </td>
+                                                            <td className="p-1.5 border border-gray-200 text-center">
+                                                                {g.median !== null ? `${g.median.toFixed(2)} (${g.q1?.toFixed(2)}–${g.q3?.toFixed(2)})` : '—'}
+                                                            </td>
+                                                            <td className="p-1.5 border border-gray-200 text-center">
+                                                                {g.min !== null ? `${g.min.toFixed(2)}–${g.max?.toFixed(2)}` : '—'}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                            <p className={`text-xs mt-1.5 font-medium ${sigColor}`}>
+                                                Mann-Whitney U: p = {fmtP(pValue)}
+                                                {pValue !== null && pValue < 0.05 && <span className="text-green-600 ml-1">✓ Có ý nghĩa thống kê</span>}
+                                                {pValue !== null && pValue >= 0.05 && <span className="text-gray-400 ml-1">✗ Không có ý nghĩa</span>}
+                                            </p>
+                                        </div>
+                                    </>
                                 )}
                             </ChartCard>
                         );
