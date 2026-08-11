@@ -17,13 +17,14 @@ import {
 import { mean, sd, median, q1, q3, meanSd, frac, psiClass, linearRegression } from '../utils/statsHelpers';
 import ExpectedResultsTab from '../components/analytics/ExpectedResultsTab';
 import CrosstabTab from '../components/analytics/CrosstabTab';
+import RegressionTab from '../components/analytics/RegressionTab';
 
 const COLORS = ['#0d9488', '#0ea5e9', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#10b981', '#f97316'];
 const PSI_COLORS: Record<string, string> = {
     I: '#22c55e', II: '#84cc16', III: '#f59e0b', IV: '#f97316', V: '#ef4444',
 };
 
-type Tab = 'overview' | 'micro' | 'biomarker' | 'expected' | 'crosstab';
+type Tab = 'overview' | 'micro' | 'biomarker' | 'expected' | 'crosstab' | 'regression';
 
 export default function AnalyticsPage() {
     const [patients, setPatients] = useState<Patient[]>([]);
@@ -80,6 +81,7 @@ export default function AnalyticsPage() {
         { key: 'biomarker', label: 'Biomarker (MT2)' },
         { key: 'expected', label: 'Dự kiến kết quả NC' },
         { key: 'crosstab', label: 'Bảng chéo (m×n)' },
+        { key: 'regression', label: 'Hồi quy' },
     ];
 
     return (
@@ -136,6 +138,7 @@ export default function AnalyticsPage() {
             {tab === 'biomarker' && <BiomarkerTab patients={enabledPatients} />}
             {tab === 'expected' && <ExpectedResultsTab patients={enabledPatients} drugGroup1={drugGroup1} drugGroup2={drugGroup2} />}
             {tab === 'crosstab' && <CrosstabTab patients={enabledPatients} />}
+            {tab === 'regression' && <RegressionTab patients={enabledPatients} />}
         </div>
     );
 }
