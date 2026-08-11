@@ -426,6 +426,7 @@ export function standardizedResiduals(observed: number[][], expected: number[][]
 
 /** Adjusted standardized residuals */
 export function adjustedStdResiduals(observed: number[][], expected: number[][]): number[][] {
+    const m = observed.length;
     const n = observed[0]?.length ?? 0;
     const rowTotals = observed.map(r => r.reduce((a, b) => a + b, 0));
     const colTotals = Array.from({ length: n }, (_, j) => observed.reduce((a, r) => a + r[j], 0));
