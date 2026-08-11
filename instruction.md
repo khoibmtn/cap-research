@@ -17,7 +17,13 @@
 
 Mở trình duyệt web (Chrome, Safari, Edge đều được), truy cập vào địa chỉ phần mềm. Nhập email và mật khẩu để đăng nhập.
 
-Sau khi vào, bạn sẽ thấy thanh menu bên trái với 3 mục chính: **Bệnh nhân**, **Thống kê**, và **Cài đặt**.
+Có 2 loại tài khoản:
+- **Admin** (`admin@capresearch.com`): Toàn quyền — thêm, sửa, xóa bệnh nhân và quản lý cài đặt.
+- **Advisor** (`advisor@capresearch.com`): Chỉ xem — có thể xem tất cả dữ liệu, thống kê, cài đặt nhưng không thể chỉnh sửa.
+
+> **Mẹo:** Khi nhập email, gõ "admin" hoặc "advisor" rồi nhấn Tab — phần mềm tự động điền đầy đủ email.
+
+Sau khi vào, bạn sẽ thấy thanh menu bên trái với 4 mục chính: **Danh sách nghiên cứu**, **Thống kê**, và **Cài đặt**. Góc dưới trái hiển thị tài khoản đang đăng nhập và vai trò (Admin/Advisor).
 
 Trên điện thoại, bấm vào biểu tượng ☰ ở góc trái để mở menu.
 
@@ -108,7 +114,9 @@ Nhập diễn biến điều trị (thở máy, sốc nhiễm khuẩn, lọc má
 
 ## Thống kê — Xem tổng quan nghiên cứu
 
-Trang Thống kê được chia thành **3 tab**, dữ liệu cập nhật tự động khi bạn thêm hoặc sửa bệnh nhân. Mỗi biểu đồ cột đều hiển thị số lượng (n) và tỷ lệ phần trăm (%) trên đỉnh cột.
+Trang Thống kê được chia thành **6 tab**, dữ liệu cập nhật tự động khi bạn thêm hoặc sửa bệnh nhân. Mỗi biểu đồ cột đều hiển thị số lượng (n) và tỷ lệ phần trăm (%) trên đỉnh cột.
+
+Phía trên cùng có banner cho biết đang thống kê trên bao nhiêu bệnh nhân (những BN bị loại khỏi thống kê sẽ được ghi chú riêng).
 
 ### Tab "Tổng quan"
 
@@ -140,6 +148,45 @@ Dành cho **Mục tiêu 2** — dấu ấn sinh học:
 - **Biểu đồ Biomarker theo phân tầng PSI:** 5 biểu đồ cột (1 cho mỗi biomarker), hiển thị giá trị median tăng dần theo PSI Class I → V, kèm đường Q1/Q3
 - **Biểu đồ NLR/PLR/CAR vs PSI:** 3 biểu đồ phân tán (scatter) thể hiện mối liên quan giữa chỉ số viêm và điểm PSI
 - **Biểu đồ tử vong theo PSI:** Biểu đồ cột xếp chồng (stacked) hiển thị số BN sống và tử vong ở mỗi nhóm PSI
+
+### Tab "Dự kiến kết quả NC"
+
+Hiển thị các bảng dự kiến kết quả nghiên cứu theo mẫu luận văn: so sánh nhóm bệnh nhân theo đặc điểm lâm sàng, xét nghiệm, vi sinh, và thuốc sử dụng.
+
+### Tab "Bảng chéo (m×n)"
+
+Phân tích bảng chéo (cross-tabulation) giữa 2 biến phân loại bất kỳ:
+
+- Chọn biến hàng và biến cột từ danh sách các biến trong dữ liệu
+- Hiển thị bảng tần số kèm tỷ lệ phần trăm
+- Tính kiểm định Chi-square (χ²) hoặc Fisher Exact Test tùy trường hợp
+- Kèm diễn giải kết quả bằng tiếng Việt
+
+### Tab "Hồi quy"
+
+Phân tích hồi quy logistic nhị phân và hồi quy tuyến tính — kết quả tương đương SPSS:
+
+**Cách sử dụng:**
+1. Chọn loại hồi quy: **Logistic nhị phân** (biến phụ thuộc Y là nhị phân 0/1) hoặc **Tuyến tính** (Y là biến liên tục)
+2. Chọn phương pháp: **Đơn biến** (chạy từng biến X riêng lẻ) hoặc **Đa biến** (tất cả biến X vào cùng 1 mô hình)
+3. Chọn **biến phụ thuộc (Y)** và **biến độc lập (X)** bằng cách bấm "Thêm biến" — phần mềm tự kiểm tra loại biến phù hợp (ví dụ: Logistic chỉ chấp nhận biến nhị phân làm Y)
+4. Bấm **"Chạy hồi quy"**
+
+**Kết quả hiển thị:**
+
+*Hồi quy Logistic:*
+- Omnibus Test, Model Summary (-2LL, Cox & Snell R², Nagelkerke R²)
+- Hosmer-Lemeshow Test (kiểm định độ phù hợp mô hình)
+- Bảng Variables in the Equation (B, S.E., Wald, Sig., Exp(B) tức OR, 95% CI)
+- Classification Table (độ nhạy, độ đặc hiệu, % phân loại đúng)
+- Diễn giải tự động bằng tiếng Việt
+
+*Hồi quy Tuyến tính:*
+- Model Summary (R, R², Adjusted R², Std. Error, Durbin-Watson)
+- Bảng ANOVA (SS, df, MS, F, Sig.)
+- Bảng Coefficients (B, Std. Error, Beta, t, Sig., 95% CI, VIF/Tolerance cho đa biến)
+- **Scatter plot + đường hồi quy + 95% CI** (cho phân tích đơn biến)
+- Diễn giải tự động bằng tiếng Việt
 
 ---
 
