@@ -13,7 +13,7 @@ import {
     formatPValue,
     interpretCramersV, interpretOR, interpretChiSquare,
 } from '../../utils/statisticalTests';
-import { Plus, X, Table2, AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import { Plus, X, Table2, AlertTriangle, CheckCircle, Info, ArrowUpDown, ArrowLeftRight } from 'lucide-react';
 
 // ====================================================================
 // VARIABLE DEFINITIONS
@@ -88,6 +88,8 @@ export default function CrosstabTab({ patients }: { patients: Patient[] }) {
     const [showAddMenu, setShowAddMenu] = useState(false);
     const [showExpected, setShowExpected] = useState(false);
     const [showResiduals, setShowResiduals] = useState(false);
+    const [rowFlipped, setRowFlipped] = useState(false);
+    const [colFlipped, setColFlipped] = useState(false);
 
     // All available variables (default + user-added)
     const allVars = useMemo(() => {
@@ -124,12 +126,15 @@ export default function CrosstabTab({ patients }: { patients: Patient[] }) {
 
         if (data.length < 2) return null;
 
-        // Get unique labels (preserve natural order)
+        // Get unique labels — auto-sort: positive/exposure first (SPSS convention)
         const rowLabelsSet = new Set<string>();
         const colLabelsSet = new Set<string>();
         data.forEach(d => { rowLabelsSet.add(d.row); colLabelsSet.add(d.col); });
-        const rowLabels = Array.from(rowLabelsSet);
-        const colLabels = Array.from(colLabelsSet);
+        const rowLabelsRaw = sortPositiveFirst(Array.from(rowLabelsSet));
+        const colLabelsRaw = sortPositiveFirst(Array.from(colLabelsSet));
+        // Apply manual flip if user toggled
+        const rowLabels = rowFlipped ? [...rowLabelsRaw].reverse() : rowLabelsRaw;
+        const colLabels = colFlipped ? [...colLabelsRaw].reverse() : colLabelsRaw;
 
         if (rowLabels.length < 2 || colLabels.length < 2) return null;
 
@@ -177,7 +182,7 @@ export default function CrosstabTab({ patients }: { patients: Patient[] }) {
             stdRes, adjRes,
             is2x2, m, n, validN: data.length,
         };
-    }, [rowVar, colVar, rowVarId, colVarId, patients]);
+    }, [rowVar, colVar, rowVarId, colVarId, patients, rowFlipped, colFlipped]);
 
     const fmtP = (p: number | null | undefined) => formatPValue(p);
     const fmtN = (n: number) => n.toFixed(2);
@@ -316,7 +321,7 @@ export default function CrosstabTab({ patients }: { patients: Patient[] }) {
             {/* RESULTS */}
             {analysis && (
                 <div className="space-y-6">
-                    {/* Table header info */}
+                    {/* Table header info + reorder buttons */}
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                         <span className="font-semibold">{rowVar!.label}</span>
                         <span>×</span>
@@ -324,7 +329,25 @@ export default function CrosstabTab({ patients }: { patients: Patient[] }) {
                         <span className="text-gray-400 ml-2">
                             ({analysis.m}×{analysis.n} | N = {analysis.validN})
                         </span>
+                        <span className="mx-1 text-gray-300">|</span>
+                        <button
+                            onClick={() => setRowFlipped(f => !f)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded border border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                            title="Đảo thứ tự hàng"
+                        >
+                            <ArrowUpDown className="w-3 h-3" /> Hàng
+                        </button>
+                        <button
+                            onClick={() => setColFlipped(f => !f)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded border border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                            title="Đảo thứ tự cột"
+                        >
+                            <ArrowLeftRight className="w-3 h-3" /> Cột
+                        </button>
                     </div>
+                    <p className="text-[10px] text-gray-400 -mt-4">
+                        Mặc định: Có/Dương tính ở trên-trái (SPSS convention). Bấm nút ↕↔ để đảo.
+                    </p>
 
                     {/* Observed contingency table */}
                     <div className="overflow-x-auto">
@@ -683,4 +706,22 @@ function groupVars(vars: CategoricalVar[]): Record<string, CategoricalVar[]> {
         groups[v.group].push(v);
     }
     return groups;
+}
+
+/**
+ * Sort labels so positive/exposure values come first (top-left of table).
+ * SPSS convention: 0 = Có (positive/exposed), 1 = Không (negative/unexposed).
+ * This ensures OR/RR are calculated correctly with disease+exposure in cell [0,0].
+ */
+const POSITIVE_FIRST = ['Có', 'Dương tính', 'Nam', '≥2', '≥65', 'Nặng (III–V)', 'Nặng (3–5)'];
+const NEGATIVE_LAST = ['Không', 'Âm tính', 'Nữ', '0–1', '<65', 'Nhẹ (I–II)', 'Nhẹ (0–1)'];
+
+function sortPositiveFirst(labels: string[]): string[] {
+    return [...labels].sort((a, b) => {
+        const aPos = POSITIVE_FIRST.includes(a) ? -1 : NEGATIVE_LAST.includes(a) ? 1 : 0;
+        const bPos = POSITIVE_FIRST.includes(b) ? -1 : NEGATIVE_LAST.includes(b) ? 1 : 0;
+        if (aPos !== bPos) return aPos - bPos;
+        // For multi-level (e.g. PSI Class), keep natural order
+        return a.localeCompare(b, 'vi');
+    });
 }
