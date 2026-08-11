@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { ChevronLeft, ChevronRight, Save, Loader2, Edit, ArrowLeft, Printer, Trash2, XCircle } from 'lucide-react';
 import { patientService } from '../services/patientService';
 import { settingsService } from '../services/settingsService';
@@ -41,6 +42,8 @@ export default function PatientFormPage() {
     const location = useLocation();
     const isEdit = !!id && id !== 'new';
     const readOnly = isEdit && !location.pathname.endsWith('/edit');
+    const { role } = useAuth();
+    const isAdvisor = role === 'advisor';
 
     const [currentStep, setCurrentStep] = useState(0);
     const [formData, setFormData] = useState<FormData>(createDefaultPatient());
@@ -567,6 +570,8 @@ export default function PatientFormPage() {
                                 <Printer className="w-4 h-4" />
                                 In BANC
                             </button>
+                            {!isAdvisor && (
+                            <>
                             <button
                                 onClick={() => navigate(`/patient/${id}/edit`)}
                                 className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 transition-colors shadow-sm"
@@ -582,6 +587,8 @@ export default function PatientFormPage() {
                                 <Trash2 className="w-4 h-4" />
                                 Xóa
                             </button>
+                            </>
+                            )}
                         </div>
                     )}
                     {(!readOnly && isEdit || !isEdit) && (

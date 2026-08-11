@@ -737,6 +737,7 @@ function migrateSpssConfigEncoding(config: SpssVarConfig): SpssVarConfig {
 // ─── Settings Page ───────────────────────────────────────────────────
 export default function SettingsPage() {
     const { role } = useAuth();
+    const isAdvisor = role === 'advisor';
     const [activeTab, setActiveTab] = useState<TabKey>('hanhchinh');
 
     // Hành chính tab
@@ -1101,6 +1102,17 @@ export default function SettingsPage() {
                     </button>
                 ))}
             </div>
+
+            {/* Read-only banner for advisor */}
+            {isAdvisor && (
+                <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2">
+                    <span className="text-amber-600 text-lg">🔒</span>
+                    <p className="text-sm text-amber-800 font-medium">Chế độ chỉ xem — Tài khoản Advisor không có quyền chỉnh sửa cài đặt.</p>
+                </div>
+            )}
+
+            {/* Tab content — read-only wrapper for advisor */}
+            <div className={isAdvisor ? 'pointer-events-none opacity-80 select-text' : ''}>
 
             {/* ══════════════ TAB 1: Hành chính ══════════════ */}
             {activeTab === 'hanhchinh' && (
@@ -2664,6 +2676,8 @@ function BackupTab({
                     onCancel={() => setRestoreTarget(null)}
                 />
             )}
+
+            </div>{/* end advisor read-only wrapper */}
         </div>
     );
 }
