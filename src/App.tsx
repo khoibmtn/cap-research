@@ -59,7 +59,7 @@ function AppRoutes() {
         <Route path="/patient/:id" element={<PatientFormPage />} />
         <Route path="/patient/:id/edit" element={role === 'advisor' ? <Navigate to="/" replace /> : <PatientFormPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

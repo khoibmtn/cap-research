@@ -115,9 +115,8 @@ export default function AppLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [showPwModal, setShowPwModal] = useState(false);
 
-    const navItems = role === 'advisor'
-        ? NAV_ITEMS.filter(item => item.to !== '/settings')
-        : NAV_ITEMS;
+    // All nav items visible for all roles (Settings is read-only for advisor)
+    const navItems = NAV_ITEMS;
 
     const handleLogout = async () => {
         await logout();
@@ -169,7 +168,7 @@ export default function AppLayout() {
                         </button>
                     </div>
                     <p className="px-6 pb-2 text-[10px] text-gray-400 leading-tight truncate">
-                        Cập nhật 11/08/2026 22:33 — Advisor account
+                        Cập nhật 12/08/2026 02:54 — Advisor read-only fix
                     </p>
                 </div>
 
