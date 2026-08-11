@@ -479,6 +479,7 @@ function normalCDF(z: number): number {
 // TAB 3: BIOMARKER (MT2)
 // ====================================================================
 function BiomarkerTab({ patients }: { patients: Patient[] }) {
+    const [psiIsX, setPsiIsX] = useState(true); // true = PSI on X-axis (independent), false = PSI on Y-axis (dependent)
     const markers = useMemo(() => {
         const classes = ['I', 'II', 'III', 'IV', 'V'];
         const extract = (key: 'sTREM1' | 'tIMP1' | 'il6' | 'il10' | 'il17') => {
@@ -522,13 +523,14 @@ function BiomarkerTab({ patients }: { patients: Patient[] }) {
             }));
     }, [patients]);
 
-    // Regression models for scatter plots
+    // Regression models for scatter plots (direction depends on psiIsX)
     const regressionModels = useMemo(() => {
         const calc = (key: 'nlr' | 'plr' | 'car') => {
             const valid = scatterData.filter(d => d[key] !== null);
             if (valid.length < 3) return null;
-            const xs = valid.map(d => d.psi);
-            const ys = valid.map(d => d[key] as number);
+            // If psiIsX: x=PSI, y=marker; else x=marker, y=PSI
+            const xs = psiIsX ? valid.map(d => d.psi) : valid.map(d => d[key] as number);
+            const ys = psiIsX ? valid.map(d => d[key] as number) : valid.map(d => d.psi);
             const reg = linearRegression(xs, ys);
             if (!reg) return null;
             const minX = Math.min(...xs);
@@ -536,7 +538,7 @@ function BiomarkerTab({ patients }: { patients: Patient[] }) {
             return { ...reg, minX, maxX };
         };
         return { nlr: calc('nlr'), plr: calc('plr'), car: calc('car') };
-    }, [scatterData]);
+    }, [scatterData, psiIsX]);
 
     // CURB-65 boxplot data: 2 groups (0-1 vs ≥2)
     const curb65BoxData = useMemo(() => {
@@ -681,6 +683,32 @@ function BiomarkerTab({ patients }: { patients: Patient[] }) {
 
             {/* Scatter: NLR/PLR/CAR vs PSI with Regression Line */}
             <Section title="Hồi quy tuyến tính: Chỉ số viêm vs PSI Score">
+                {/* Toggle: PSI as X (independent) or Y (dependent) */}
+                <div className="flex items-center gap-2 mb-4">
+                    <span className="text-xs text-gray-500">Biến độc lập (trục X):</span>
+                    <div className="inline-flex rounded-lg border border-gray-200 bg-gray-100 p-0.5">
+                        <button
+                            onClick={() => setPsiIsX(true)}
+                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                                psiIsX
+                                    ? 'bg-white text-primary-700 shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            PSI Score
+                        </button>
+                        <button
+                            onClick={() => setPsiIsX(false)}
+                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                                !psiIsX
+                                    ? 'bg-white text-primary-700 shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            Chỉ số viêm
+                        </button>
+                    </div>
+                </div>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     {([
                         { key: 'nlr' as const, label: 'NLR', color: '#0d9488' },
@@ -689,23 +717,32 @@ function BiomarkerTab({ patients }: { patients: Patient[] }) {
                     ]).map(({ key, label, color }) => {
                         const filtered = scatterData.filter(d => d[key] !== null).map(d => ({ ...d, val: d[key] as number }));
                         const reg = regressionModels[key];
+                        // Axis labels based on direction
+                        const xLabel = psiIsX ? 'PSI Score' : label;
+                        const yLabel = psiIsX ? label : 'PSI Score';
+                        const xDataKey = psiIsX ? 'psi' : 'val';
+                        const yDataKey = psiIsX ? 'val' : 'psi';
+                        // Dependent variable name for equation
+                        const depLabel = psiIsX ? label : 'PSI';
+                        const indLabel = psiIsX ? 'PSI' : label;
                         // Generate regression line data points
                         const regLineData = reg ? [
-                            { psi: reg.minX, val: reg.slope * reg.minX + reg.intercept },
-                            { psi: reg.maxX, val: reg.slope * reg.maxX + reg.intercept },
+                            { [xDataKey]: reg.minX, [yDataKey]: reg.slope * reg.minX + reg.intercept },
+                            { [xDataKey]: reg.maxX, [yDataKey]: reg.slope * reg.maxX + reg.intercept },
                         ] : [];
                         const fmtP = (p: number) => p < 0.001 ? '< 0.001' : p.toFixed(3);
                         const sigIcon = reg && reg.pValue < 0.05 ? '✓' : '✗';
                         const sigColor = reg && reg.pValue < 0.05 ? 'text-green-600' : 'text-red-500';
+                        const chartTitle = psiIsX ? `${label} vs PSI Score` : `PSI Score vs ${label}`;
                         return (
-                            <ChartCard key={key} title={`${label} vs PSI Score`}>
+                            <ChartCard key={key} title={chartTitle}>
                                 {filtered.length === 0 ? <EmptyChart msg="Chưa đủ dữ liệu" /> : (
                                     <>
                                         <ResponsiveContainer width="100%" height={220}>
                                             <ScatterChart margin={{ left: 0, right: 10, bottom: 5 }}>
                                                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                                                <XAxis dataKey="psi" type="number" name="PSI Score" domain={['auto', 'auto']} tick={{ fontSize: 11 }} label={{ value: 'PSI Score', position: 'bottom', fontSize: 10 }} />
-                                                <YAxis dataKey="val" name={label} tick={{ fontSize: 11 }} label={{ value: label, angle: -90, position: 'insideLeft', fontSize: 10 }} />
+                                                <XAxis dataKey={xDataKey} type="number" name={xLabel} domain={['auto', 'auto']} tick={{ fontSize: 11 }} label={{ value: xLabel, position: 'bottom', fontSize: 10 }} />
+                                                <YAxis dataKey={yDataKey} type="number" name={yLabel} tick={{ fontSize: 11 }} label={{ value: yLabel, angle: -90, position: 'insideLeft', fontSize: 10 }} />
                                                 <Tooltip
                                                     cursor={{ strokeDasharray: '3 3' }}
                                                     content={({ active, payload }) => {
@@ -738,7 +775,7 @@ function BiomarkerTab({ patients }: { patients: Patient[] }) {
                                         {reg && (
                                             <div className="mt-2 px-2 py-1.5 bg-gray-50 rounded-lg text-xs space-y-0.5">
                                                 <p className="font-mono text-gray-700">
-                                                    <span className="font-semibold">{label}</span> = {reg.slope >= 0 ? '' : '−'}{Math.abs(reg.slope).toFixed(4)} × PSI {reg.intercept >= 0 ? '+' : '−'} {Math.abs(reg.intercept).toFixed(2)}
+                                                    <span className="font-semibold">{depLabel}</span> = {reg.slope >= 0 ? '' : '−'}{Math.abs(reg.slope).toFixed(4)} × {indLabel} {reg.intercept >= 0 ? '+' : '−'} {Math.abs(reg.intercept).toFixed(2)}
                                                 </p>
                                                 <p className="text-gray-500">
                                                     R² = {reg.r2.toFixed(4)} | <span className={`font-semibold ${sigColor}`}>p = {fmtP(reg.pValue)} {sigIcon}</span>
