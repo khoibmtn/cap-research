@@ -217,3 +217,287 @@ export function cohensKappa(a: boolean[], b: boolean[]): { kappa: number; interp
     return { kappa: Math.max(-1, Math.min(1, kappa)), interpretation };
 }
 
+// ═══════════════════════════════════════════════════════
+// CROSSTAB / CONTINGENCY TABLE ANALYSIS
+// ═══════════════════════════════════════════════════════
+
+/** Chi-square test for independence on m×n table */
+export function chiSquareTest(observed: number[][]): {
+    chiSq: number; df: number; p: number;
+    expected: number[][]; valid: boolean; warning: string | null;
+} {
+    const m = observed.length;
+    const n = observed[0]?.length ?? 0;
+    const rowTotals = observed.map(r => r.reduce((a, b) => a + b, 0));
+    const colTotals = Array.from({ length: n }, (_, j) => observed.reduce((a, r) => a + r[j], 0));
+    const total = rowTotals.reduce((a, b) => a + b, 0);
+
+    if (total === 0) return { chiSq: 0, df: 0, p: 1, expected: [], valid: false, warning: 'Không có dữ liệu' };
+
+    const expected = observed.map((row, i) =>
+        row.map((_, j) => (rowTotals[i] * colTotals[j]) / total)
+    );
+
+    let chiSq = 0;
+    let lowExpected = 0;
+    for (let i = 0; i < m; i++) {
+        for (let j = 0; j < n; j++) {
+            const e = expected[i][j];
+            if (e > 0) {
+                chiSq += ((observed[i][j] - e) ** 2) / e;
+            }
+            if (e < 5) lowExpected++;
+        }
+    }
+
+    const df = (m - 1) * (n - 1);
+    const p = chiSquarePValue(chiSq, df);
+
+    const totalCells = m * n;
+    let warning: string | null = null;
+    if (lowExpected > 0) {
+        const pct = ((lowExpected / totalCells) * 100).toFixed(0);
+        warning = `${lowExpected}/${totalCells} ô (${pct}%) có tần suất kỳ vọng < 5. Kết quả Chi-square có thể không chính xác.`;
+    }
+
+    return { chiSq, df, p, expected, valid: df > 0, warning };
+}
+
+/** Likelihood Ratio test (G²) */
+export function likelihoodRatioTest(observed: number[][]): { g2: number; df: number; p: number } {
+    const m = observed.length;
+    const n = observed[0]?.length ?? 0;
+    const rowTotals = observed.map(r => r.reduce((a, b) => a + b, 0));
+    const colTotals = Array.from({ length: n }, (_, j) => observed.reduce((a, r) => a + r[j], 0));
+    const total = rowTotals.reduce((a, b) => a + b, 0);
+    if (total === 0) return { g2: 0, df: 0, p: 1 };
+
+    let g2 = 0;
+    for (let i = 0; i < m; i++) {
+        for (let j = 0; j < n; j++) {
+            const o = observed[i][j];
+            const e = (rowTotals[i] * colTotals[j]) / total;
+            if (o > 0 && e > 0) {
+                g2 += 2 * o * Math.log(o / e);
+            }
+        }
+    }
+
+    const df = (m - 1) * (n - 1);
+    return { g2, df, p: chiSquarePValue(g2, df) };
+}
+
+/** Yates' corrected Chi-square (2×2 only) */
+export function yatesCorrectedChiSquare(table: number[][]): { chiSq: number; p: number } | null {
+    if (table.length !== 2 || table[0].length !== 2) return null;
+    const a = table[0][0], b = table[0][1], c = table[1][0], d = table[1][1];
+    const n = a + b + c + d;
+    if (n === 0) return null;
+
+    const num = Math.max(0, Math.abs(a * d - b * c) - n / 2) ** 2 * n;
+    const denom = (a + b) * (c + d) * (a + c) * (b + d);
+    if (denom === 0) return null;
+
+    const chiSq = num / denom;
+    return { chiSq, p: chiSquarePValue(chiSq, 1) };
+}
+
+/** Fisher's exact test (2×2 only, using hypergeometric) */
+export function fisherExactTest(table: number[][]): { p: number } | null {
+    if (table.length !== 2 || table[0].length !== 2) return null;
+    const a = table[0][0], b = table[0][1], c = table[1][0], d = table[1][1];
+    const n = a + b + c + d;
+    if (n === 0) return null;
+    const r1 = a + b, c1 = a + c;
+    const r2 = c + d;
+
+    const logHyp = (x: number) => {
+        return lnFact(r1) + lnFact(r2) + lnFact(c1) + lnFact(n - c1)
+            - lnFact(n) - lnFact(x) - lnFact(r1 - x)
+            - lnFact(c1 - x) - lnFact(r2 - c1 + x);
+    };
+
+    const pObs = Math.exp(logHyp(a));
+    let pValue = 0;
+    const minA = Math.max(0, c1 - r2);
+    const maxA = Math.min(r1, c1);
+    for (let x = minA; x <= maxA; x++) {
+        const px = Math.exp(logHyp(x));
+        if (px <= pObs + 1e-10) pValue += px;
+    }
+
+    return { p: Math.min(1, Math.max(0, pValue)) };
+}
+
+function lnFact(n: number): number {
+    if (n <= 1) return 0;
+    return logGamma(n + 1);
+}
+
+/** Effect sizes */
+export function phiCoefficient(chiSq: number, n: number): number {
+    return n > 0 ? Math.sqrt(chiSq / n) : 0;
+}
+
+export function cramersV(chiSq: number, n: number, minDim: number): number {
+    if (n <= 0 || minDim <= 1) return 0;
+    return Math.sqrt(chiSq / (n * (minDim - 1)));
+}
+
+export function contingencyCoefficient(chiSq: number, n: number): number {
+    return n > 0 ? Math.sqrt(chiSq / (chiSq + n)) : 0;
+}
+
+/** Odds Ratio with 95% CI (2×2 only) */
+export function oddsRatio(table: number[][]): { or: number; ci: [number, number]; p: number } | null {
+    if (table.length !== 2 || table[0].length !== 2) return null;
+    const a = table[0][0], b = table[0][1], c = table[1][0], d = table[1][1];
+    // Haldane-Anscombe correction if zero cell
+    const hasZero = a === 0 || b === 0 || c === 0 || d === 0;
+    const a2 = hasZero ? a + 0.5 : a;
+    const b2 = hasZero ? b + 0.5 : b;
+    const c2 = hasZero ? c + 0.5 : c;
+    const d2 = hasZero ? d + 0.5 : d;
+    const or = (a2 * d2) / (b2 * c2);
+    const se = Math.sqrt(1 / a2 + 1 / b2 + 1 / c2 + 1 / d2);
+    const lnOR = Math.log(or);
+    return {
+        or,
+        ci: [Math.exp(lnOR - 1.96 * se), Math.exp(lnOR + 1.96 * se)],
+        p: 2 * (1 - normalCDF(Math.abs(lnOR / se))),
+    };
+}
+
+/** Relative Risk with 95% CI (2×2 only) */
+export function relativeRisk(table: number[][]): { rr: number; ci: [number, number]; p: number } | null {
+    if (table.length !== 2 || table[0].length !== 2) return null;
+    const a = table[0][0], b = table[0][1], c = table[1][0], d = table[1][1];
+    const r1 = a + b, r2 = c + d;
+    if (r1 === 0 || r2 === 0) return null;
+    const p1 = a / r1, p2 = c / r2;
+    if (p2 === 0) return null;
+    const rr = p1 / p2;
+    const se = Math.sqrt((1 - p1) / (a || 0.5) + (1 - p2) / (c || 0.5));
+    const lnRR = Math.log(rr);
+    return {
+        rr,
+        ci: [Math.exp(lnRR - 1.96 * se), Math.exp(lnRR + 1.96 * se)],
+        p: 2 * (1 - normalCDF(Math.abs(lnRR / se))),
+    };
+}
+
+/** Diagnostic metrics for 2×2 (Se, Sp, PPV, NPV) with Wilson CI */
+export function diagnosticMetrics(table: number[][]): {
+    sensitivity: { value: number; ci: [number, number] };
+    specificity: { value: number; ci: [number, number] };
+    ppv: { value: number; ci: [number, number] };
+    npv: { value: number; ci: [number, number] };
+} | null {
+    if (table.length !== 2 || table[0].length !== 2) return null;
+    const a = table[0][0], b = table[0][1], c = table[1][0], d = table[1][1];
+
+    const wilsonCI = (x: number, n: number): [number, number] => {
+        if (n === 0) return [0, 1];
+        const z = 1.96;
+        const p = x / n;
+        const denom = 1 + z * z / n;
+        const center = (p + z * z / (2 * n)) / denom;
+        const margin = (z / denom) * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n));
+        return [Math.max(0, center - margin), Math.min(1, center + margin)];
+    };
+
+    return {
+        sensitivity: { value: (a + c) > 0 ? a / (a + c) : 0, ci: wilsonCI(a, a + c) },
+        specificity: { value: (b + d) > 0 ? d / (b + d) : 0, ci: wilsonCI(d, b + d) },
+        ppv: { value: (a + b) > 0 ? a / (a + b) : 0, ci: wilsonCI(a, a + b) },
+        npv: { value: (c + d) > 0 ? d / (c + d) : 0, ci: wilsonCI(d, c + d) },
+    };
+}
+
+/** Standardized residuals */
+export function standardizedResiduals(observed: number[][], expected: number[][]): number[][] {
+    return observed.map((row, i) =>
+        row.map((o, j) => {
+            const e = expected[i][j];
+            return e > 0 ? (o - e) / Math.sqrt(e) : 0;
+        })
+    );
+}
+
+/** Adjusted standardized residuals */
+export function adjustedStdResiduals(observed: number[][], expected: number[][]): number[][] {
+    const m = observed.length;
+    const n = observed[0]?.length ?? 0;
+    const rowTotals = observed.map(r => r.reduce((a, b) => a + b, 0));
+    const colTotals = Array.from({ length: n }, (_, j) => observed.reduce((a, r) => a + r[j], 0));
+    const total = rowTotals.reduce((a, b) => a + b, 0);
+    if (total === 0) return observed.map(r => r.map(() => 0));
+
+    return observed.map((row, i) =>
+        row.map((o, j) => {
+            const e = expected[i][j];
+            if (e <= 0) return 0;
+            const pi = rowTotals[i] / total;
+            const pj = colTotals[j] / total;
+            const v = e * (1 - pi) * (1 - pj);
+            return v > 0 ? (o - e) / Math.sqrt(v) : 0;
+        })
+    );
+}
+
+/** Linear-by-Linear association (for ordinal variables) */
+export function linearByLinear(observed: number[][]): { chiSq: number; p: number } | null {
+    const m = observed.length;
+    const n = observed[0]?.length ?? 0;
+    const total = observed.reduce((s, r) => s + r.reduce((a, b) => a + b, 0), 0);
+    if (total <= 1) return null;
+
+    let sumXY = 0, sumX = 0, sumY = 0, sumX2 = 0, sumY2 = 0;
+    for (let i = 0; i < m; i++) {
+        for (let j = 0; j < n; j++) {
+            const f = observed[i][j];
+            sumXY += f * i * j;
+            sumX += f * i;
+            sumY += f * j;
+            sumX2 += f * i * i;
+            sumY2 += f * j * j;
+        }
+    }
+
+    const denom = (total * sumX2 - sumX * sumX) * (total * sumY2 - sumY * sumY);
+    if (denom <= 0) return null;
+    const r = (total * sumXY - sumX * sumY) / Math.sqrt(denom);
+
+    if (isNaN(r) || !isFinite(r)) return null;
+    const chiSq = (total - 1) * r * r;
+    return { chiSq, p: chiSquarePValue(chiSq, 1) };
+}
+
+// ═══════════════════════════════════════════════════════
+// INTERPRETATION HELPERS
+// ═══════════════════════════════════════════════════════
+
+export function interpretCramersV(v: number): string {
+    if (v < 0.1) return 'Rất yếu (negligible)';
+    if (v < 0.3) return 'Yếu (weak)';
+    if (v < 0.5) return 'Trung bình (moderate)';
+    return 'Mạnh (strong)';
+}
+
+export function interpretOR(or: number, ci: [number, number]): string {
+    if (ci[0] <= 1 && ci[1] >= 1) {
+        return `OR = ${or.toFixed(2)} — KTC 95% chứa 1 → Không có ý nghĩa thống kê.`;
+    }
+    if (or > 1) {
+        return `OR = ${or.toFixed(2)} > 1 — Nhóm phơi nhiễm có nguy cơ cao hơn ${or.toFixed(1)} lần.`;
+    }
+    return `OR = ${or.toFixed(2)} < 1 — Nhóm phơi nhiễm có nguy cơ thấp hơn (yếu tố bảo vệ).`;
+}
+
+export function interpretChiSquare(p: number, df: number): string {
+    if (p < 0.001) return `p < 0.001 — Có sự khác biệt rất có ý nghĩa thống kê (df = ${df}).`;
+    if (p < 0.01) return `p = ${p.toFixed(3)} — Có sự khác biệt có ý nghĩa thống kê cao (df = ${df}).`;
+    if (p < 0.05) return `p = ${p.toFixed(3)} — Có sự khác biệt có ý nghĩa thống kê (df = ${df}).`;
+    if (p < 0.1) return `p = ${p.toFixed(3)} — Xu hướng khác biệt, nhưng chưa đạt ý nghĩa thống kê (df = ${df}).`;
+    return `p = ${p.toFixed(3)} — Không có sự khác biệt có ý nghĩa thống kê (df = ${df}).`;
+}
