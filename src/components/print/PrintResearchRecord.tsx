@@ -14,6 +14,7 @@ interface PrintSettings {
     signLeft: string;
     signRight: string;
     showPsiLevel: boolean;
+    fieldVisibility?: Record<string, boolean>;
 }
 
 interface Props {
@@ -48,7 +49,14 @@ function loadList(key: string, defaults: string[]): string[] {
         const raw = localStorage.getItem(key);
         if (raw) {
             const p = JSON.parse(raw);
-            if (Array.isArray(p) && p.length > 0) return p;
+            if (Array.isArray(p) && p.length > 0) {
+                if (key === 'cap_tinh_trang_ra_vien') {
+                    const filtered = (p as string[]).filter(x => x !== 'Chuyển tuyến trên' && x !== 'Chuyển tuyến dưới');
+                    if (!filtered.includes('Chuyển tuyến')) filtered.push('Chuyển tuyến');
+                    return filtered;
+                }
+                return p;
+            }
         }
     } catch { /* ignore */ }
     return defaults;
@@ -120,6 +128,13 @@ function PatientRecord({ patient: p, settings }: { patient: Patient; settings: P
     const soNgayDieuTri = countDays(hc.ngayVaoVien, hc.ngayRaVien);
     const soNgayKS = countDays(kc.ngayBatDauKhangSinh, kc.ngayKetThucKhangSinh);
 
+    const isVis = (key: string, parentKey?: string) => {
+        if (parentKey && settings.fieldVisibility && settings.fieldVisibility[parentKey] === false) {
+            return false;
+        }
+        return settings.fieldVisibility ? settings.fieldVisibility[key] !== false : true;
+    };
+
     return (
         <div className="print-record">
             {/* ══════ HEADER ══════ */}
@@ -136,322 +151,416 @@ function PatientRecord({ patient: p, settings }: { patient: Patient; settings: P
             </div>
 
             {/* ══════ A. HÀNH CHÍNH ══════ */}
-            <div className="print-section">
-                <h2>A. HÀNH CHÍNH</h2>
-                <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 4 }}>
-                    <span>Họ và tên: {dotFill(hc.hoTen)}</span>
-                    <span style={{ marginLeft: 'auto', whiteSpace: 'nowrap', paddingLeft: 16 }}>Tuổi: {dotFill(hc.tuoi)}</span>
-                    <span style={{ whiteSpace: 'nowrap', paddingLeft: 16 }}>Giới: {dotFill(hc.gioiTinh === 'nam' ? 'Nam' : hc.gioiTinh === 'nu' ? 'Nữ' : '')}</span>
+            {(isVis('hc_hoTen') || isVis('hc_tuoi') || isVis('hc_gioiTinh') || isVis('hc_ngheNghiep') || isVis('hc_diaChi') || isVis('hc_noiO') || isVis('hc_ngayVaoVien') || isVis('hc_ngayRaVien') || isVis('hc_maBenhAnNoiTru')) && (
+                <div className="print-section">
+                    <h2>A. HÀNH CHÍNH</h2>
+                    {(isVis('hc_hoTen') || isVis('hc_tuoi') || isVis('hc_gioiTinh')) && (
+                        <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 4 }}>
+                            {isVis('hc_hoTen') && <span>Họ và tên: {dotFill(hc.hoTen)}</span>}
+                            {isVis('hc_tuoi') && <span style={{ marginLeft: 'auto', whiteSpace: 'nowrap', paddingLeft: 16 }}>Tuổi: {dotFill(hc.tuoi)}</span>}
+                            {isVis('hc_gioiTinh') && <span style={{ whiteSpace: 'nowrap', paddingLeft: 16 }}>Giới: {dotFill(hc.gioiTinh === 'nam' ? 'Nam' : hc.gioiTinh === 'nu' ? 'Nữ' : '')}</span>}
+                        </div>
+                    )}
+                    {isVis('hc_ngheNghiep') && <div>Nghề nghiệp: {dotFill(hc.ngheNghiep)}</div>}
+                    {(isVis('hc_diaChi') || isVis('hc_noiO')) && (
+                        <div className="print-row">
+                            {isVis('hc_diaChi') ? <div>Địa chỉ: {dotFill([hc.diaChiXaPhuong, hc.diaChiTinhThanh].filter(Boolean).join(', '))}</div> : <div />}
+                            {isVis('hc_noiO') ? <div>Nơi ở: {dotFill(hc.noiO)}</div> : <div />}
+                        </div>
+                    )}
+                    {(isVis('hc_ngayVaoVien') || isVis('hc_ngayRaVien')) && (
+                        <div className="print-row">
+                            {isVis('hc_ngayVaoVien') ? <div>Ngày vào viện: {dotFill(formatDate(hc.ngayVaoVien))}</div> : <div />}
+                            {isVis('hc_ngayRaVien') ? <div>Ngày ra viện: {dotFill(formatDate(hc.ngayRaVien))}</div> : <div />}
+                        </div>
+                    )}
+                    {isVis('hc_maBenhAnNoiTru') && <div>Mã bệnh án nội trú: {dotFill(p.maBenhAnNoiTru)}</div>}
                 </div>
-                <div>Nghề nghiệp: {dotFill(hc.ngheNghiep)}</div>
-                <div className="print-row">
-                    <div>Địa chỉ: {dotFill([hc.diaChiXaPhuong, hc.diaChiTinhThanh].filter(Boolean).join(', '))}</div>
-                    <div>Nơi ở: {dotFill(hc.noiO)}</div>
-                </div>
-                <div className="print-row">
-                    <div>Ngày vào viện: {dotFill(formatDate(hc.ngayVaoVien))}</div>
-                    <div>Ngày ra viện: {dotFill(formatDate(hc.ngayRaVien))}</div>
-                </div>
-                <div>Mã bệnh án nội trú: {dotFill(p.maBenhAnNoiTru)}</div>
-            </div>
+            )}
 
             {/* ══════ B. TIỀN SỬ ══════ */}
-            <div className="print-section">
-                <h2>B. TIỀN SỬ</h2>
-                <div className="print-flex-row">
-                    <span className="print-checkbox-item">{CB(ts.daiThaoDuong)} Đái tháo đường</span>
-                    <span className="print-checkbox-item">{CB(ts.tangHuyetAp)} Tăng huyết áp</span>
-                    <span className="print-checkbox-item">{CB(ts.viemDaDay)} Viêm dạ dày</span>
-                </div>
-                <div className="print-flex-row">
-                    <span className="print-checkbox-item">{CB(ts.viemGanMan)} Viêm gan mạn</span>
-                    <span className="print-checkbox-item">{CB(ts.benhThanMan)} Bệnh thận mạn</span>
-                    <span className="print-checkbox-item">{CB(ts.gut)} Gút</span>
-                </div>
-                <div className="print-flex-row">
-                    <span className="print-checkbox-item">{CB(ts.ungThu)} Ung thư{ts.ungThu && ts.khac ? `: ${ts.khac}` : ''}</span>
-                    <span className="print-checkbox-item">{CB(ts.suyTimUHuyet)} Suy tim ứ huyết</span>
-                </div>
-                <div className="print-flex-row">
-                    <span className="print-checkbox-item">{CB(ts.benhMachMauNao)} Bệnh mạch máu não</span>
-                </div>
-                {!ts.ungThu && ts.khac && <div>Khác (ghi rõ): {dotFill(ts.khac)}</div>}
-                <div className="print-flex-row" style={{ marginTop: 4 }}>
-                    <span>Hút thuốc lá: {CB(ts.hutThuocLa)} có {CB(!ts.hutThuocLa)} không</span>
-                    {ts.hutThuocLa && <span>Số bao-năm: {dotFill(ts.soBaoNam)}</span>}
-                </div>
-                {/* Thuốc đã dùng trước nhập viện */}
-                <div style={{ marginTop: 8 }}>
-                    <strong>* Thuốc đã dùng trước nhập viện:</strong>
-                    {ts.thuocDaDung?.length > 0 ? (
-                        <table className="print-table" style={{ marginTop: 4 }}>
-                            <thead>
-                                <tr><th>Tên thuốc</th><th>Liều lượng</th><th>Tổng liều</th><th>Đường dùng</th><th>Thời gian (ngày)</th></tr>
-                            </thead>
-                            <tbody>
-                                {ts.thuocDaDung.map((t) => (
-                                    <tr key={t.id}>
-                                        <td>{t.tenThuoc}</td>
-                                        <td>{t.lieuLuong}</td>
-                                        <td>{t.tongLieu}</td>
-                                        <td>{t.duongDung}</td>
-                                        <td>{val(t.thoiGianDung)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    ) : <span> Không</span>}
-                </div>
-            </div>
-
-            {/* ══════ C. TRIỆU CHỨNG LÂM SÀNG ══════ */}
-            <div className="print-section">
-                <h2>C. TRIỆU CHỨNG LÂM SÀNG</h2>
-                <div>Thời điểm xuất hiện triệu chứng so với nhập viện: {dotFill(formatDate(ls.thoiDiemTrieuChung))}</div>
-                <div className="print-vitals-row">
-                    <span>Mạch: {dotFill(ls.mach)} l/p</span>
-                    <span style={{ marginLeft: 16 }}>HA: {dotFill(ls.huyetAp)} mmHg</span>
-                    <span style={{ marginLeft: 16 }}>Nhiệt độ: {dotFill(ls.nhietDo)} °C</span>
-                </div>
-                <div className="print-vitals-row">
-                    <span>Nhịp thở: {dotFill(ls.nhipTho)} l/p</span>
-                    <span style={{ marginLeft: 16 }}>SpO₂: {dotFill(ls.spO2)} %</span>
-                    <span style={{ marginLeft: 16 }}>BMI: {dotFill(ls.bmi)} kg/m²</span>
-                </div>
-                {ls.diemGlasgow !== null && ls.diemGlasgow !== undefined && (
-                    <div>Điểm Glasgow: {dotFill(ls.diemGlasgow)}</div>
-                )}
-                <div className="print-flex-row" style={{ marginTop: 6 }}>
-                    <span className="print-checkbox-item">{CB(ls.hoKhan)} Ho khan</span>
-                    <span className="print-checkbox-item">{CB(ls.hoMau)} Ho máu</span>
-                </div>
-                <div className="print-flex-row">
-                    <span className="print-checkbox-item">{CB(ls.hoKhacDom)} Ho khạc đờm</span>
-                    {ls.hoKhacDom && (
-                        <>
-                            <span>Tính chất: {val(ls.domTinh?.join(', '))}</span>
-                            <span>Màu sắc: {dotFill(ls.domMauSac)}</span>
-                        </>
+            {(isVis('ts_daiThaoDuong') || isVis('ts_tangHuyetAp') || isVis('ts_viemDaDay') || isVis('ts_viemGanMan') || isVis('ts_benhThanMan') || isVis('ts_gut') || isVis('ts_ungThu') || isVis('ts_suyTim') || isVis('ts_benhMachMauNao') || isVis('ts_khac') || isVis('ts_hutThuocLa') || isVis('ts_thuocDaDung')) && (
+                <div className="print-section">
+                    <h2>B. TIỀN SỬ</h2>
+                    <div className="print-flex-row">
+                        {isVis('ts_daiThaoDuong') && <span className="print-checkbox-item">{CB(ts.daiThaoDuong)} Đái tháo đường</span>}
+                        {isVis('ts_tangHuyetAp') && <span className="print-checkbox-item">{CB(ts.tangHuyetAp)} Tăng huyết áp</span>}
+                        {isVis('ts_viemDaDay') && <span className="print-checkbox-item">{CB(ts.viemDaDay)} Viêm dạ dày</span>}
+                    </div>
+                    <div className="print-flex-row">
+                        {isVis('ts_viemGanMan') && <span className="print-checkbox-item">{CB(ts.viemGanMan)} Viêm gan mạn</span>}
+                        {isVis('ts_benhThanMan') && <span className="print-checkbox-item">{CB(ts.benhThanMan)} Bệnh thận mạn</span>}
+                        {isVis('ts_gut') && <span className="print-checkbox-item">{CB(ts.gut)} Gút</span>}
+                    </div>
+                    <div className="print-flex-row">
+                        {isVis('ts_ungThu') && <span className="print-checkbox-item">{CB(ts.ungThu)} Ung thư{ts.ungThu && ts.khac ? `: ${ts.khac}` : ''}</span>}
+                        {isVis('ts_suyTim') && <span className="print-checkbox-item">{CB(ts.suyTimUHuyet)} Suy tim ứ huyết</span>}
+                        {isVis('ts_benhMachMauNao') && <span className="print-checkbox-item">{CB(ts.benhMachMauNao)} Bệnh mạch máu não</span>}
+                    </div>
+                    {isVis('ts_khac') && !ts.ungThu && ts.khac && <div>Khác (ghi rõ): {dotFill(ts.khac)}</div>}
+                    {isVis('ts_hutThuocLa') && (
+                        <div className="print-flex-row" style={{ marginTop: 4 }}>
+                            <span>Hút thuốc lá: {CB(ts.hutThuocLa)} có {CB(!ts.hutThuocLa)} không</span>
+                            {ts.hutThuocLa && <span>Số bao-năm: {dotFill(ts.soBaoNam)}</span>}
+                        </div>
+                    )}
+                    {/* Thuốc đã dùng trước nhập viện */}
+                    {isVis('ts_thuocDaDung') && (
+                        <div style={{ marginTop: 8 }}>
+                            <strong>* Thuốc đã dùng trước nhập viện:</strong>
+                            {ts.thuocDaDung?.length > 0 ? (
+                                <table className="print-table" style={{ marginTop: 4 }}>
+                                    <thead>
+                                        <tr><th>Tên thuốc</th><th>Liều lượng</th><th>Tổng liều</th><th>Đường dùng</th><th>Thời gian (ngày)</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {ts.thuocDaDung.map((t) => (
+                                            <tr key={t.id}>
+                                                <td>{t.tenThuoc}</td>
+                                                <td>{t.lieuLuong}</td>
+                                                <td>{t.tongLieu}</td>
+                                                <td>{t.duongDung}</td>
+                                                <td>{val(t.thoiGianDung)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : <span> Không</span>}
+                        </div>
                     )}
                 </div>
-                <div className="print-flex-row">
-                    <span className="print-checkbox-item">{CB(ls.dauNguc)} Đau ngực</span>
-                    <span className="print-checkbox-item">{CB(ls.khoTho)} Khó thở</span>
+            )}
+
+            {/* ══════ C. TRIỆU CHỨNG LÂM SÀNG ══════ */}
+            {(isVis('ls_thoiDiemTrieuChung') || isVis('ls_sinhHieu') || isVis('ls_diemGlasgow') || isVis('ls_ho') || isVis('ls_coNang') || isVis('ls_ranPhoi') || isVis('ls_hoiChungTDMP') || isVis('ls_hoiChungDongDac') || isVis('ls_hoiChungTKMP')) && (
+                <div className="print-section">
+                    <h2>C. TRIỆU CHỨNG LÂM SÀNG</h2>
+                    {isVis('ls_thoiDiemTrieuChung') && <div>Thời điểm xuất hiện triệu chứng so với nhập viện: {dotFill(formatDate(ls.thoiDiemTrieuChung))}</div>}
+                    {isVis('ls_sinhHieu') && (
+                        <>
+                            <div className="print-vitals-row">
+                                {isVis('ls_sinhHieu_mach', 'ls_sinhHieu') && <span>Mạch: {dotFill(ls.mach)} l/p</span>}
+                                {isVis('ls_sinhHieu_huyetAp', 'ls_sinhHieu') && <span style={{ marginLeft: 16 }}>HA: {dotFill(ls.huyetAp)} mmHg</span>}
+                                {isVis('ls_sinhHieu_nhietDo', 'ls_sinhHieu') && <span style={{ marginLeft: 16 }}>Nhiệt độ: {dotFill(ls.nhietDo)} °C</span>}
+                            </div>
+                            <div className="print-vitals-row">
+                                {isVis('ls_sinhHieu_nhipTho', 'ls_sinhHieu') && <span>Nhịp thở: {dotFill(ls.nhipTho)} l/p</span>}
+                                {isVis('ls_sinhHieu_spO2', 'ls_sinhHieu') && <span style={{ marginLeft: 16 }}>SpO₂: {dotFill(ls.spO2)} %</span>}
+                                {isVis('ls_sinhHieu_bmi', 'ls_sinhHieu') && <span style={{ marginLeft: 16 }}>BMI: {dotFill(ls.bmi)} kg/m²</span>}
+                            </div>
+                        </>
+                    )}
+                    {isVis('ls_diemGlasgow') && ls.diemGlasgow !== null && ls.diemGlasgow !== undefined && (
+                        <div>Điểm Glasgow: {dotFill(ls.diemGlasgow)}</div>
+                    )}
+                    {isVis('ls_ho') && (
+                        <>
+                            <div className="print-flex-row" style={{ marginTop: 6 }}>
+                                {isVis('ls_ho_khan', 'ls_ho') && <span className="print-checkbox-item">{CB(ls.hoKhan)} Ho khan</span>}
+                                {isVis('ls_ho_mau', 'ls_ho') && <span className="print-checkbox-item">{CB(ls.hoMau)} Ho máu</span>}
+                            </div>
+                            <div className="print-flex-row">
+                                {isVis('ls_ho_khacDom', 'ls_ho') && <span className="print-checkbox-item">{CB(ls.hoKhacDom)} Ho khạc đờm</span>}
+                                {ls.hoKhacDom && isVis('ls_ho_tinhChatMauSac', 'ls_ho') && (
+                                    <>
+                                        <span>Tính chất: {val(ls.domTinh?.join(', '))}</span>
+                                        <span>Màu sắc: {dotFill(ls.domMauSac)}</span>
+                                    </>
+                                )}
+                            </div>
+                        </>
+                    )}
+                    {isVis('ls_coNang') && (
+                        <div className="print-flex-row">
+                            {isVis('ls_coNang_dauNguc', 'ls_coNang') && <span className="print-checkbox-item">{CB(ls.dauNguc)} Đau ngực</span>}
+                            {isVis('ls_coNang_khoTho', 'ls_coNang') && <span className="print-checkbox-item">{CB(ls.khoTho)} Khó thở</span>}
+                        </div>
+                    )}
+                    {isVis('ls_ranPhoi') && (
+                        <div className="print-flex-row">
+                            {isVis('ls_ranPhoi_ranAm', 'ls_ranPhoi') && <span className="print-checkbox-item">{CB(ls.ranAm)} Ran ẩm</span>}
+                            {isVis('ls_ranPhoi_ranNo', 'ls_ranPhoi') && <span className="print-checkbox-item">{CB(ls.ranNo)} Ran nổ</span>}
+                            {isVis('ls_ranPhoi_ranRit', 'ls_ranPhoi') && <span className="print-checkbox-item">{CB(ls.ranRit)} Ran rít</span>}
+                            {isVis('ls_ranPhoi_ranNgay', 'ls_ranPhoi') && <span className="print-checkbox-item">{CB(ls.ranNgay)} Ran ngáy</span>}
+                        </div>
+                    )}
+                    {/* Hội chứng */}
+                    {isVis('ls_hoiChungTDMP') && (
+                        <div className="print-hoi-chung-row">
+                            <span>{CB(ls.hoiChungTDMP.co)} Hội chứng TDMP:</span>
+                            <span className="print-hoi-chung-ben">
+                                {CB(benMatch(ls.hoiChungTDMP.ben, 'Trái'))} bên trái{' '}
+                                {CB(benMatch(ls.hoiChungTDMP.ben, 'Phải'))} bên phải{' '}
+                                {CB(benMatch(ls.hoiChungTDMP.ben, 'Hai bên'))} hai bên
+                            </span>
+                        </div>
+                    )}
+                    {isVis('ls_hoiChungDongDac') && (
+                        <div className="print-hoi-chung-row">
+                            <span>{CB(ls.hoiChungDongDac.co)} Hội chứng đông đặc:</span>
+                            <span className="print-hoi-chung-ben">
+                                {CB(benMatch(ls.hoiChungDongDac.ben, 'Trái'))} bên trái{' '}
+                                {CB(benMatch(ls.hoiChungDongDac.ben, 'Phải'))} bên phải{' '}
+                                {CB(benMatch(ls.hoiChungDongDac.ben, 'Hai bên'))} hai bên
+                            </span>
+                        </div>
+                    )}
+                    {isVis('ls_hoiChungTKMP') && (
+                        <div className="print-hoi-chung-row">
+                            <span>{CB(ls.hoiChungTKMP.co)} Hội chứng TKMP:</span>
+                            <span className="print-hoi-chung-ben">
+                                {CB(benMatch(ls.hoiChungTKMP.ben, 'Trái'))} bên trái{' '}
+                                {CB(benMatch(ls.hoiChungTKMP.ben, 'Phải'))} bên phải{' '}
+                                {CB(benMatch(ls.hoiChungTKMP.ben, 'Hai bên'))} hai bên
+                            </span>
+                        </div>
+                    )}
                 </div>
-                <div className="print-flex-row">
-                    <span className="print-checkbox-item">{CB(ls.ranAm)} Ran ẩm</span>
-                    <span className="print-checkbox-item">{CB(ls.ranNo)} Ran nổ</span>
-                    <span className="print-checkbox-item">{CB(ls.ranRit)} Ran rít</span>
-                    <span className="print-checkbox-item">{CB(ls.ranNgay)} Ran ngáy</span>
-                </div>
-                {/* Hội chứng */}
-                <div className="print-hoi-chung-row">
-                    <span>{CB(ls.hoiChungTDMP.co)} Hội chứng TDMP:</span>
-                    <span className="print-hoi-chung-ben">
-                        {CB(benMatch(ls.hoiChungTDMP.ben, 'Trái'))} bên trái{' '}
-                        {CB(benMatch(ls.hoiChungTDMP.ben, 'Phải'))} bên phải{' '}
-                        {CB(benMatch(ls.hoiChungTDMP.ben, 'Hai bên'))} hai bên
-                    </span>
-                </div>
-                <div className="print-hoi-chung-row">
-                    <span>{CB(ls.hoiChungDongDac.co)} Hội chứng đông đặc:</span>
-                    <span className="print-hoi-chung-ben">
-                        {CB(benMatch(ls.hoiChungDongDac.ben, 'Trái'))} bên trái{' '}
-                        {CB(benMatch(ls.hoiChungDongDac.ben, 'Phải'))} bên phải{' '}
-                        {CB(benMatch(ls.hoiChungDongDac.ben, 'Hai bên'))} hai bên
-                    </span>
-                </div>
-                <div className="print-hoi-chung-row">
-                    <span>{CB(ls.hoiChungTKMP.co)} Hội chứng TKMP:</span>
-                    <span className="print-hoi-chung-ben">
-                        {CB(benMatch(ls.hoiChungTKMP.ben, 'Trái'))} bên trái{' '}
-                        {CB(benMatch(ls.hoiChungTKMP.ben, 'Phải'))} bên phải{' '}
-                        {CB(benMatch(ls.hoiChungTKMP.ben, 'Hai bên'))} hai bên
-                    </span>
-                </div>
-            </div>
+            )}
 
             {/* ══════ D. CẬN LÂM SÀNG ══════ */}
-            <div className="print-section">
-                <h2>D. CẬN LÂM SÀNG LÂM SÀNG</h2>
-                <table className="print-lab-table">
-                    <thead>
-                        <tr>
-                            <th>Chỉ số</th>
-                            <th>Kết quả</th>
-                            <th>Chỉ số</th>
-                            <th>Kết quả</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td className="lab-header">1. Công thức máu</td><td></td><td className="lab-header">Điện giải đồ</td><td></td></tr>
-                        <tr><td>WBC (G/l)</td><td>{val(xn.wbc)}</td><td>Na</td><td>{val(xn.na)}</td></tr>
-                        <tr><td>Neutrophil (%)</td><td>{val(xn.neutrophil)}</td><td>K</td><td>{val(xn.k)}</td></tr>
-                        <tr><td>Lympho (%)</td><td>{val(xn.lymphocyte)}</td><td>Cl</td><td>{val(xn.cl)}</td></tr>
-                        <tr><td>RBC (T/l)</td><td>{val(xn.rbc)}</td><td className="lab-header">Khí máu</td><td></td></tr>
-                        <tr><td>Hemoglobin (g/l)</td><td>{val(xn.hemoglobin)}</td><td>pH</td><td>{val(xn.ph)}</td></tr>
-                        <tr><td>Hct (%)</td><td>{val(xn.hct)}</td><td>SaO2</td><td>{val(xn.saO2)}</td></tr>
-                        <tr><td>PLT (G/l)</td><td>{val(xn.plt)}</td><td>PaCO2</td><td>{val(xn.paCO2)}</td></tr>
-                        <tr><td className="lab-header">2. Sinh hóa máu</td><td></td><td>HCO3</td><td>{val(xn.hcO3)}</td></tr>
-                        <tr><td>Ure máu (mmol/l)</td><td>{val(xn.ure)}</td><td>BE</td><td>{val(xn.be)}</td></tr>
-                        <tr><td>Creatinin (µmol/l)</td><td>{val(xn.creatinin)}</td><td className="lab-header">Dấu ấn sinh học</td><td>BC: {val(xn.biomarkerBarcode)}</td></tr>
-                        <tr><td>AST (U/l)</td><td>{val(xn.ast)}</td><td>sTREM-1</td><td>{val(xn.sTREM1)}</td></tr>
-                        <tr><td>ALT (U/l)</td><td>{val(xn.alt)}</td><td>TIMP-1</td><td>{val(xn.tIMP1)}</td></tr>
-                        <tr><td>GGT (U/l)</td><td>{val(xn.ggt)}</td><td>IL6</td><td>{val(xn.il6)}</td></tr>
-                        <tr><td>Glucose máu (µmol/l)</td><td>{val(xn.glucose)}</td><td>IL10</td><td>{val(xn.il10)}</td></tr>
-                        <tr><td>Protein (g/l)</td><td>{val(xn.protein)}</td><td>IL17</td><td>{val(xn.il17)}</td></tr>
-                        <tr><td>Albumin (g/l)</td><td>{val(xn.albumin)}</td><td className="lab-header">3. Các chỉ số tính toán</td><td></td></tr>
-                        <tr><td>CRP (mg/l)</td><td>{val(xn.crp)}</td><td>NLR</td><td>{val(ct.nlr)}</td></tr>
-                        <tr><td>Procalcitonin (pg/ml)</td><td>{val(xn.procalcitonin)}</td><td>PLR</td><td>{val(ct.plr)}</td></tr>
-                        <tr><td></td><td></td><td>CAR</td><td>{val(ct.car)}</td></tr>
-                    </tbody>
-                </table>
-            </div>
+            {(isVis('cls_congThucMau') || isVis('cls_dienGiaiDo') || isVis('cls_khiMau') || isVis('cls_sinhHoaMau') || isVis('cls_viem') || isVis('cls_dauAnSinhHoc') || isVis('cls_chiSoTinhToan')) && (
+                <div className="print-section">
+                    <h2>D. CẬN LÂM SÀNG</h2>
+                    <table className="print-lab-table">
+                        <thead>
+                            <tr>
+                                <th>Chỉ số</th>
+                                <th>Kết quả</th>
+                                <th>Chỉ số</th>
+                                <th>Kết quả</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td className="lab-header">{isVis('cls_congThucMau') ? '1. Công thức máu' : ''}</td>
+                                <td></td>
+                                <td className="lab-header">{isVis('cls_dienGiaiDo') ? 'Điện giải đồ' : ''}</td>
+                                <td></td>
+                            </tr>
+                            <tr><td>{isVis('cls_ctm_wbc', 'cls_congThucMau') ? 'WBC (G/l)' : ''}</td><td>{isVis('cls_ctm_wbc', 'cls_congThucMau') ? val(xn.wbc) : ''}</td><td>{isVis('cls_dgd_na', 'cls_dienGiaiDo') ? 'Na' : ''}</td><td>{isVis('cls_dgd_na', 'cls_dienGiaiDo') ? val(xn.na) : ''}</td></tr>
+                            <tr><td>{isVis('cls_ctm_neutro', 'cls_congThucMau') ? 'Neutrophil (%)' : ''}</td><td>{isVis('cls_ctm_neutro', 'cls_congThucMau') ? val(xn.neutrophil) : ''}</td><td>{isVis('cls_dgd_k', 'cls_dienGiaiDo') ? 'K' : ''}</td><td>{isVis('cls_dgd_k', 'cls_dienGiaiDo') ? val(xn.k) : ''}</td></tr>
+                            <tr><td>{isVis('cls_ctm_lympho', 'cls_congThucMau') ? 'Lympho (%)' : ''}</td><td>{isVis('cls_ctm_lympho', 'cls_congThucMau') ? val(xn.lymphocyte) : ''}</td><td>{isVis('cls_dgd_cl', 'cls_dienGiaiDo') ? 'Cl' : ''}</td><td>{isVis('cls_dgd_cl', 'cls_dienGiaiDo') ? val(xn.cl) : ''}</td></tr>
+                            <tr><td>{isVis('cls_ctm_rbc', 'cls_congThucMau') ? 'RBC (T/l)' : ''}</td><td>{isVis('cls_ctm_rbc', 'cls_congThucMau') ? val(xn.rbc) : ''}</td><td className="lab-header">{isVis('cls_khiMau') ? 'Khí máu' : ''}</td><td></td></tr>
+                            <tr><td>{isVis('cls_ctm_hb', 'cls_congThucMau') ? 'Hemoglobin (g/l)' : ''}</td><td>{isVis('cls_ctm_hb', 'cls_congThucMau') ? val(xn.hemoglobin) : ''}</td><td>{isVis('cls_km_ph', 'cls_khiMau') ? 'pH' : ''}</td><td>{isVis('cls_km_ph', 'cls_khiMau') ? val(xn.ph) : ''}</td></tr>
+                            <tr><td>{isVis('cls_ctm_hct', 'cls_congThucMau') ? 'Hct (%)' : ''}</td><td>{isVis('cls_ctm_hct', 'cls_congThucMau') ? val(xn.hct) : ''}</td><td>{isVis('cls_km_sao2', 'cls_khiMau') ? 'SaO2' : ''}</td><td>{isVis('cls_km_sao2', 'cls_khiMau') ? val(xn.saO2) : ''}</td></tr>
+                            <tr><td>{isVis('cls_ctm_plt', 'cls_congThucMau') ? 'PLT (G/l)' : ''}</td><td>{isVis('cls_ctm_plt', 'cls_congThucMau') ? val(xn.plt) : ''}</td><td>{isVis('cls_km_paco2', 'cls_khiMau') ? 'PaCO2' : ''}</td><td>{isVis('cls_km_paco2', 'cls_khiMau') ? val(xn.paCO2) : ''}</td></tr>
+                            <tr>
+                                <td className="lab-header">{isVis('cls_sinhHoaMau') ? '2. Sinh hóa máu' : ''}</td>
+                                <td></td>
+                                <td>{isVis('cls_km_hco3', 'cls_khiMau') ? 'HCO3' : ''}</td>
+                                <td>{isVis('cls_km_hco3', 'cls_khiMau') ? val(xn.hcO3) : ''}</td>
+                            </tr>
+                            <tr><td>{isVis('cls_shm_ure', 'cls_sinhHoaMau') ? 'Ure máu (mmol/l)' : ''}</td><td>{isVis('cls_shm_ure', 'cls_sinhHoaMau') ? val(xn.ure) : ''}</td><td>{isVis('cls_km_be', 'cls_khiMau') ? 'BE' : ''}</td><td>{isVis('cls_km_be', 'cls_khiMau') ? val(xn.be) : ''}</td></tr>
+                            <tr><td>{isVis('cls_shm_creatinin', 'cls_sinhHoaMau') ? 'Creatinin (µmol/l)' : ''}</td><td>{isVis('cls_shm_creatinin', 'cls_sinhHoaMau') ? val(xn.creatinin) : ''}</td><td className="lab-header">{isVis('cls_dauAnSinhHoc') ? 'Dấu ấn sinh học' : ''}</td><td>{isVis('cls_dash_barcode', 'cls_dauAnSinhHoc') ? `BC: ${val(xn.biomarkerBarcode)}` : ''}</td></tr>
+                            <tr><td>{isVis('cls_shm_ast', 'cls_sinhHoaMau') ? 'AST (U/l)' : ''}</td><td>{isVis('cls_shm_ast', 'cls_sinhHoaMau') ? val(xn.ast) : ''}</td><td>{isVis('cls_dash_strem1', 'cls_dauAnSinhHoc') ? 'sTREM-1' : ''}</td><td>{isVis('cls_dash_strem1', 'cls_dauAnSinhHoc') ? val(xn.sTREM1) : ''}</td></tr>
+                            <tr><td>{isVis('cls_shm_alt', 'cls_sinhHoaMau') ? 'ALT (U/l)' : ''}</td><td>{isVis('cls_shm_alt', 'cls_sinhHoaMau') ? val(xn.alt) : ''}</td><td>{isVis('cls_dash_timp1', 'cls_dauAnSinhHoc') ? 'TIMP-1' : ''}</td><td>{isVis('cls_dash_timp1', 'cls_dauAnSinhHoc') ? val(xn.tIMP1) : ''}</td></tr>
+                            <tr><td>{isVis('cls_shm_ggt', 'cls_sinhHoaMau') ? 'GGT (U/l)' : ''}</td><td>{isVis('cls_shm_ggt', 'cls_sinhHoaMau') ? val(xn.ggt) : ''}</td><td>{isVis('cls_dash_il6', 'cls_dauAnSinhHoc') ? 'IL6' : ''}</td><td>{isVis('cls_dash_il6', 'cls_dauAnSinhHoc') ? val(xn.il6) : ''}</td></tr>
+                            <tr><td>{isVis('cls_shm_glucose', 'cls_sinhHoaMau') ? 'Glucose máu (µmol/l)' : ''}</td><td>{isVis('cls_shm_glucose', 'cls_sinhHoaMau') ? val(xn.glucose) : ''}</td><td>{isVis('cls_dash_il10', 'cls_dauAnSinhHoc') ? 'IL10' : ''}</td><td>{isVis('cls_dash_il10', 'cls_dauAnSinhHoc') ? val(xn.il10) : ''}</td></tr>
+                            <tr><td>{isVis('cls_shm_protein', 'cls_sinhHoaMau') ? 'Protein (g/l)' : ''}</td><td>{isVis('cls_shm_protein', 'cls_sinhHoaMau') ? val(xn.protein) : ''}</td><td>{isVis('cls_dash_il17', 'cls_dauAnSinhHoc') ? 'IL17' : ''}</td><td>{isVis('cls_dash_il17', 'cls_dauAnSinhHoc') ? val(xn.il17) : ''}</td></tr>
+                            <tr><td>{isVis('cls_shm_albumin', 'cls_sinhHoaMau') ? 'Albumin (g/l)' : ''}</td><td>{isVis('cls_shm_albumin', 'cls_sinhHoaMau') ? val(xn.albumin) : ''}</td><td className="lab-header">{isVis('cls_chiSoTinhToan') ? '3. Các chỉ số tính toán' : ''}</td><td></td></tr>
+                            <tr><td>{isVis('cls_viem_crp', 'cls_viem') ? 'CRP (mg/l)' : ''}</td><td>{isVis('cls_viem_crp', 'cls_viem') ? val(xn.crp) : ''}</td><td>{isVis('cls_cstt_nlr', 'cls_chiSoTinhToan') ? 'NLR' : ''}</td><td>{isVis('cls_cstt_nlr', 'cls_chiSoTinhToan') ? val(ct.nlr) : ''}</td></tr>
+                            <tr><td>{isVis('cls_viem_pct', 'cls_viem') ? 'Procalcitonin (pg/ml)' : ''}</td><td>{isVis('cls_viem_pct', 'cls_viem') ? val(xn.procalcitonin) : ''}</td><td>{isVis('cls_cstt_plr', 'cls_chiSoTinhToan') ? 'PLR' : ''}</td><td>{isVis('cls_cstt_plr', 'cls_chiSoTinhToan') ? val(ct.plr) : ''}</td></tr>
+                            <tr><td></td><td></td><td>{isVis('cls_cstt_car', 'cls_chiSoTinhToan') ? 'CAR' : ''}</td><td>{isVis('cls_cstt_car', 'cls_chiSoTinhToan') ? val(ct.car) : ''}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
             {/* ══════ 4. CHẨN ĐOÁN HÌNH ẢNH ══════ */}
-            <div className="print-section">
-                <h2>4. Chẩn đoán hình ảnh</h2>
+            {(isVis('ha_xquang') || isVis('ha_ct')) && (
+                <div className="print-section">
+                    <h2>4. Chẩn đoán hình ảnh</h2>
 
-                <div style={{ marginBottom: 8 }}>
-                    <strong>* Xquang ngực thẳng:</strong>
-                    {ha.xquangTonThuong.length > 0 ? (
-                        <table className="print-table">
-                            <thead>
-                                <tr><th>Vị trí</th><th>Tổn thương</th><th>Diện</th><th>Thời điểm</th></tr>
-                            </thead>
-                            <tbody>
-                                {ha.xquangTonThuong.map((t) => (
-                                    <tr key={t.id}>
-                                        <td>{[t.viTri, t.ben].filter(Boolean).join(', ')}</td>
-                                        <td>{t.hinhThai}</td>
-                                        <td>{t.dien}</td>
-                                        <td>{(t as { thoiDiem?: string }).thoiDiem || ''}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    ) : <span> Không có tổn thương</span>}
-                </div>
+                    {isVis('ha_xquang') && (
+                        <div style={{ marginBottom: 8 }}>
+                            <strong>* Xquang ngực thẳng:</strong>
+                            {ha.xquangTonThuong.length > 0 ? (
+                                <table className="print-table">
+                                    <thead>
+                                        <tr><th>Vị trí</th><th>Tổn thương</th><th>Diện</th><th>Thời điểm</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {ha.xquangTonThuong.map((t) => (
+                                            <tr key={t.id}>
+                                                <td>{[t.viTri, t.ben].filter(Boolean).join(', ')}</td>
+                                                <td>{t.hinhThai}</td>
+                                                <td>{t.dien}</td>
+                                                <td>{(t as { thoiDiem?: string }).thoiDiem || ''}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : <span> Không có tổn thương</span>}
+                        </div>
+                    )}
 
-                <div>
-                    <strong>* Cắt lớp vi tính lồng ngực:</strong>
-                    {ha.ctTonThuong.length > 0 ? (
-                        <table className="print-table">
-                            <thead>
-                                <tr><th>Vị trí</th><th>Tổn thương</th><th>Mức độ</th><th>Thời điểm</th></tr>
-                            </thead>
-                            <tbody>
-                                {ha.ctTonThuong.map((t) => (
-                                    <tr key={t.id}>
-                                        <td>{[t.thuy, t.ben].filter(Boolean).join(', ')}</td>
-                                        <td>{t.hinhThai}</td>
-                                        <td>{t.dien}</td>
-                                        <td>{(t as { thoiDiem?: string }).thoiDiem || ''}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    ) : <span> Không có tổn thương</span>}
+                    {isVis('ha_ct') && (
+                        <div>
+                            <strong>* Cắt lớp vi tính lồng ngực:</strong>
+                            {ha.ctTonThuong.length > 0 ? (
+                                <table className="print-table">
+                                    <thead>
+                                        <tr><th>Vị trí</th><th>Tổn thương</th><th>Mức độ</th><th>Thời điểm</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {ha.ctTonThuong.map((t) => (
+                                            <tr key={t.id}>
+                                                <td>{[t.thuy, t.ben].filter(Boolean).join(', ')}</td>
+                                                <td>{t.hinhThai}</td>
+                                                <td>{t.dien}</td>
+                                                <td>{(t as { thoiDiem?: string }).thoiDiem || ''}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : <span> Không có tổn thương</span>}
+                        </div>
+                    )}
                 </div>
-            </div>
+            )}
 
             {/* ══════ 5. VI KHUẨN + KHÁNG SINH ĐỒ ══════ */}
-            <div className="print-section">
-                <h2>5. Xét nghiệm vi khuẩn</h2>
-                {p.viKhuan.length === 0 ? (
-                    <div>Không có kết quả vi khuẩn.</div>
-                ) : (
-                    p.viKhuan.map((vk, idx) => (
-                        <div key={vk.id} style={{ marginBottom: 12 }}>
-                            <div><strong>Vi khuẩn {idx + 1}:</strong> {vk.tenViKhuan || '...............'}</div>
-                            {(() => {
-                                const tested = vk.khangSinhDo.filter(ks => ks.mucDo === 'S' || ks.mucDo === 'R' || ks.mucDo === 'I');
-                                return tested.length > 0 ? (
-                                    <table className="print-table" style={{ marginTop: 4 }}>
-                                        <thead>
-                                            <tr>
-                                                <th rowSpan={2}>Kháng sinh</th>
-                                                <th colSpan={3}>Kết quả</th>
-                                            </tr>
-                                            <tr>
-                                                <th>S</th>
-                                                <th>R</th>
-                                                <th>I</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {tested.map((ks, kIdx) => (
-                                                <tr key={kIdx}>
-                                                    <td>{ks.tenKhangSinh}</td>
-                                                    <td style={{ textAlign: 'center' }}>{ks.mucDo === 'S' ? 'x' : ''}</td>
-                                                    <td style={{ textAlign: 'center' }}>{ks.mucDo === 'R' ? 'x' : ''}</td>
-                                                    <td style={{ textAlign: 'center' }}>{ks.mucDo === 'I' ? 'x' : ''}</td>
+            {isVis('cls_viKhuan') && (
+                <div className="print-section">
+                    <h2>5. Xét nghiệm vi khuẩn</h2>
+                    {p.viKhuan.length === 0 ? (
+                        <div>Không có kết quả vi khuẩn.</div>
+                    ) : (
+                        p.viKhuan.map((vk, idx) => (
+                            <div key={vk.id} style={{ marginBottom: 12 }}>
+                                <div><strong>Vi khuẩn {idx + 1}:</strong> {vk.tenViKhuan || '...............'}</div>
+                                {(() => {
+                                    const tested = vk.khangSinhDo.filter(ks => ks.mucDo === 'S' || ks.mucDo === 'R' || ks.mucDo === 'I');
+                                    return tested.length > 0 ? (
+                                        <table className="print-table" style={{ marginTop: 4 }}>
+                                            <thead>
+                                                <tr>
+                                                    <th rowSpan={2}>Kháng sinh</th>
+                                                    <th colSpan={3}>Kết quả</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                ) : null;
-                            })()}
-                        </div>
-                    ))
-                )}
-            </div>
+                                                <tr>
+                                                    <th>S</th>
+                                                    <th>R</th>
+                                                    <th>I</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {tested.map((ks, kIdx) => (
+                                                    <tr key={kIdx}>
+                                                        <td>{ks.tenKhangSinh}</td>
+                                                        <td style={{ textAlign: 'center' }}>{ks.mucDo === 'S' ? 'x' : ''}</td>
+                                                        <td style={{ textAlign: 'center' }}>{ks.mucDo === 'R' ? 'x' : ''}</td>
+                                                        <td style={{ textAlign: 'center' }}>{ks.mucDo === 'I' ? 'x' : ''}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    ) : null;
+                                })()}
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
 
-            {/* ══════ CURB-65 ══════ */}
-            <div className="print-section">
-                <h2>D. PHÂN ĐỘ MỨC ĐỘ NẶNG</h2>
-                <div style={{ marginBottom: 8 }}>
-                    <strong>1. CURB-65:</strong>
-                    <div style={{ marginLeft: 16 }}>
-                        <div>- Tổng điểm: {dotFill(p.curb65?.duDuLieu ? p.curb65.tongDiem : 'Chưa đủ dữ liệu')}</div>
-                        <div>- Phân nhóm: {dotFill(p.curb65?.duDuLieu ? p.curb65.phanNhom : '')}</div>
-                        <div style={{ marginTop: 4 }}>
-                            {CB(p.curb65?.chiTiet?.c === true)} C — Confusion (Rối loạn ý thức mới){'  '}
-                            {CB(p.curb65?.chiTiet?.u === true)} U — Ure {'>'} 7 mmol/L{'  '}
-                            {CB(p.curb65?.chiTiet?.r === true)} R — Nhịp thở ≥ 30
+            {/* ══════ PHÂN ĐỘ MỨC ĐỘ NẶNG ══════ */}
+            {(isVis('score_curb65') || isVis('score_psi')) && (
+                <div className="print-section">
+                    <h2>D. PHÂN ĐỘ MỨC ĐỘ NẶNG</h2>
+                    {isVis('score_curb65') && (
+                        <div style={{ marginBottom: 8 }}>
+                            <strong>1. CURB-65:</strong>
+                            <div style={{ marginLeft: 16 }}>
+                                {isVis('curb65_tongDiem', 'score_curb65') && (
+                                    <>
+                                        <div>- Tổng điểm: {dotFill(p.curb65?.duDuLieu ? p.curb65.tongDiem : 'Chưa đủ dữ liệu')}</div>
+                                        <div>- Phân nhóm: {dotFill(p.curb65?.duDuLieu ? p.curb65.phanNhom : '')}</div>
+                                    </>
+                                )}
+                                <div style={{ marginTop: 4 }}>
+                                    {isVis('curb65_c', 'score_curb65') && <>{CB(p.curb65?.chiTiet?.c === true)} C — Confusion (Rối loạn ý thức mới){'  '}</>}
+                                    {isVis('curb65_u', 'score_curb65') && <>{CB(p.curb65?.chiTiet?.u === true)} U — Ure {'>'} 7 mmol/L{'  '}</>}
+                                    {isVis('curb65_r', 'score_curb65') && <>{CB(p.curb65?.chiTiet?.r === true)} R — Nhịp thở ≥ 30{'  '}</>}
+                                </div>
+                                <div>
+                                    {isVis('curb65_b', 'score_curb65') && <>{CB(p.curb65?.chiTiet?.b === true)} B — HA {'<'} 90/60 mmHg{'  '}</>}
+                                    {isVis('curb65_age65', 'score_curb65') && <>{CB(p.curb65?.chiTiet?.age65 === true)} 65 — Tuổi ≥ 65</>}
+                                </div>
+                            </div>
                         </div>
+                    )}
+                    {isVis('score_psi') && (
                         <div>
-                            {CB(p.curb65?.chiTiet?.b === true)} B — HA {'<'} 90/60 mmHg{'  '}
-                            {CB(p.curb65?.chiTiet?.age65 === true)} 65 — Tuổi ≥ 65
+                            <strong>2. PSI:</strong>
+                            <div style={{ marginLeft: 16 }}>
+                                <div>- Tổng điểm: {dotFill(psi.tongDiem)}</div>
+                                {settings.showPsiLevel && (
+                                    <div>- Mức độ: {dotFill(getPhanTang(psi.tongDiem))}</div>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
-                <div>
-                    <strong>2. PSI:</strong>
-                    <div style={{ marginLeft: 16 }}>
-                        <div>- Tổng điểm: {dotFill(psi.tongDiem)}</div>
-                        {settings.showPsiLevel && (
-                            <div>- Mức độ: {dotFill(getPhanTang(psi.tongDiem))}</div>
-                        )}
-                    </div>
-                </div>
-            </div>
+            )}
 
             {/* ══════ E. KẾT CỤC ĐIỀU TRỊ ══════ */}
-            <div className="print-section">
-                <h2>E. KẾT CỤC ĐIỀU TRỊ</h2>
-                <div>1. Diễn biến điều trị:</div>
-                <div className="print-flex-row" style={{ marginLeft: 16 }}>
-                    {dienBienList.map((label) => (
-                        <span key={label} className="print-checkbox-item">
-                            {CB(selectedDienBien.includes(label))} {label}
-                            {label === 'Lọc máu' && kc.soNgayLocMau != null && ` (${kc.soNgayLocMau} ngày)`}
-                        </span>
-                    ))}
+            {(isVis('kc_dienBien') || isVis('kc_tinhTrangRaVien') || isVis('kc_khangSinh') || isVis('kc_soNgayDieuTri')) && (
+                <div className="print-section">
+                    <h2>E. KẾT CỤC ĐIỀU TRỊ</h2>
+                    {isVis('kc_dienBien') && (
+                        <>
+                            <div>1. Diễn biến điều trị:</div>
+                            <div className="print-flex-row" style={{ marginLeft: 16 }}>
+                                {dienBienList.map((label) => {
+                                    let subKey = '';
+                                    if (label === 'Thở máy') subKey = 'kc_dienBien_thoMay';
+                                    else if (label === 'Sốc nhiễm khuẩn') subKey = 'kc_dienBien_socNhiemKhuan';
+                                    else if (label === 'Lọc máu') subKey = 'kc_dienBien_locMau';
+                                    if (subKey && !isVis(subKey, 'kc_dienBien')) return null;
+
+                                    return (
+                                        <span key={label} className="print-checkbox-item">
+                                            {CB(selectedDienBien.includes(label))} {label}
+                                            {label === 'Lọc máu' && kc.soNgayLocMau != null && ` (${kc.soNgayLocMau} ngày)`}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
+                    {isVis('kc_tinhTrangRaVien') && (
+                        <>
+                            <div style={{ marginTop: 6 }}>2. Tình trạng ra viện:</div>
+                            <div className="print-flex-row" style={{ marginLeft: 16 }}>
+                                {tinhTrangList.map((label) => {
+                                    let subKey = '';
+                                    if (label === 'Tử vong') subKey = 'kc_tinhTrangRaVien_tuVong';
+                                    else if (label === 'Xin về') subKey = 'kc_tinhTrangRaVien_xinVe';
+                                    else if (label === 'Tiến triển tốt, xuất viện') subKey = 'kc_tinhTrangRaVien_xuatVien';
+                                    else if (label === 'Chuyển tuyến') subKey = 'kc_tinhTrangRaVien_chuyenTuyen';
+                                    if (subKey && !isVis(subKey, 'kc_tinhTrangRaVien')) return null;
+
+                                    return (
+                                        <span key={label} className="print-checkbox-item">
+                                            {CB(kc.tinhTrangRaVien === label)} {label}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
+                    {isVis('kc_khangSinh') && (
+                        <div style={{ marginTop: 6 }}>
+                            Sử dụng kháng sinh:
+                            {isVis('kc_khangSinh_ngayBatDau', 'kc_khangSinh') && ` từ ngày ${dotFill(formatDate(kc.ngayBatDauKhangSinh))}`}
+                            {isVis('kc_khangSinh_ngayKetThuc', 'kc_khangSinh') && ` đến ngày: ${dotFill(formatDate(kc.ngayKetThucKhangSinh))}`}
+                            {isVis('kc_khangSinh_soNgay', 'kc_khangSinh') && ` (${dotFill(soNgayKS)} ngày)`}
+                        </div>
+                    )}
+                    {isVis('kc_soNgayDieuTri') && <div>Tổng số ngày điều trị: {dotFill(soNgayDieuTri)}</div>}
                 </div>
-                <div style={{ marginTop: 6 }}>2. Tình trạng ra viện:</div>
-                <div className="print-flex-row" style={{ marginLeft: 16 }}>
-                    {tinhTrangList.map((label) => (
-                        <span key={label} className="print-checkbox-item">
-                            {CB(kc.tinhTrangRaVien === label)} {label}
-                        </span>
-                    ))}
-                </div>
-                <div style={{ marginTop: 6 }}>
-                    Sử dụng kháng sinh: từ ngày {dotFill(formatDate(kc.ngayBatDauKhangSinh))} đến ngày: {dotFill(formatDate(kc.ngayKetThucKhangSinh))} ({dotFill(soNgayKS)} ngày)
-                </div>
-                <div>Tổng số ngày điều trị: {dotFill(soNgayDieuTri)}</div>
-            </div>
+            )}
 
             {/* ══════ SIGNATURE ══════ */}
             <div className="print-signature">

@@ -65,7 +65,7 @@ export const DEFAULT_NOI_O = ['Nông thôn', 'Thành thị', 'Hải đảo'];
 
 export const DEFAULT_DIEN_BIEN_DIEU_TRI = ['Thở máy', 'Sốc nhiễm khuẩn', 'Lọc máu'];
 
-export const DEFAULT_TINH_TRANG_RA_VIEN = ['Tử vong', 'Xin về', 'Tiến triển tốt, xuất viện'];
+export const DEFAULT_TINH_TRANG_RA_VIEN = ['Tử vong', 'Xin về', 'Tiến triển tốt, xuất viện', 'Chuyển tuyến'];
 
 export const PSI_LABELS: Record<string, { label: string; diem: number }> = {
     nhaDuongLao: { label: 'Sống ở nhà dưỡng lão/điều dưỡng', diem: 10 },

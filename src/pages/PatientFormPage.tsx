@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { ChevronLeft, ChevronRight, Save, Loader2, Edit, ArrowLeft, Printer, Trash2, XCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Save, Loader2, Edit, ArrowLeft, Printer, Trash2, XCircle, Eye } from 'lucide-react';
 import { patientService } from '../services/patientService';
 import { settingsService } from '../services/settingsService';
 import { useCalculatedIndices } from '../hooks/useCalculatedIndices';
@@ -673,11 +673,31 @@ export default function PatientFormPage() {
                 </div>
             </div>
 
+            {/* Read-only / Advisor Banner */}
+            {readOnly && (
+                <div className="mb-4 px-4 py-2.5 bg-sky-50 border border-sky-200 rounded-xl flex items-center justify-between text-xs text-sky-800 shadow-2xs">
+                    <div className="flex items-center gap-2">
+                        <Eye className="w-4 h-4 text-sky-600 shrink-0" />
+                        <span>
+                            {isAdvisor
+                                ? 'Chế độ xem cố vấn (Advisor): Hồ sơ chỉ đọc, các trường thông tin không thể chỉnh sửa.'
+                                : 'Chế độ xem chi tiết: Nhấn "Chỉnh sửa" ở thanh công cụ phía trên nếu bạn muốn cập nhật dữ liệu.'
+                            }
+                        </span>
+                    </div>
+                    <span className="text-[11px] font-semibold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-md shrink-0">
+                        Chỉ đọc
+                    </span>
+                </div>
+            )}
+
             {/* Step content */}
-            <div className={`bg-white rounded-xl border border-gray-200 p-6 mb-6${readOnly ? ' pointer-events-none opacity-80' : ''}`}
-                style={readOnly ? { userSelect: 'text' } : undefined}
+            <div className={`bg-white rounded-xl border border-gray-200 p-6 mb-6 transition-all ${readOnly ? 'bg-gray-50/30' : ''}`}
+                style={{ userSelect: 'text' }}
             >
-                {renderStep()}
+                <fieldset disabled={readOnly} className="border-0 p-0 m-0 w-full disabled:opacity-95">
+                    {renderStep()}
+                </fieldset>
             </div>
 
             {/* Navigation */}

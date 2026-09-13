@@ -41,11 +41,23 @@ export default function StepKetCuc({ data, ngayVaoVien, ngayRaVien, onChange }: 
     }, []);
 
     const tinhTrangList = useMemo(() => {
+        let list: string[] = [...DEFAULT_TINH_TRANG_RA_VIEN];
         try {
             const raw = localStorage.getItem('cap_tinh_trang_ra_vien');
-            if (raw) { const p = JSON.parse(raw); if (Array.isArray(p) && p.length > 0) return p as string[]; }
+            if (raw) {
+                const p = JSON.parse(raw);
+                if (Array.isArray(p) && p.length > 0) list = p as string[];
+            }
         } catch { /* ignore */ }
-        return DEFAULT_TINH_TRANG_RA_VIEN;
+        // Migration: loại bỏ các tùy chọn cũ và đảm bảo có 'Chuyển tuyến'
+        list = list.filter(item => item !== 'Chuyển tuyến trên' && item !== 'Chuyển tuyến dưới');
+        if (!list.includes('Chuyển tuyến')) {
+            list.push('Chuyển tuyến');
+        }
+        try {
+            localStorage.setItem('cap_tinh_trang_ra_vien', JSON.stringify(list));
+        } catch { /* ignore */ }
+        return list;
     }, []);
 
     // Auto-calculate total days
@@ -117,14 +129,14 @@ export default function StepKetCuc({ data, ngayVaoVien, ngayRaVien, onChange }: 
                     {dienBienList.map((label) => {
                         const selected = (data.dienBienDieuTri || []);
                         const checked = selected.includes(label);
-                        const colors = ['amber', 'orange', 'rose', 'red', 'purple', 'blue'];
+                        const colors = ['amber', 'orange', 'rose', 'red', 'teal', 'blue'];
                         const color = colors[dienBienList.indexOf(label) % colors.length];
                         const bgMap: Record<string, string> = {
                             amber: 'bg-amber-50 border-amber-300',
                             orange: 'bg-orange-50 border-orange-300',
                             rose: 'bg-rose-50 border-rose-300',
                             red: 'bg-red-50 border-red-300',
-                            purple: 'bg-purple-50 border-purple-300',
+                            teal: 'bg-teal-50 border-teal-300',
                             blue: 'bg-blue-50 border-blue-300',
                         };
                         return (
@@ -170,21 +182,20 @@ export default function StepKetCuc({ data, ngayVaoVien, ngayRaVien, onChange }: 
             {/* ── 2. Tình trạng ra viện (single choice — dynamic from settings) ── */}
             <div className="border-t border-gray-100 pt-5">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Tình trạng ra viện <span className="text-gray-400 font-normal">(chọn 1)</span></h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
                     {tinhTrangList.map((label) => {
                         const selected = data.tinhTrangRaVien === label;
-                        const colors = ['red', 'orange', 'green', 'blue', 'purple'];
-                        const color = colors[tinhTrangList.indexOf(label) % colors.length];
-                        const bgMap: Record<string, string> = {
-                            red: 'bg-red-50 border-red-300',
-                            orange: 'bg-orange-50 border-orange-300',
-                            green: 'bg-green-50 border-green-300',
-                            blue: 'bg-blue-50 border-blue-300',
-                            purple: 'bg-purple-50 border-purple-300',
+                        const styleMap: Record<string, string> = {
+                            'Tử vong': 'bg-red-50 border-red-400 text-red-900 shadow-2xs',
+                            'Xin về': 'bg-amber-50 border-amber-400 text-amber-900 shadow-2xs',
+                            'Tiến triển tốt, xuất viện': 'bg-emerald-50 border-emerald-400 text-emerald-900 shadow-2xs',
+                            'Chuyển tuyến': 'bg-sky-50 border-sky-400 text-sky-900 shadow-2xs',
                         };
+                        const activeStyle = styleMap[label] || 'bg-teal-50 border-teal-400 text-teal-900 shadow-2xs';
+
                         return (
                             <label key={label}
-                                className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${selected ? bgMap[color] : 'border-gray-200 hover:border-gray-300'}`}>
+                                className={`flex items-center gap-2.5 py-2.5 px-3 rounded-xl border-2 cursor-pointer transition-all ${selected ? activeStyle : 'border-gray-200 hover:border-gray-300 bg-white'}`}>
                                 <input type="radio" name="tinhTrangRaVien"
                                     checked={selected}
                                     onChange={() => {
@@ -195,11 +206,14 @@ export default function StepKetCuc({ data, ngayVaoVien, ngayRaVien, onChange }: 
                                             tuVong: label === 'Tử vong',
                                             xinVe: label === 'Xin về',
                                             tienTrienTotXuatVien: label === 'Tiến triển tốt, xuất viện',
+                                            chuyenTuyen: label === 'Chuyển tuyến',
                                         };
                                         onChange(updated);
                                     }}
-                                    className="w-4 h-4 border-gray-300 text-primary-600 focus:ring-primary-500" />
-                                <span className="text-sm font-medium text-gray-800">{label}</span>
+                                    className="w-4 h-4 border-gray-300 text-primary-600 focus:ring-primary-500 shrink-0" />
+                                <span className="text-xs sm:text-sm font-medium text-gray-800 leading-snug truncate" title={label}>
+                                    {label}
+                                </span>
                             </label>
                         );
                     })}

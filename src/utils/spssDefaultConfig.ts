@@ -307,10 +307,12 @@ const KET_CUC: SpssVarDef[] = [
     num('kc_ngay_loc_mau', 'Kết cục: Số ngày lọc máu', 'ket_cuc', { decimals: 0, measureLevel: 'scale' }),
     // Tình trạng ra viện — chuỗi (text từ dropdown)
     str('kc_tinh_trang_ra_vien', 'Kết cục: Tình trạng ra viện', 'ket_cuc', { width: 64 }),
-    // Legacy binary outcomes
+    // Binary outcomes
     binClinical('kc_tu_vong', 'Kết cục: Tử vong', 'ket_cuc'),
     binClinical('kc_xin_ve', 'Kết cục: Xin về', 'ket_cuc'),
     bin('kc_tien_trien_tot', 'Kết cục: Tiến triển tốt — xuất viện', 'ket_cuc'),
+    binClinical('kc_chuyen_tuyen', 'Kết cục: Chuyển tuyến', 'ket_cuc'),
+    binClinical('kc_ket_cuc_nang', 'Kết cục: Biến cố nặng (Tử vong / Xin về / Chuyển tuyến)', 'ket_cuc'),
     // Thời gian
     num('kc_ngay_dieu_tri', 'Kết cục: Tổng số ngày điều trị', 'ket_cuc', { decimals: 0, measureLevel: 'scale' }),
     str('kc_ngay_bat_dau_ks', 'Kết cục: Ngày bắt đầu kháng sinh (dd/mm/yyyy)', 'ket_cuc', { width: 16 }),

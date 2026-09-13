@@ -249,9 +249,10 @@ const psiColor = (score: number) =>
             'bg-red-50 text-red-700';
 
 const ketCucBadge = (p: Patient) => {
-    if (p.ketCuc.tuVong) return <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-medium">Tử vong</span>;
-    if (p.ketCuc.tienTrienTotXuatVien) return <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 font-medium">Xuất viện</span>;
-    if (p.ketCuc.xinVe) return <span className="text-xs px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 font-medium">Xin về</span>;
+    if (p.ketCuc.tuVong || p.ketCuc.tinhTrangRaVien === 'Tử vong') return <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-medium">Tử vong</span>;
+    if (p.ketCuc.tienTrienTotXuatVien || p.ketCuc.tinhTrangRaVien === 'Tiến triển tốt, xuất viện') return <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 font-medium">Xuất viện</span>;
+    if (p.ketCuc.xinVe || p.ketCuc.tinhTrangRaVien === 'Xin về') return <span className="text-xs px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 font-medium">Xin về</span>;
+    if (p.ketCuc.chuyenTuyen || p.ketCuc.tinhTrangRaVien === 'Chuyển tuyến') return <span className="text-xs px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 font-medium">Chuyển tuyến</span>;
     if (p.ketCuc.tinhTrangRaVien) return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 font-medium">{p.ketCuc.tinhTrangRaVien}</span>;
     return '—';
 };
@@ -533,9 +534,10 @@ export default function DashboardPage() {
         }
 
         if (filters.ketCucType.size > 0) {
-            const matched = (filters.ketCucType.has('tu_vong') && p.ketCuc?.tuVong)
-                || (filters.ketCucType.has('xin_ve') && p.ketCuc?.xinVe)
-                || (filters.ketCucType.has('xuat_vien') && p.ketCuc?.tienTrienTotXuatVien);
+            const matched = (filters.ketCucType.has('tu_vong') && (p.ketCuc?.tuVong || p.ketCuc?.tinhTrangRaVien === 'Tử vong'))
+                || (filters.ketCucType.has('xin_ve') && (p.ketCuc?.xinVe || p.ketCuc?.tinhTrangRaVien === 'Xin về'))
+                || (filters.ketCucType.has('xuat_vien') && (p.ketCuc?.tienTrienTotXuatVien || p.ketCuc?.tinhTrangRaVien === 'Tiến triển tốt, xuất viện'))
+                || (filters.ketCucType.has('chuyen_tuyen') && (p.ketCuc?.chuyenTuyen || p.ketCuc?.tinhTrangRaVien === 'Chuyển tuyến'));
             if (!matched) return false;
         }
 
@@ -1104,7 +1106,7 @@ export default function DashboardPage() {
                             <div className="mt-2">
                                 <span className="text-[11px] text-gray-400">Tình trạng ra viện</span>
                                 <div className="mt-1 flex flex-wrap gap-1">
-                                    {[{ v: 'xuat_vien', l: 'Xuất viện' }, { v: 'tu_vong', l: 'Tử vong' }, { v: 'xin_ve', l: 'Xin về' }].map(o => (
+                                    {[{ v: 'xuat_vien', l: 'Xuất viện' }, { v: 'tu_vong', l: 'Tử vong' }, { v: 'xin_ve', l: 'Xin về' }, { v: 'chuyen_tuyen', l: 'Chuyển tuyến' }].map(o => (
                                         <button
                                             key={o.v}
                                             onClick={() => setFilters(prev => {

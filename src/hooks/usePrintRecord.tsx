@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import PrintResearchRecord from '../components/print/PrintResearchRecord';
 import type { Patient } from '../types/patient';
 
+import { loadBancVisibility } from '../data/bancFields';
+
 interface PrintSettings {
     paperSize: 'A4' | 'A5' | 'Letter';
     margins: { top: number; left: number; right: number; bottom: number };
@@ -12,6 +14,7 @@ interface PrintSettings {
     signLeft: string;
     signRight: string;
     showPsiLevel: boolean;
+    fieldVisibility?: Record<string, boolean>;
 }
 
 const DEFAULT_PRINT_SETTINGS: PrintSettings = {
@@ -26,11 +29,12 @@ const DEFAULT_PRINT_SETTINGS: PrintSettings = {
 };
 
 function loadPrintSettings(): PrintSettings {
+    const visibility = loadBancVisibility();
     try {
         const raw = localStorage.getItem('cap_print_settings');
-        if (raw) return { ...DEFAULT_PRINT_SETTINGS, ...JSON.parse(raw) };
+        if (raw) return { ...DEFAULT_PRINT_SETTINGS, fieldVisibility: visibility, ...JSON.parse(raw) };
     } catch { /* ignore */ }
-    return DEFAULT_PRINT_SETTINGS;
+    return { ...DEFAULT_PRINT_SETTINGS, fieldVisibility: visibility };
 }
 
 export function usePrintRecord() {

@@ -229,6 +229,7 @@ export interface KetCuc {
     tuVong: boolean;
     xinVe: boolean;
     tienTrienTotXuatVien: boolean;
+    chuyenTuyen?: boolean;
     // Other
     tongSoNgayDieuTri: number | null;
     ngayBatDauKhangSinh: string;
@@ -316,7 +317,7 @@ export const createDefaultKetCuc = (): KetCuc => ({
     thoMay: false, socNhiemKhuan: false, locMau: false, soNgayLocMau: null,
     dienBienDieuTri: [],
     tinhTrangRaVien: '',
-    tuVong: false, xinVe: false, tienTrienTotXuatVien: false,
+    tuVong: false, xinVe: false, tienTrienTotXuatVien: false, chuyenTuyen: false,
     tongSoNgayDieuTri: null,
     ngayBatDauKhangSinh: '', ngayKetThucKhangSinh: '',
 });

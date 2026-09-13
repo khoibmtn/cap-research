@@ -16,7 +16,6 @@
 
 /* ── Print mode ── */
 @media print {
-
     /* Hide everything except the print container */
     body>*:not(.print-overlay) {
         display: none !important;
@@ -30,8 +29,20 @@
     .print-container {
         display: block !important;
     }
+}
 
-    /* ── Typography ── */
+/* ── Screen Preview Sheet ── */
+.banc-preview-sheet {
+    background-color: #ffffff;
+    color: #000000;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+    margin: 0 auto 32px auto;
+    min-height: 297mm;
+    height: auto;
+    box-sizing: border-box;
+}
+
+/* ── Typography ── */
     .print-record,
     .print-record * {
         font-family: 'Times New Roman', Times, serif;
@@ -236,4 +247,3 @@
         display: inline-flex;
         gap: 12px;
     }
-}
