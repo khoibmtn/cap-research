@@ -265,11 +265,12 @@ function Table311({ patients }: { patients: Patient[] }) {
         const hutThuoc = patients.filter(p => p.tienSu.hutThuocLa).length;
         const soBaoNam = patients.map(p => p.tienSu.soBaoNam).filter(num);
         const ngayDT = patients.map(p => p.ketCuc?.tongSoNgayDieuTri).filter(num);
-        const tuVong = patients.filter(p => p.ketCuc?.tuVong).length;
-        const xuatVien = patients.filter(p => p.ketCuc?.tienTrienTotXuatVien).length;
-        const xinVe = patients.filter(p => p.ketCuc?.xinVe).length;
+        const tuVong = patients.filter(p => p.ketCuc?.tuVong || p.ketCuc?.tinhTrangRaVien === 'Tử vong').length;
+        const xuatVien = patients.filter(p => p.ketCuc?.tienTrienTotXuatVien || p.ketCuc?.tinhTrangRaVien === 'Tiến triển tốt, xuất viện').length;
+        const xinVe = patients.filter(p => p.ketCuc?.xinVe || p.ketCuc?.tinhTrangRaVien === 'Xin về').length;
+        const chuyenTuyen = patients.filter(p => p.ketCuc?.chuyenTuyen || p.ketCuc?.tinhTrangRaVien === 'Chuyển tuyến').length;
 
-        return { ages, males, females, bmis, ngheNghiep, noiO, tienSuItems, hutThuoc, soBaoNam, ngayDT, tuVong, xuatVien, xinVe };
+        return { ages, males, females, bmis, ngheNghiep, noiO, tienSuItems, hutThuoc, soBaoNam, ngayDT, tuVong, xuatVien, xinVe, chuyenTuyen };
     }, [patients]);
 
     // Tiền sử dùng kháng sinh trước nhập viện
@@ -332,10 +333,11 @@ function Table311({ patients }: { patients: Patient[] }) {
     rows.push(['Thời gian khởi bệnh → nhập viện (ngày)', thoiGianKhoiBenh.length > 0 ? meanSd(thoiGianKhoiBenh) : '—', thoiGianKhoiBenh.length > 0 ? `Median: ${median(thoiGianKhoiBenh).toFixed(0)}, n = ${thoiGianKhoiBenh.length}` : '—']);
 
     rows.push(['Số ngày điều trị (Mean ± SD)', data.ngayDT.length > 0 ? meanSd(data.ngayDT) : '—', data.ngayDT.length > 0 ? minMax(data.ngayDT) : '—']);
-    rows.push(['Kết cục', '', '']);
-    rows.push(['  Xuất viện', String(data.xuatVien), pct(data.xuatVien, N)]);
+    rows.push(['Kết cục điều trị', '', '']);
+    rows.push(['  Tiến triển tốt, xuất viện', String(data.xuatVien), pct(data.xuatVien, N)]);
     rows.push(['  Tử vong', String(data.tuVong), pct(data.tuVong, N)]);
     rows.push(['  Xin về', String(data.xinVe), pct(data.xinVe, N)]);
+    rows.push(['  Chuyển viện / Chuyển tuyến', String(data.chuyenTuyen), pct(data.chuyenTuyen, N)]);
 
     return (
         <SectionCard
@@ -1136,8 +1138,10 @@ function Table316b({ patients }: { patients: Patient[] }) {
             il17: 'IL-17', crp: 'CRP (mg/L)', procalcitonin: 'PCT (ng/mL)',
         };
 
-        const tuVongKhongMoc = khongMocGroup.filter(p => p.ketCuc?.tuVong).length;
-        const tuVongCoVK = coVkGroup.filter(p => p.ketCuc?.tuVong).length;
+        const tuVongKhongMoc = khongMocGroup.filter(p => p.ketCuc?.tuVong || p.ketCuc?.tinhTrangRaVien === 'Tử vong').length;
+        const tuVongCoVK = coVkGroup.filter(p => p.ketCuc?.tuVong || p.ketCuc?.tinhTrangRaVien === 'Tử vong').length;
+        const chuyenTuyenKhongMoc = khongMocGroup.filter(p => p.ketCuc?.chuyenTuyen || p.ketCuc?.tinhTrangRaVien === 'Chuyển tuyến').length;
+        const chuyenTuyenCoVK = coVkGroup.filter(p => p.ketCuc?.chuyenTuyen || p.ketCuc?.tinhTrangRaVien === 'Chuyển tuyến').length;
         const nangPSIKhongMoc = khongMocGroup.filter(p => p.psi.tongDiem > 0 && ['III', 'IV', 'V'].includes(psiClass(p.psi.tongDiem))).length;
         const nangPSICoVK = coVkGroup.filter(p => p.psi.tongDiem > 0 && ['III', 'IV', 'V'].includes(psiClass(p.psi.tongDiem))).length;
         const nangCURBKhongMoc = khongMocGroup.filter(p => getCurb65(p).tongDiem >= 2).length;
@@ -1149,6 +1153,7 @@ function Table316b({ patients }: { patients: Patient[] }) {
             nKhongMoc: khongMocGroup.length,
             nCoVK: coVkGroup.length,
             tuVongKhongMoc, tuVongCoVK,
+            chuyenTuyenKhongMoc, chuyenTuyenCoVK,
             nangPSIKhongMoc, nangPSICoVK,
             nangCURBKhongMoc, nangCURBCoVK,
             thoMayKhongMoc, thoMayCoVK,
@@ -1180,6 +1185,7 @@ function Table316b({ patients }: { patients: Patient[] }) {
     const clinicalRows: (string | React.ReactNode)[][] = [
         ['Số bệnh nhân', String(data.nKhongMoc), `${pct(data.nKhongMoc, N)}`, String(data.nCoVK), `${pct(data.nCoVK, N)}`],
         ['Tử vong', String(data.tuVongKhongMoc), frac(data.tuVongKhongMoc, data.nKhongMoc || 1), String(data.tuVongCoVK), frac(data.tuVongCoVK, data.nCoVK || 1)],
+        ['Chuyển viện / Chuyển tuyến', String(data.chuyenTuyenKhongMoc), frac(data.chuyenTuyenKhongMoc, data.nKhongMoc || 1), String(data.chuyenTuyenCoVK), frac(data.chuyenTuyenCoVK, data.nCoVK || 1)],
         ['PSI nặng (III–V)', String(data.nangPSIKhongMoc), frac(data.nangPSIKhongMoc, data.nKhongMoc || 1), String(data.nangPSICoVK), frac(data.nangPSICoVK, data.nCoVK || 1)],
         ['CURB-65 nặng (≥2)', String(data.nangCURBKhongMoc), frac(data.nangCURBKhongMoc, data.nKhongMoc || 1), String(data.nangCURBCoVK), frac(data.nangCURBCoVK, data.nCoVK || 1)],
         ['Thở máy', String(data.thoMayKhongMoc), frac(data.thoMayKhongMoc, data.nKhongMoc || 1), String(data.thoMayCoVK), frac(data.thoMayCoVK, data.nCoVK || 1)],
@@ -1462,12 +1468,14 @@ function Table323({ patients }: { patients: Patient[] }) {
     const [computed, , triggerCompute] = useComputeP();
 
     const data = useMemo(() => {
-        const tuVong = patients.filter(p => p.ketCuc?.tuVong);
-        const song = patients.filter(p => !p.ketCuc?.tuVong && (p.ketCuc?.tienTrienTotXuatVien || p.ketCuc?.xinVe || p.ketCuc?.chuyenTuyen || p.ketCuc?.tinhTrangRaVien === 'Chuyển tuyến'));
+        const tuVong = patients.filter(p => p.ketCuc?.tuVong || p.ketCuc?.tinhTrangRaVien === 'Tử vong');
+        const song = patients.filter(p => !(p.ketCuc?.tuVong || p.ketCuc?.tinhTrangRaVien === 'Tử vong') && (p.ketCuc?.tienTrienTotXuatVien || p.ketCuc?.xinVe || p.ketCuc?.chuyenTuyen || p.ketCuc?.tinhTrangRaVien === 'Chuyển tuyến' || p.ketCuc?.tinhTrangRaVien === 'Tiến triển tốt, xuất viện' || p.ketCuc?.tinhTrangRaVien === 'Xin về'));
         const thoMay = patients.filter(p => p.ketCuc?.thoMay || p.ketCuc?.dienBienDieuTri?.includes('Thở máy'));
         const khongThoMay = patients.filter(p => !(p.ketCuc?.thoMay || p.ketCuc?.dienBienDieuTri?.includes('Thở máy')));
         const socNK = patients.filter(p => p.ketCuc?.socNhiemKhuan || p.ketCuc?.dienBienDieuTri?.includes('Sốc nhiễm khuẩn'));
         const khongSocNK = patients.filter(p => !(p.ketCuc?.socNhiemKhuan || p.ketCuc?.dienBienDieuTri?.includes('Sốc nhiễm khuẩn')));
+        const chuyenVien = patients.filter(p => p.ketCuc?.chuyenTuyen || p.ketCuc?.tinhTrangRaVien === 'Chuyển tuyến');
+        const khongChuyenVien = patients.filter(p => !(p.ketCuc?.chuyenTuyen || p.ketCuc?.tinhTrangRaVien === 'Chuyển tuyến'));
 
         const extract = (group: Patient[], key: string) => {
             const vals = group.map(p => p.xetNghiem[key as keyof typeof p.xetNghiem] as number | null).filter(num) as number[];
@@ -1479,7 +1487,7 @@ function Table323({ patients }: { patients: Patient[] }) {
             };
         };
 
-        return { tuVong, song, thoMay, khongThoMay, socNK, khongSocNK, extract };
+        return { tuVong, song, thoMay, khongThoMay, socNK, khongSocNK, chuyenVien, khongChuyenVien, extract };
     }, [patients]);
 
     const markers: { key: string; label: string }[] = [
@@ -1511,7 +1519,7 @@ function Table323({ patients }: { patients: Patient[] }) {
         <SectionCard
             id="table-323"
             title="Bảng 3.10 — Biomarker theo kết cục lâm sàng"
-            subtitle="Mục 3.2.1: So sánh nồng độ biomarker giữa các nhóm kết cục (tử vong, thở máy, sốc NK)"
+            subtitle="Mục 3.2.1: So sánh nồng độ biomarker giữa các nhóm kết cục (tử vong, thở máy, sốc NK, chuyển viện)"
         >
             <div className="flex items-center gap-3 mb-3">
                 <CalcButton onClick={triggerCompute} computed={computed} />
@@ -1545,6 +1553,16 @@ function Table323({ patients }: { patients: Patient[] }) {
                     <DataTable
                         headers={['Biomarker', 'Sốc NK — Median (Q1–Q3)', 'n', 'Không — Median (Q1–Q3)', 'n', 'p']}
                         rows={buildRows(data.socNK, data.khongSocNK)}
+                    />
+                </div>
+
+                <div>
+                    <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
+                        D. Chuyển viện / Chuyển tuyến (n={data.chuyenVien.length}) vs Không chuyển tuyến (n={data.khongChuyenVien.length})
+                    </h4>
+                    <DataTable
+                        headers={['Biomarker', 'Chuyển tuyến — Median (Q1–Q3)', 'n', 'Không chuyển — Median (Q1–Q3)', 'n', 'p']}
+                        rows={buildRows(data.chuyenVien, data.khongChuyenVien)}
                     />
                 </div>
             </div>
@@ -1765,27 +1783,37 @@ function Table33Drug({ patients, drugGroup1, drugGroup2 }: { patients: Patient[]
 function Table34Outcome({ patients }: { patients: Patient[] }) {
     const N = patients.length;
     const data = useMemo(() => {
-        const thoMay = patients.filter(p => p.ketCuc?.thoMay).length;
-        const socNK = patients.filter(p => p.ketCuc?.socNhiemKhuan).length;
-        const locMau = patients.filter(p => p.ketCuc?.locMau).length;
+        const thoMay = patients.filter(p => p.ketCuc?.thoMay || p.ketCuc?.dienBienDieuTri?.includes('Thở máy')).length;
+        const socNK = patients.filter(p => p.ketCuc?.socNhiemKhuan || p.ketCuc?.dienBienDieuTri?.includes('Sốc nhiễm khuẩn')).length;
+        const locMau = patients.filter(p => p.ketCuc?.locMau || p.ketCuc?.dienBienDieuTri?.includes('Lọc máu')).length;
         const ngayLocMau = patients.map(p => p.ketCuc?.soNgayLocMau).filter(num);
 
-        // Diễn biến điều trị (dynamic)
+        // Diễn biến điều trị (dynamic ngoài 3 mục chính)
         const dienBien: Record<string, number> = {};
         patients.forEach(p => {
             p.ketCuc?.dienBienDieuTri?.forEach(db => {
-                if (db) dienBien[db] = (dienBien[db] || 0) + 1;
+                if (db && !['Thở máy', 'Sốc nhiễm khuẩn', 'Lọc máu'].includes(db)) {
+                    dienBien[db] = (dienBien[db] || 0) + 1;
+                }
             });
         });
 
-        // Tình trạng ra viện
-        const raVien: Record<string, number> = {};
+        // Tình trạng ra viện (chuẩn 4 nhóm nghiên cứu)
+        const xuatVien = patients.filter(p => p.ketCuc?.tienTrienTotXuatVien || p.ketCuc?.tinhTrangRaVien === 'Tiến triển tốt, xuất viện').length;
+        const tuVong = patients.filter(p => p.ketCuc?.tuVong || p.ketCuc?.tinhTrangRaVien === 'Tử vong').length;
+        const xinVe = patients.filter(p => p.ketCuc?.xinVe || p.ketCuc?.tinhTrangRaVien === 'Xin về').length;
+        const chuyenTuyen = patients.filter(p => p.ketCuc?.chuyenTuyen || p.ketCuc?.tinhTrangRaVien === 'Chuyển tuyến').length;
+
+        // Tình trạng khác nếu có
+        const raVienKhac: Record<string, number> = {};
         patients.forEach(p => {
             const tt = p.ketCuc?.tinhTrangRaVien || '';
-            if (tt) raVien[tt] = (raVien[tt] || 0) + 1;
+            if (tt && !['Tiến triển tốt, xuất viện', 'Tử vong', 'Xin về', 'Chuyển tuyến'].includes(tt)) {
+                raVienKhac[tt] = (raVienKhac[tt] || 0) + 1;
+            }
         });
 
-        return { thoMay, socNK, locMau, ngayLocMau, dienBien, raVien };
+        return { thoMay, socNK, locMau, ngayLocMau, dienBien, xuatVien, tuVong, xinVe, chuyenTuyen, raVienKhac };
     }, [patients]);
 
     const rows: (string | React.ReactNode)[][] = [
@@ -1801,12 +1829,15 @@ function Table34Outcome({ patients }: { patients: Patient[] }) {
         rows.push([`  ${k}`, String(v), pct(v, N)]);
     });
 
-    if (Object.keys(data.raVien).length > 0) {
-        rows.push(['Tình trạng ra viện', '', '']);
-        Object.entries(data.raVien).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => {
-            rows.push([`  ${k}`, String(v), pct(v, N)]);
-        });
-    }
+    rows.push(['Tình trạng ra viện (Kết cục)', '', '']);
+    rows.push(['  Tiến triển tốt, xuất viện', String(data.xuatVien), pct(data.xuatVien, N)]);
+    rows.push(['  Tử vong tại viện', String(data.tuVong), pct(data.tuVong, N)]);
+    rows.push(['  Tiên lượng nặng xin về', String(data.xinVe), pct(data.xinVe, N)]);
+    rows.push(['  Chuyển viện / Chuyển tuyến', String(data.chuyenTuyen), pct(data.chuyenTuyen, N)]);
+
+    Object.entries(data.raVienKhac).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => {
+        rows.push([`  ${k}`, String(v), pct(v, N)]);
+    });
 
     return (
         <SectionCard

@@ -25,13 +25,19 @@
    - Phát hiện nguyên nhân mẫu bị mất do `firestore.rules` chưa deploy lên Firebase Cloud khiến cloud chặn quyền ghi `analysis_templates`.
    - Đã deploy thành công `firestore.rules` lên Firebase Cloud.
    - Nâng cấp `templateService.ts` với cơ chế đồng bộ 2 chiều (Smart Merge) và tự động upload mẫu từ Local lên Firestore khi mở ứng dụng.
-6. **Đồng Bộ Sổ Tay Người Dùng:**
+6. **Bổ Sung Biến Chuyển Viện / Chuyển Tuyến Vào Tab Dự Kiến Kết Quả NC:**
+   - Bảng 3.1: Thêm dòng *Chuyển viện / Chuyển tuyến* vào nhóm *Kết cục điều trị*.
+   - Bảng 3.6b: Thêm so sánh *Chuyển viện / Chuyển tuyến* giữa nhóm không mọc vi khuẩn vs có vi khuẩn.
+   - Bảng 3.10: Thêm Mục D so sánh nồng độ 7 biomarkers giữa nhóm *Chuyển viện / Chuyển tuyến* vs *Không chuyển tuyến*.
+   - Bảng 3.x (Kết cục bổ sung): Chuẩn hóa phân loại tình trạng ra viện thành 4 nhóm chuẩn y khoa (*Tiến triển tốt xuất viện*, *Tử vong tại viện*, *Tiên lượng nặng xin về*, *Chuyển viện / Chuyển tuyến*).
+7. **Đồng Bộ Sổ Tay Người Dùng:**
    - Cập nhật đầy đủ `instruction.md` phản ánh mọi tính năng mới.
 
 ## Work In Progress
 - Toàn bộ các tính năng yêu cầu trong phiên đều đã hoàn thành 100%, kiểm tra build và chạy thử trên browser đạt kết quả hoàn hảo.
 
 ## Key Files Modified
+- `src/components/analytics/ExpectedResultsTab.tsx`: Bổ sung biến Chuyển viện / Chuyển tuyến vào các Bảng 3.1, 3.6b, 3.10 (Mục D), và 3.x.
 - `firestore.rules`: Cấp quyền read/write cho collection `analysis_templates`.
 - `src/services/templateService.ts`: Quản lý lưu và đồng bộ 2 chiều mẫu phân tích Bảng chéo & Hồi quy.
 - `src/data/bancFields.ts`: Định nghĩa danh mục biến BANC và các biến con (`subFields`).

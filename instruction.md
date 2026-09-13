@@ -153,7 +153,17 @@ Dành cho **Mục tiêu 2** — dấu ấn sinh học:
 
 ### Tab "Dự kiến kết quả NC"
 
-Hiển thị các bảng dự kiến kết quả nghiên cứu theo mẫu luận văn: so sánh nhóm bệnh nhân theo đặc điểm lâm sàng, xét nghiệm, vi sinh, và thuốc sử dụng.
+Hiển thị toàn bộ các bảng kết quả nghiên cứu chuẩn mực theo khung luận văn y khoa:
+- **Bảng 3.1 (Đặc điểm chung đối tượng nghiên cứu):** Tổng hợp tuổi, giới, BMI, nơi cư trú, bệnh đồng mắc, thói quen hút thuốc, thời gian khởi bệnh, số ngày điều trị nội trú, và **kết cục điều trị** với đầy đủ 4 phân nhóm: *Tiến triển tốt xuất viện*, *Tử vong*, *Xin về*, và ***Chuyển viện / Chuyển tuyến***.
+- **Bảng 3.2 – 3.5 (Lâm sàng, Cận lâm sàng, PSI, CURB-65, Hình ảnh học):** Thống kê chi tiết các triệu chứng, xét nghiệm sinh hóa/khí máu/công thức máu và tổn thương X-quang/CT.
+- **Bảng 3.6 & 3.6b (Căn nguyên vi sinh & Nhóm không mọc vi khuẩn):** So sánh đặc điểm lâm sàng giữa nhóm không mọc vi khuẩn vs có vi khuẩn (bao gồm *Tử vong*, *Thở máy*, *Phân độ nặng PSI/CURB-65*, và ***Chuyển viện / Chuyển tuyến***).
+- **Bảng 3.10 (Biomarker theo kết cục lâm sàng):** So sánh trung vị (Q1–Q3) và kiểm định Mann-Whitney U của 7 biomarkers giữa các cặp kết cục:
+  - Mục A: Tử vong vs Sống
+  - Mục B: Thở máy vs Không thở máy
+  - Mục C: Sốc nhiễm khuẩn vs Không sốc NK
+  - Mục D: ***Chuyển viện / Chuyển tuyến vs Không chuyển tuyến***
+- **Bảng 3.x (Diễn biến điều trị & Kết cục bổ sung):** Thống kê chi tiết can thiệp hồi sức (Thở máy, Sốc NK, Lọc máu, số ngày lọc máu) và tình trạng ra viện chuẩn 4 nhóm (*Xuất viện*, *Tử vong tại viện*, *Tiên lượng nặng xin về*, ***Chuyển viện / Chuyển tuyến***).
+- **Biểu đồ Kaplan-Meier:** Vẽ đường cong sống còn theo thời gian nằm viện.
 
 ### Tab "Bảng chéo (m×n)"
 
