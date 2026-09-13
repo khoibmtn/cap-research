@@ -3,7 +3,7 @@
  * Tab Hồi quy (Logistic nhị phân & Tuyến tính) cho trang Thống kê.
  * Output tương đương SPSS Regression + diễn giải kết quả.
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { Patient } from '../../types/patient';
 import {
     runLinearRegression, runLogisticRegression,
@@ -16,8 +16,14 @@ import {
 } from 'recharts';
 import {
     Plus, X, AlertTriangle, CheckCircle, Info, TrendingUp, Loader2,
+    Bookmark, Star, Trash2, Save, Pencil
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import {
+    type AnalysisTemplate,
+    getTemplates, saveTemplate, deleteTemplate, setDefaultTemplate, renameTemplate,
+    saveLastState, getLastState
+} from '../../services/templateService';
 
 // ═══════════════════════════════════════════════════════════
 // VARIABLE REGISTRY — All extractable numeric variables
@@ -152,6 +158,11 @@ const ALL_VARIABLES: RegressionVar[] = [
 
     // ── Kết cục ──
     { id: 'kc_tuVong', label: 'Tử vong', group: 'Kết cục', type: 'binary', extract: p => p.ketCuc?.tinhTrangRaVien === 'Tử vong' ? 1 : p.ketCuc?.tinhTrangRaVien ? 0 : null },
+    { id: 'kc_chuyenTuyen', label: 'Chuyển tuyến', group: 'Kết cục', type: 'binary', extract: p => (p.ketCuc?.chuyenTuyen || p.ketCuc?.tinhTrangRaVien === 'Chuyển tuyến') ? 1 : p.ketCuc?.tinhTrangRaVien ? 0 : null },
+    { id: 'kc_ketCucNang', label: 'Biến cố nặng (TV/Xin về/Chuyển tuyến)', group: 'Kết cục', type: 'binary', extract: p => {
+        if (!p.ketCuc?.tinhTrangRaVien && !p.ketCuc?.tuVong && !p.ketCuc?.xinVe && !p.ketCuc?.chuyenTuyen) return null;
+        return (p.ketCuc.tuVong || p.ketCuc.xinVe || p.ketCuc.chuyenTuyen || p.ketCuc.tinhTrangRaVien === 'Tử vong' || p.ketCuc.tinhTrangRaVien === 'Xin về' || p.ketCuc.tinhTrangRaVien === 'Chuyển tuyến') ? 1 : 0;
+    }},
     { id: 'kc_thoMay', label: 'Thở máy', group: 'Kết cục', type: 'binary', extract: p => p.ketCuc?.thoMay ? 1 : 0 },
     { id: 'kc_socNK', label: 'Sốc nhiễm khuẩn', group: 'Kết cục', type: 'binary', extract: p => p.ketCuc?.socNhiemKhuan ? 1 : 0 },
     { id: 'kc_locMau', label: 'Lọc máu', group: 'Kết cục', type: 'binary', extract: p => p.ketCuc?.locMau ? 1 : 0 },
@@ -714,6 +725,166 @@ export default function RegressionTab({ patients }: { patients: Patient[] }) {
     const [univariateResults, setUnivariateResults] = useState<{ varId: string; result: LinearRegressionResult | LogisticRegressionResult | { error: string } }[]>([]);
     const [running, setRunning] = useState(false);
 
+    // Template & Persistence State
+    const [templates, setTemplates] = useState<AnalysisTemplate[]>([]);
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+    const [showSaveModal, setShowSaveModal] = useState(false);
+    const [showRenameModal, setShowRenameModal] = useState(false);
+    const [newTemplateName, setNewTemplateName] = useState('');
+    const [renameTemplateName, setRenameTemplateName] = useState('');
+    const [newTemplateIsDefault, setNewTemplateIsDefault] = useState(false);
+    const [isLoadedFromStorage, setIsLoadedFromStorage] = useState(false);
+
+    const applyTemplateConfig = useCallback((tmpl: AnalysisTemplate) => {
+        const cfg = tmpl.config;
+        if (cfg.regType) setRegType(cfg.regType);
+        if (cfg.mode) setMode(cfg.mode);
+        if (Array.isArray(cfg.depVarId)) setDepVarId(cfg.depVarId);
+        if (Array.isArray(cfg.indepVarIds)) setIndepVarIds(cfg.indepVarIds);
+        setSelectedTemplateId(tmpl.id);
+        setResult(null);
+        setUnivariateResults([]);
+    }, []);
+
+    // Load templates and restore last state or default template
+    useEffect(() => {
+        getTemplates('regression').then(list => {
+            setTemplates(list);
+
+            const last = getLastState<any>('regression');
+            const defaultTmpl = list.find(t => t.isDefault);
+
+            if (last && (last.depVarId?.length || last.indepVarIds?.length)) {
+                if (last.regType) setRegType(last.regType);
+                if (last.mode) setMode(last.mode);
+                if (Array.isArray(last.depVarId)) setDepVarId(last.depVarId);
+                if (Array.isArray(last.indepVarIds)) setIndepVarIds(last.indepVarIds);
+                if (last.templateId) setSelectedTemplateId(last.templateId);
+            } else if (defaultTmpl?.config) {
+                applyTemplateConfig(defaultTmpl);
+            }
+            setIsLoadedFromStorage(true);
+        });
+    }, [applyTemplateConfig]);
+
+    // Auto-save last state whenever configuration changes
+    useEffect(() => {
+        if (!isLoadedFromStorage) return;
+        saveLastState('regression', {
+            regType,
+            mode,
+            depVarId,
+            indepVarIds,
+            templateId: selectedTemplateId
+        });
+    }, [regType, mode, depVarId, indepVarIds, selectedTemplateId, isLoadedFromStorage]);
+
+    const handleSelectTemplate = (id: string) => {
+        if (!id) {
+            setSelectedTemplateId('');
+            return;
+        }
+        const tmpl = templates.find(t => t.id === id);
+        if (tmpl) {
+            applyTemplateConfig(tmpl);
+            toast.success(`Đã áp dụng mẫu "${tmpl.name}"`);
+        }
+    };
+
+    const handleSaveNewTemplate = async () => {
+        if (!newTemplateName.trim()) {
+            toast.error('Vui lòng nhập tên mẫu');
+            return;
+        }
+        try {
+            const saved = await saveTemplate({
+                name: newTemplateName.trim(),
+                type: 'regression',
+                isDefault: newTemplateIsDefault,
+                config: {
+                    regType,
+                    mode,
+                    depVarId,
+                    indepVarIds,
+                }
+            });
+            const updated = await getTemplates('regression');
+            setTemplates(updated);
+            setSelectedTemplateId(saved.id);
+            setShowSaveModal(false);
+            setNewTemplateName('');
+            setNewTemplateIsDefault(false);
+            toast.success('Đã lưu mẫu phân tích hồi quy mới');
+        } catch {
+            toast.error('Không thể lưu mẫu phân tích');
+        }
+    };
+
+    const handleUpdateCurrentTemplate = async () => {
+        const current = templates.find(t => t.id === selectedTemplateId);
+        if (!current) return;
+        try {
+            await saveTemplate({
+                id: current.id,
+                name: current.name,
+                type: 'regression',
+                isDefault: current.isDefault,
+                config: {
+                    regType,
+                    mode,
+                    depVarId,
+                    indepVarIds,
+                }
+            });
+            const updated = await getTemplates('regression');
+            setTemplates(updated);
+            toast.success(`Đã cập nhật mẫu "${current.name}"`);
+        } catch {
+            toast.error('Lỗi khi cập nhật mẫu');
+        }
+    };
+
+    const handleRenameTemplate = async () => {
+        if (!renameTemplateName.trim()) {
+            toast.error('Vui lòng nhập tên mẫu');
+            return;
+        }
+        try {
+            await renameTemplate(selectedTemplateId, renameTemplateName.trim(), 'regression');
+            const updated = await getTemplates('regression');
+            setTemplates(updated);
+            setShowRenameModal(false);
+            toast.success(`Đã đổi tên mẫu thành "${renameTemplateName.trim()}"`);
+        } catch {
+            toast.error('Lỗi khi đổi tên mẫu');
+        }
+    };
+
+    const handleDeleteTemplate = async (id: string) => {
+        const tmpl = templates.find(t => t.id === id);
+        if (!window.confirm(`Bạn có chắc muốn xóa mẫu "${tmpl?.name || 'này'}"?`)) return;
+        try {
+            await deleteTemplate(id, 'regression');
+            const updated = await getTemplates('regression');
+            setTemplates(updated);
+            if (selectedTemplateId === id) setSelectedTemplateId('');
+            toast.success('Đã xóa mẫu phân tích');
+        } catch {
+            toast.error('Lỗi khi xóa mẫu');
+        }
+    };
+
+    const handleSetDefaultTemplate = async (id: string) => {
+        try {
+            await setDefaultTemplate(id, 'regression');
+            const updated = await getTemplates('regression');
+            setTemplates(updated);
+            toast.success('Đã đặt làm mẫu mặc định');
+        } catch {
+            toast.error('Lỗi khi đặt mặc định');
+        }
+    };
+
     const enabledPatients = patients.filter(p => !p.disabled);
     const depVar = depVarId.length > 0 ? ALL_VARIABLES.find(v => v.id === depVarId[0]) : null;
 
@@ -776,8 +947,111 @@ export default function RegressionTab({ patients }: { patients: Patient[] }) {
 
     return (
         <div className="space-y-6">
-            {/* Controls panel */}
-            <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-5">
+            {/* ════════════════ 1. QUẢN LÝ & LƯU MẪU HỒI QUY (XANH DƯƠNG NHẠT) ════════════════ */}
+            <div className="bg-sky-50/70 border border-sky-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-sky-200/70 pb-3">
+                    <div className="flex items-center gap-2.5">
+                        <span className="w-6 h-6 rounded-full bg-sky-600 text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">1</span>
+                        <div>
+                            <h4 className="text-sm font-semibold text-sky-950">Quản lý & Lưu mẫu hồi quy</h4>
+                            <p className="text-xs text-sky-800/70">Lưu lại mô hình hồi quy (đơn biến/đa biến, Y, X) thường dùng hoặc đặt mẫu mặc định tự động nạp khi mở tab</p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const name = depVar ? `Hồi quy ${regType === 'logistic' ? 'Logistic' : 'Tuyến tính'}: ${depVar.label}` : 'Mẫu hồi quy mới';
+                            setNewTemplateName(name);
+                            setNewTemplateIsDefault(false);
+                            setShowSaveModal(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-sky-700 hover:bg-sky-800 rounded-lg transition-colors shadow-2xs shrink-0 self-start sm:self-auto"
+                    >
+                        <Bookmark className="w-3.5 h-3.5" />
+                        Lưu thành mẫu...
+                    </button>
+                </div>
+
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-1">
+                    <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-sky-900 bg-white px-2.5 py-1.5 rounded-lg border border-sky-200 shrink-0 shadow-2xs">
+                            <Bookmark className="w-4 h-4 text-sky-600" />
+                            <span>Mẫu hồi quy:</span>
+                        </div>
+                        <select
+                            value={selectedTemplateId}
+                            onChange={(e) => handleSelectTemplate(e.target.value)}
+                            className="text-xs sm:text-sm font-medium border border-sky-200 rounded-lg px-3 py-1.5 bg-white text-gray-900 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 min-w-[260px] sm:min-w-[360px] lg:min-w-[420px] max-w-2xl flex-1 shadow-2xs"
+                            title={templates.find(t => t.id === selectedTemplateId)?.name || 'Chọn mẫu hồi quy'}
+                        >
+                            <option value="">-- Mẫu mặc định / Chưa chọn mẫu --</option>
+                            {templates.map(t => (
+                                <option key={t.id} value={t.id}>
+                                    {t.name} {t.isDefault ? '⭐ [Mặc định]' : ''}
+                                </option>
+                            ))}
+                        </select>
+                        {selectedTemplateId && (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const cur = templates.find(t => t.id === selectedTemplateId);
+                                        if (cur) {
+                                            setRenameTemplateName(cur.name);
+                                            setShowRenameModal(true);
+                                        }
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors shadow-2xs"
+                                    title="Đổi tên mẫu hồi quy này"
+                                >
+                                    <Pencil className="w-3.5 h-3.5 text-slate-500" />
+                                    Đổi tên
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleUpdateCurrentTemplate}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-sky-800 bg-sky-100/80 border border-sky-300 rounded-lg hover:bg-sky-200/80 transition-colors shadow-2xs"
+                                    title="Lưu đè cấu hình hiện tại vào mẫu này"
+                                >
+                                    <Save className="w-3.5 h-3.5 text-sky-700" />
+                                    Cập nhật
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSetDefaultTemplate(selectedTemplateId)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors shadow-2xs"
+                                    title="Đặt mẫu này tự động tải khi mở tab"
+                                >
+                                    <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                                    Mặc định
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDeleteTemplate(selectedTemplateId)}
+                                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200"
+                                    title="Xóa mẫu này"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* ════════════════ 2. THIẾT LẬP MÔ HÌNH & ĐIỀU CHỈNH BIẾN (VÀNG NHẠT) ════════════════ */}
+            <div className="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/70 pb-3">
+                    <div className="flex items-center gap-2.5">
+                        <span className="w-6 h-6 rounded-full bg-amber-600 text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">2</span>
+                        <div>
+                            <h4 className="text-sm font-semibold text-amber-950">Thiết lập mô hình & Điều chỉnh biến</h4>
+                            <p className="text-xs text-amber-800/70">Chọn loại hồi quy, phương pháp phân tích, biến phụ thuộc (Y) và các biến độc lập (X)</p>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Regression type selector */}
                 <div>
                     <label className="text-xs font-medium text-gray-700 mb-2 block">Loại hồi quy</label>
@@ -811,13 +1085,13 @@ export default function RegressionTab({ patients }: { patients: Patient[] }) {
                         <button
                             onClick={() => { setMode('univariate'); setResult(null); setUnivariateResults([]); }}
                             className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${
-                                mode === 'univariate' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                mode === 'univariate' ? 'bg-amber-600 text-white font-semibold' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
                             }`}
                         >Phân tích đơn biến</button>
                         <button
                             onClick={() => { setMode('multivariate'); setResult(null); setUnivariateResults([]); }}
                             className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${
-                                mode === 'multivariate' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                mode === 'multivariate' ? 'bg-amber-600 text-white font-semibold' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
                             }`}
                         >Phân tích đa biến</button>
                     </div>
@@ -842,77 +1116,207 @@ export default function RegressionTab({ patients }: { patients: Patient[] }) {
                 </div>
 
                 {/* Run button */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 pt-2">
                     <button
                         onClick={runAnalysis}
                         disabled={running || !depVar || indepVarIds.length === 0}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-primary-600 rounded-xl hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-amber-600 rounded-xl hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
                     >
                         {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" />}
                         Chạy hồi quy
                     </button>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-gray-500">
                         n = {enabledPatients.length} bệnh nhân
                         {mode === 'univariate' && ` · ${indepVarIds.length} mô hình đơn biến`}
                     </span>
                 </div>
             </div>
 
-            {/* Error display */}
-            {result && 'error' in result && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-red-800">{result.error}</div>
+            {/* ════════════════ 3. HIỂN THỊ KẾT QUẢ & DIỄN GIẢI (NỀN TRẮNG) ════════════════ */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                        <span className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">3</span>
+                        <div>
+                            <h4 className="text-sm font-semibold text-gray-900">Hiển thị kết quả & Diễn giải mô hình hồi quy</h4>
+                            <p className="text-xs text-gray-500">Hệ số B / OR, 95% CI, p-value, bảng tóm tắt và đánh giá mức độ phù hợp mô hình</p>
+                        </div>
+                    </div>
+                    {(result || univariateResults.length > 0) && depVar && (
+                        <div className="text-xs text-emerald-900 font-semibold bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 self-start sm:self-auto">
+                            Y: {depVar.label} ({regType === 'logistic' ? 'Logistic' : 'Tuyến tính'} · {mode === 'univariate' ? 'Đơn biến' : 'Đa biến'})
+                        </div>
+                    )}
+                </div>
+
+                {/* If not run yet */}
+                {!result && univariateResults.length === 0 && !running && (
+                    <div className="text-center py-12 text-gray-400 text-sm bg-gray-50/50 rounded-xl border border-gray-100">
+                        <TrendingUp className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                        <p className="font-medium text-gray-600">Chưa chạy mô hình hồi quy</p>
+                        <p className="text-xs text-gray-400 mt-1">Vui lòng chọn biến phụ thuộc (Y) và ít nhất 1 biến độc lập (X) ở khối thiết lập rồi nhấn "Chạy hồi quy".</p>
+                    </div>
+                )}
+
+                {/* Error display */}
+                {result && 'error' in result && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+                        <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-red-800">{result.error}</div>
+                    </div>
+                )}
+
+                {/* Multivariate result */}
+                {result && !('error' in result) && result.type === 'linear' && (
+                    <LinearResultView
+                        result={result}
+                        depName={depVar?.label ?? ''}
+                        patients={enabledPatients}
+                        depId={depVarId[0]}
+                        indepIds={indepVarIds}
+                    />
+                )}
+                {result && !('error' in result) && result.type === 'logistic' && (
+                    <LogisticResultView result={result} depName={depVar?.label ?? ''} />
+                )}
+
+                {/* Univariate results */}
+                {univariateResults.length > 0 && (
+                    <div className="space-y-6">
+                        <h3 className="text-lg font-bold text-gray-800">Kết quả phân tích đơn biến ({univariateResults.length} mô hình)</h3>
+                        {/* Summary table first */}
+                        <UnivariateSummaryTable results={univariateResults} regType={regType} />
+                        {/* Detailed per variable */}
+                        {univariateResults.map(({ varId, result: r }) => {
+                            const xVar = ALL_VARIABLES.find(v => v.id === varId);
+                            if (!xVar) return null;
+                            return (
+                                <details key={varId} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                                    <summary className="px-4 py-3 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-50 flex items-center gap-2">
+                                        {'error' in r ? (
+                                            <><AlertTriangle className="w-4 h-4 text-red-500" /> {xVar.label}: {r.error}</>
+                                        ) : r.type === 'logistic' ? (
+                                            <><span className={r.omnibus.pValue < 0.05 ? 'text-green-600' : 'text-gray-400'}>{r.omnibus.pValue < 0.05 ? '✓' : '✗'}</span> {xVar.label} — OR = {r.coefficients[1]?.expB.toFixed(2)}, p = {formatP(r.coefficients[1]?.pValue ?? 1)}</>
+                                        ) : (
+                                            <><span className={r.anova.pValue < 0.05 ? 'text-green-600' : 'text-gray-400'}>{r.anova.pValue < 0.05 ? '✓' : '✗'}</span> {xVar.label} — R² = {formatNum(r.R2)}, p = {formatP(r.anova.pValue)}</>
+                                        )}
+                                    </summary>
+                                    <div className="px-4 py-4 border-t border-gray-100">
+                                        {'error' in r ? (
+                                            <p className="text-sm text-red-600">{r.error}</p>
+                                        ) : r.type === 'linear' ? (
+                                            <LinearResultView result={r} depName={depVar?.label ?? ''} patients={enabledPatients} depId={depVarId[0]} indepIds={[varId]} />
+                                        ) : (
+                                            <LogisticResultView result={r} depName={depVar?.label ?? ''} />
+                                        )}
+                                    </div>
+                                </details>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+
+            {/* Modal Lưu Template */}
+            {showSaveModal && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 space-y-4 border border-gray-100">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                            <h3 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+                                <Bookmark className="w-4 h-4 text-primary-600" />
+                                Lưu mẫu phân tích Hồi quy
+                            </h3>
+                            <button onClick={() => setShowSaveModal(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Tên mẫu phân tích</label>
+                                <input
+                                    type="text"
+                                    value={newTemplateName}
+                                    onChange={(e) => setNewTemplateName(e.target.value)}
+                                    placeholder="VD: Hồi quy Logistic yếu tố nguy cơ tử vong..."
+                                    className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    autoFocus
+                                />
+                            </div>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={newTemplateIsDefault}
+                                    onChange={(e) => setNewTemplateIsDefault(e.target.checked)}
+                                    className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500 border-gray-300"
+                                />
+                                <span className="text-xs text-gray-700">Tự động tải mẫu này khi mở tab Hồi quy</span>
+                            </label>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                            <button
+                                type="button"
+                                onClick={() => setShowSaveModal(false)}
+                                className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg font-medium"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSaveNewTemplate}
+                                className="px-4 py-1.5 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-xs transition-colors"
+                            >
+                                Lưu mẫu
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
-            {/* Multivariate result */}
-            {result && !('error' in result) && result.type === 'linear' && (
-                <LinearResultView
-                    result={result}
-                    depName={depVar?.label ?? ''}
-                    patients={enabledPatients}
-                    depId={depVarId[0]}
-                    indepIds={indepVarIds}
-                />
-            )}
-            {result && !('error' in result) && result.type === 'logistic' && (
-                <LogisticResultView result={result} depName={depVar?.label ?? ''} />
-            )}
-
-            {/* Univariate results */}
-            {univariateResults.length > 0 && (
-                <div className="space-y-6">
-                    <h3 className="text-lg font-bold text-gray-800">Kết quả phân tích đơn biến ({univariateResults.length} mô hình)</h3>
-                    {/* Summary table first */}
-                    <UnivariateSummaryTable results={univariateResults} regType={regType} />
-                    {/* Detailed per variable */}
-                    {univariateResults.map(({ varId, result: r }) => {
-                        const xVar = ALL_VARIABLES.find(v => v.id === varId);
-                        if (!xVar) return null;
-                        return (
-                            <details key={varId} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                                <summary className="px-4 py-3 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-50 flex items-center gap-2">
-                                    {'error' in r ? (
-                                        <><AlertTriangle className="w-4 h-4 text-red-500" /> {xVar.label}: {r.error}</>
-                                    ) : r.type === 'logistic' ? (
-                                        <><span className={r.omnibus.pValue < 0.05 ? 'text-green-600' : 'text-gray-400'}>{r.omnibus.pValue < 0.05 ? '✓' : '✗'}</span> {xVar.label} — OR = {r.coefficients[1]?.expB.toFixed(2)}, p = {formatP(r.coefficients[1]?.pValue ?? 1)}</>
-                                    ) : (
-                                        <><span className={r.anova.pValue < 0.05 ? 'text-green-600' : 'text-gray-400'}>{r.anova.pValue < 0.05 ? '✓' : '✗'}</span> {xVar.label} — R² = {formatNum(r.R2)}, p = {formatP(r.anova.pValue)}</>
-                                    )}
-                                </summary>
-                                <div className="px-4 py-4 border-t border-gray-100">
-                                    {'error' in r ? (
-                                        <p className="text-sm text-red-600">{r.error}</p>
-                                    ) : r.type === 'linear' ? (
-                                        <LinearResultView result={r} depName={depVar?.label ?? ''} patients={enabledPatients} depId={depVarId[0]} indepIds={[varId]} />
-                                    ) : (
-                                        <LogisticResultView result={r} depName={depVar?.label ?? ''} />
-                                    )}
-                                </div>
-                            </details>
-                        );
-                    })}
+            {/* Modal Đổi tên Template */}
+            {showRenameModal && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 space-y-4 border border-gray-100">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                            <h3 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+                                <Pencil className="w-4 h-4 text-primary-600" />
+                                Đổi tên mẫu hồi quy
+                            </h3>
+                            <button onClick={() => setShowRenameModal(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Tên mẫu mới</label>
+                                <input
+                                    type="text"
+                                    value={renameTemplateName}
+                                    onChange={(e) => setRenameTemplateName(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') handleRenameTemplate(); }}
+                                    placeholder="Nhập tên mẫu hồi quy..."
+                                    className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                            <button
+                                type="button"
+                                onClick={() => setShowRenameModal(false)}
+                                className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg font-medium"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleRenameTemplate}
+                                disabled={!renameTemplateName.trim()}
+                                className="px-4 py-1.5 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-xs transition-colors disabled:opacity-40"
+                            >
+                                Lưu tên mới
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

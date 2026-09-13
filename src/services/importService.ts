@@ -136,12 +136,18 @@ function rowToPatient(row: Record<string, unknown>): Omit<Patient, 'id' | 'creat
         car: num(row['CAR']),
     };
 
+    const chuyenTuyen = bool(row['Chuyển tuyến']) || str(row['Tình trạng ra viện']) === 'Chuyển tuyến';
+    const rawTT = str(row['Tình trạng ra viện']);
+    const tinhTrangRaVien = rawTT || (bool(row['Tử vong']) ? 'Tử vong' : bool(row['Xin về']) ? 'Xin về' : bool(row['Tiến triển tốt xuất viện']) ? 'Tiến triển tốt, xuất viện' : chuyenTuyen ? 'Chuyển tuyến' : '');
+
     const ketCuc = {
         ...createDefaultKetCuc(),
-        tuVong: bool(row['Tử vong']),
-        xinVe: bool(row['Xin về']),
+        tinhTrangRaVien,
+        tuVong: bool(row['Tử vong']) || tinhTrangRaVien === 'Tử vong',
+        xinVe: bool(row['Xin về']) || tinhTrangRaVien === 'Xin về',
         thoMay: bool(row['Thở máy']),
-        tienTrienTotXuatVien: bool(row['Tiến triển tốt xuất viện']),
+        tienTrienTotXuatVien: bool(row['Tiến triển tốt xuất viện']) || tinhTrangRaVien === 'Tiến triển tốt, xuất viện',
+        chuyenTuyen: chuyenTuyen || tinhTrangRaVien === 'Chuyển tuyến',
         tongSoNgayDieuTri: num(row['Tổng số ngày điều trị']),
         ngayBatDauKhangSinh: str(row['Ngày bắt đầu KS']),
         ngayKetThucKhangSinh: str(row['Ngày kết thúc KS']),
@@ -347,6 +353,7 @@ function computeDiffs(
     addDiff(diffs, 'Tử vong', kcOld.tuVong, kcNew.tuVong);
     addDiff(diffs, 'Xin về', kcOld.xinVe, kcNew.xinVe);
     addDiff(diffs, 'Tiến triển tốt', kcOld.tienTrienTotXuatVien, kcNew.tienTrienTotXuatVien);
+    addDiff(diffs, 'Chuyển tuyến', kcOld.chuyenTuyen, kcNew.chuyenTuyen);
     addDiff(diffs, 'Tổng ngày ĐT', kcOld.tongSoNgayDieuTri, kcNew.tongSoNgayDieuTri);
     addDiff(diffs, 'Ngày BĐ KS', kcOld.ngayBatDauKhangSinh, kcNew.ngayBatDauKhangSinh);
     addDiff(diffs, 'Ngày KT KS', kcOld.ngayKetThucKhangSinh, kcNew.ngayKetThucKhangSinh);

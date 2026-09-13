@@ -19,7 +19,7 @@ Mở trình duyệt web (Chrome, Safari, Edge đều được), truy cập vào 
 
 Có 2 loại tài khoản:
 - **Admin** (`admin@capresearch.com`): Toàn quyền — thêm, sửa, xóa bệnh nhân và quản lý cài đặt.
-- **Advisor** (`advisor@capresearch.com`): Chỉ xem — có thể xem tất cả dữ liệu, thống kê, cài đặt nhưng không thể chỉnh sửa.
+- **Advisor** (`advisor@capresearch.com`): Chế độ chỉ xem — có thể xem tất cả dữ liệu, thống kê, phân tích và cài đặt. Khi xem hồ sơ bệnh nhân, giao diện hiển thị thanh thông báo chỉ đọc nhã nhặn; các trường thông tin được bảo vệ nhưng vẫn cho phép chọn văn bản, sao chép dữ liệu và cuộn trang thuận tiện.
 
 > **Mẹo:** Khi nhập email, gõ "admin" hoặc "advisor" rồi nhấn Tab — phần mềm tự động điền đầy đủ email.
 
@@ -101,7 +101,9 @@ Tab này hiển thị 2 thang điểm đánh giá mức độ nặng, tất cả
 Phần mềm tự tính điểm PSI (PORT Score) dựa trên các thông tin đã nhập ở các bước trước. Hiển thị tổng điểm và phân tầng nguy cơ (Class I → V).
 
 ### Bước 8 — Kết cục
-Nhập diễn biến điều trị (thở máy, sốc nhiễm khuẩn, lọc máu...), tình trạng ra viện, tử vong hay không, ngày bắt đầu và kết thúc kháng sinh, tổng số ngày điều trị.
+Nhập diễn biến điều trị (thở máy, sốc nhiễm khuẩn, lọc máu...), tình trạng ra viện, ngày bắt đầu và kết thúc kháng sinh, tổng số ngày điều trị.
+- **Tình trạng ra viện gồm 4 tùy chọn:** **Tiến triển tốt, xuất viện**, **Tử vong**, **Xin về**, **Chuyển tuyến**.
+- Khi chọn *Tử vong*, *Xin về* hoặc *Chuyển tuyến*, hệ thống tự động ghi nhận vào nhóm **Biến cố nặng** để đồng bộ vào các bảng thống kê và mô hình phân tích hồi quy.
 
 ### Lưu và các thao tác khác
 
@@ -129,7 +131,7 @@ Hiển thị **20 thẻ chỉ số (KPI)** chia thành 5 nhóm:
 
 Bên dưới có 3 biểu đồ:
 - **Phân bổ PSI:** Biểu đồ tròn hiển thị số BN ở mỗi mức PSI (I → V)
-- **Kết cục lâm sàng:** Biểu đồ donut hiển thị tỷ lệ Xuất viện / Tử vong / Xin về
+- **Kết cục lâm sàng:** Biểu đồ donut hiển thị tỷ lệ Xuất viện / Tử vong / Xin về / Chuyển tuyến
 - **Tiền sử bệnh:** Biểu đồ cột hiển thị các bệnh nền phổ biến (ĐTĐ, THA, thận mạn, suy tim, hút thuốc)
 
 ### Tab "Vi sinh (MT1)"
@@ -155,38 +157,40 @@ Hiển thị các bảng dự kiến kết quả nghiên cứu theo mẫu luận
 
 ### Tab "Bảng chéo (m×n)"
 
-Phân tích bảng chéo (cross-tabulation) giữa 2 biến phân loại bất kỳ:
+Phân tích bảng chéo (cross-tabulation) giữa 2 biến phân loại bất kỳ, được thiết kế khoa học thành **3 khối trực quan, phân màu nền nhẹ nhàng, dễ phân biệt**:
 
-- Chọn biến hàng và biến cột từ danh sách các biến trong dữ liệu
-- Hiển thị bảng tần số kèm tỷ lệ phần trăm
-- Tính kiểm định Chi-square (χ²) hoặc Fisher Exact Test tùy trường hợp
-- Kèm diễn giải kết quả bằng tiếng Việt
+- **Khối 1: Quản lý & Lưu mẫu phân tích (Nền Xanh dương nhạt):**
+  - Khung chọn mẫu rộng rãi hiển thị trọn vẹn tên mẫu dài.
+  - Bấm **"Lưu thành mẫu..."** để đặt tên và lưu cấu hình cặp biến hiện tại lên Cloud Firestore (dùng chung mọi thiết bị).
+  - Nút **"Đổi tên"** (✏️): Sửa tên mẫu đã lưu nhanh chóng.
+  - Nút **"Cập nhật"**: Ghi đè cấu hình cặp biến hiện tại vào mẫu đang chọn.
+  - Nút **"Mặc định"** (⭐): Đặt mẫu tự động nạp mỗi khi mở tab.
+  - Nút **Xóa** (🗑): Xóa mẫu không còn sử dụng.
+- **Khối 2: Thêm & Điều chỉnh biến phân tích (Nền Vàng nhạt):**
+  - Chọn biến hàng (Row) và biến cột (Column) từ hơn 30+ biến phân loại (Hành chính, Tiền sử, Lâm sàng, PSI, CURB-65, Kết cục...).
+  - Thêm/bớt biến linh hoạt vào bộ lọc phân tích thông qua menu "Quản lý biến".
+- **Khối 3: Hiển thị kết quả & Diễn giải thống kê y khoa (Nền Trắng):**
+  - **Thanh công cụ chuyên dụng:** Đảo thứ tự Hàng/Cột trực tiếp ngay tại bảng, cùng nút bật/tắt hiển thị bảng Tần số kỳ vọng (Expected) và Phần dư chuẩn hóa (Residuals).
+  - Bảng chéo quan sát kèm tỷ lệ % hàng/cột/tổng, kiểm định Chi-bình phương ($\chi^2$), Fisher's Exact Test, Odds Ratio (OR), Relative Risk (RR) kèm 95% CI.
+  - **Phân tích phần dư chuẩn hóa hiệu chỉnh:** Tự động làm nổi bật các ô có chênh lệch ý nghĩa ($|z| \ge 1.96$, $p < 0.05$).
+  - **Diễn giải y khoa tổng hợp:** Tự động soạn thảo đoạn văn chuẩn y khoa có nút **"Sao chép diễn giải"** dán ngay vào luận văn/báo cáo.
 
 ### Tab "Hồi quy"
 
-Phân tích hồi quy logistic nhị phân và hồi quy tuyến tính — kết quả tương đương SPSS:
+Phân tích hồi quy logistic nhị phân và hồi quy tuyến tính — kết quả tương đương SPSS, được cấu trúc đồng bộ thành **3 khối chuyên biệt**:
 
-**Cách sử dụng:**
-1. Chọn loại hồi quy: **Logistic nhị phân** (biến phụ thuộc Y là nhị phân 0/1) hoặc **Tuyến tính** (Y là biến liên tục)
-2. Chọn phương pháp: **Đơn biến** (chạy từng biến X riêng lẻ) hoặc **Đa biến** (tất cả biến X vào cùng 1 mô hình)
-3. Chọn **biến phụ thuộc (Y)** và **biến độc lập (X)** bằng cách bấm "Thêm biến" — phần mềm tự kiểm tra loại biến phù hợp (ví dụ: Logistic chỉ chấp nhận biến nhị phân làm Y)
-4. Bấm **"Chạy hồi quy"**
-
-**Kết quả hiển thị:**
-
-*Hồi quy Logistic:*
-- Omnibus Test, Model Summary (-2LL, Cox & Snell R², Nagelkerke R²)
-- Hosmer-Lemeshow Test (kiểm định độ phù hợp mô hình)
-- Bảng Variables in the Equation (B, S.E., Wald, Sig., Exp(B) tức OR, 95% CI)
-- Classification Table (độ nhạy, độ đặc hiệu, % phân loại đúng)
-- Diễn giải tự động bằng tiếng Việt
-
-*Hồi quy Tuyến tính:*
-- Model Summary (R, R², Adjusted R², Std. Error, Durbin-Watson)
-- Bảng ANOVA (SS, df, MS, F, Sig.)
-- Bảng Coefficients (B, Std. Error, Beta, t, Sig., 95% CI, VIF/Tolerance cho đa biến)
-- **Scatter plot + đường hồi quy + 95% CI** (cho phân tích đơn biến)
-- Diễn giải tự động bằng tiếng Việt
+- **Khối 1: Quản lý & Lưu mẫu hồi quy (Nền Xanh dương nhạt):**
+  - Quản lý các mẫu mô hình hồi quy (đơn biến, đa biến, biến Y, biến X).
+  - Đầy đủ tính năng: Lưu thành mẫu, Đổi tên, Cập nhật cấu hình, Đặt làm mặc định khi mở tab, và Xóa mẫu.
+- **Khối 2: Thiết lập mô hình & Điều chỉnh biến (Nền Vàng nhạt):**
+  - Chọn loại hồi quy: **Logistic nhị phân** (Y nhị phân 0/1: Tử vong, Chuyển tuyến, Biến cố nặng...) hoặc **Tuyến tính** (Y liên tục: ngày điều trị, bạch cầu, điểm PSI...).
+  - Chọn phương pháp: **Đơn biến** (chạy từng biến X riêng lẻ) hoặc **Đa biến** (nhiều biến X đồng thời để kiểm soát yếu tố gây nhiễu).
+  - Chọn biến phụ thuộc (Y) và biến độc lập (X).
+  - Bấm nút **"Chạy hồi quy"**.
+- **Khối 3: Hiển thị kết quả & Diễn giải mô hình hồi quy (Nền Trắng):**
+  - *Hồi quy Logistic:* Omnibus Test, Model Summary (-2LL, Cox & Snell R², Nagelkerke R²), Hosmer-Lemeshow Test, Bảng hệ số Variables in Equation (B, S.E., Wald, p, Exp(B)/OR, 95% CI), Ma trận phân loại đúng (Classification Table).
+  - *Hồi quy Tuyến tính:* Model Summary (R, R², Adjusted R², Std. Error, Durbin-Watson), Bảng ANOVA (F, p), Bảng Coefficients (B, Beta, t, p, 95% CI, VIF/Tolerance).
+  - Biểu đồ Forest Plot trực quan hóa Odds Ratio kèm khoảng tin cậy 95% CI.
 
 ---
 
@@ -205,7 +209,7 @@ Trang Cài đặt có **6 tab**:
 ### Tab "Lâm sàng" — Quản lý danh mục kết cục
 
 - **Diễn biến điều trị:** Danh sách các diễn biến như: Thở máy, Sốc nhiễm khuẩn, Lọc máu... Bệnh nhân có thể chọn nhiều mục cùng lúc.
-- **Tình trạng ra viện:** Danh sách như: Khỏi, Đỡ, Không đỡ, Nặng hơn... Bệnh nhân chỉ chọn 1 mục.
+- **Tình trạng ra viện:** Danh sách như: Khỏi, Đỡ, Không đỡ, Nặng hơn, Chuyển tuyến... Bệnh nhân chỉ chọn 1 mục.
 
 ### Tab "Vi khuẩn" — Quản lý danh mục vi sinh
 
@@ -216,15 +220,44 @@ Trang Cài đặt có **6 tab**:
 
 Quản lý danh sách thuốc dùng trong phần nhập tiền sử thuốc của bệnh nhân: thuốc nhóm 1 (tên biệt dược), thuốc nhóm 2 (tên gốc). Thuốc nào đang được bệnh nhân sử dụng sẽ không xóa được.
 
-### Tab "In BANC" — Cài đặt trang in bệnh án nghiên cứu
+### Tab "BANC" — Tùy biến xuất & in bệnh án nghiên cứu
 
-Tùy chỉnh bản in bệnh án nghiên cứu theo ý bạn:
-- **Cỡ giấy:** Chọn A4, A5 hoặc Letter
-- **Căn lề:** Chỉnh lề trên, dưới, trái, phải (tính bằng cm)
-- **Cỡ chữ:** Điều chỉnh kích thước chữ trên bản in
-- **Tiêu đề in:** Nhập 2 dòng tiêu đề đầu trang (ví dụ: dòng 1 "SỞ Y TẾ HẢI PHÒNG", dòng 2 "TTYT THỦY NGUYÊN")
-- **Tiêu đề ký:** Nhập chức danh ký bên trái (VD: "TRƯỞNG KHOA") và bên phải (VD: "BÁC SĨ ĐIỀU TRỊ")
-- **Hiển thị PSI:** Bật/tắt việc in phân tầng PSI trên bệnh án
+Tab BANC được chia làm **2 subtab** chuyên biệt:
+
+#### 1. Subtab "Xuất BANC (Tùy chỉnh biến)"
+Cho phép bạn linh hoạt bật hoặc tắt hiển thị từng biến trong toàn bộ các trường dữ liệu của bệnh nhân trên Bệnh án nghiên cứu:
+- **Tắt biến:** Khi tắt một biến, biến đó sẽ **ẩn hoàn toàn** khỏi bản in và file PDF BANC (không để lại dòng trống hay gạch ngang).
+- **Phân loại theo nhóm & Nút Mở rộng (Expand):**
+  - Các biến được chia gọn gàng theo 8 nhóm mục lớn (Hành chính, Tiền sử, Lâm sàng, Cận lâm sàng, Hình ảnh, Vi khuẩn, Phân độ, Kết cục).
+  - **Toggle cả nhóm mục:** Nút *"Bật cả nhóm"* / *"Tắt cả nhóm"* ngay trên thanh tiêu đề của mỗi phân mục giúp bật hoặc tắt nhanh toàn bộ biến trong nhóm mà không cần mở danh sách.
+  - **Nút Mở rộng (Expand) nhóm mục:** Mỗi phân mục có nút *"Mở rộng"* / *"Thu gọn"* để xem danh sách các hộp biến bên trong.
+- **Hộp nhóm biến đa thành phần & Nút "Chi tiết" bung biến con:**
+  - Đối với các biến chứa nhiều chỉ số thành phần (như: *Diễn biến điều trị* gồm Thở máy, Sốc NK, Lọc máu; *Tình trạng ra viện* gồm Xuất viện, Tử vong, Xin về, Chuyển tuyến; *Kháng sinh*; *Dấu hiệu sinh tồn*; *Công thức máu*; *CURB-65*;...):
+    - **Công tắc cả nhóm biến:** Cho phép bật hoặc tắt toàn bộ nhóm biến đó chỉ với một gạt công tắc (bật/tắt cả nhóm sẽ bật/tắt toàn bộ các biến con bên trong).
+    - **Nút "Chi tiết" / "Thu gọn":** Bấm nút *"Chi tiết"* ngay trong hộp để mở rộng panel danh sách các biến con bên trong.
+    - **Tùy chỉnh từng biến con:** Mỗi biến con có công tắc bật/tắt riêng biệt, giúp bạn tùy chỉnh chi tiết từng trường theo yêu cầu nghiên cứu (ví dụ: trong Diễn biến điều trị, bạn có thể tắt *Thở máy*, chỉ giữ lại *Sốc nhiễm khuẩn* và *Lọc máu*).
+    - **Huy hiệu & Tự động đồng bộ thông minh:** Hộp hiển thị số biến con đang bật (ví dụ: `2/3 biến con`). Khi bạn bật bất kỳ biến con nào, nhóm cha sẽ tự động bật; khi tắt tất cả biến con, nhóm cha sẽ tự động chuyển sang trạng thái tắt.
+- **Tùy chọn nâng cao:** Tùy chọn **"Hiển thị phân tầng PSI (mức độ nặng)"** nằm ngay dưới cùng của subtab Xuất BANC, cho phép bật/tắt in mức độ phân tầng (Class I → V) đi kèm tổng điểm PSI.
+- **Nút "Xem trước" (Preview) BANC:**
+  - Nút **"Xem trước"** (biểu tượng con mắt 👁️) nằm ngay trên thanh công cụ của Cấu hình biến BANC.
+  - Khi bấm, màn hình xem trước toàn màn hình sẽ hiển thị chính xác hình dạng bản in BANC trên trang giấy thực tế với đầy đủ: cỡ giấy, căn lề (cm), cỡ chữ (px), tiêu đề in, phần ký tên, tùy chọn phân tầng PSI và các biến đã bật/tắt.
+  - Tích hợp bộ điều khiển **Thu phóng (Zoom: 80% → 150%)** và cuộn xem mượt mà trọn vẹn toàn bộ các trang A4.
+  - Cho phép chuyển đổi linh hoạt giữa **Mẫu chuẩn** (đầy đủ dữ liệu demo mọi trường) và **Bệnh nhân thực tế** có trong nghiên cứu.
+  - Có sẵn nút **"In / Xuất PDF"** ngay trong khung xem trước để in hoặc xuất file PDF qua trình duyệt.
+- **Công cụ thao tác nhanh:**
+  - Ô **Tìm kiếm** theo tên hoặc mã biến (tự động mở rộng các nhóm có chứa biến phù hợp).
+  - Nút **"Bật tất cả"** / **"Tắt tất cả"** cho toàn bộ bệnh án hoặc từng phân mục riêng.
+  - Nút **"Mở rộng tất cả"** / **"Thu gọn tất cả"** để đóng/mở nhanh cả 8 nhóm biến chỉ bằng một cú nhấp chuột.
+  - Nút **"Mặc định"** để khôi phục cấu hình chuẩn ban đầu.
+- Cấu hình này được tự động đồng bộ lên máy chủ (Cloud Firestore) và lưu trong bộ nhớ máy tính để sử dụng nhất quán trên mọi thiết bị.
+
+#### 2. Subtab "In BANC (Cấu hình trang & Ký)"
+Chứa toàn bộ các thiết lập định dạng trang in:
+- **Cỡ giấy:** Chọn A4, A5 hoặc Letter.
+- **Căn lề:** Chỉnh lề trên, dưới, trái, phải (tính bằng cm).
+- **Cỡ chữ:** Điều chỉnh kích thước chữ trên bản in (mặc định 13px).
+- **Tiêu đề in:** Nhập 2 dòng tiêu đề đầu trang (ví dụ: dòng 1 "SỞ Y TẾ HẢI PHÒNG", dòng 2 "TTYT THỦY NGUYÊN").
+- **Tiêu đề ký:** Nhập chức danh ký bên trái (VD: "TRƯỞNG KHOA") và bên phải (VD: "BÁC SĨ ĐIỀU TRỊ").
 
 ### Tab "SPSS Variables" — Cấu hình xuất file SPSS
 
@@ -252,17 +285,17 @@ Danh sách toàn bộ biến (200+ biến), chia theo nhóm:
 - **Lâm sàng:** mạch, huyết áp, nhiệt độ, triệu chứng...
 - **Xét nghiệm:** WBC, CRP, PCT, biomarker...
 - **PSI / CURB-65:** các tiêu chí và tổng điểm
-- **Kết cục:** diễn biến điều trị, tình trạng ra viện...
+- **Kết cục:** diễn biến điều trị, tình trạng ra viện, đặc biệt đã tích hợp đầy đủ biến **"Chuyển tuyến" (`kc_chuyen_tuyen`)** và biến **"Biến cố nặng" (`kc_ket_cuc_nang`)**...
 
 Bạn có thể:
 - **Tìm kiếm** theo tên biến hoặc nhãn
 - **Lọc** theo nhóm biến
 - **Sửa** tên biến và nhãn bằng cách bấm biểu tượng bút chì ✏️
 - **Sửa bảng mã** (value labels) bằng cách bấm vào số bên cột "Bảng mã"
+- **Đồng bộ biến mới (🔄):** Tự động kiểm tra và bổ sung các biến chuẩn mới của hệ thống (như Chuyển tuyến, Biến cố nặng) vào profile hiện tại mà không làm mất các chỉnh sửa riêng của bạn.
+- **Khôi phục chuẩn mặc định:** Đặt lại toàn bộ danh sách biến về cấu hình chuẩn ban đầu của hệ thống.
 
 Biến có nhãn `[template]` là biến động — sẽ được nhân ra đủ slot khi xuất file.
-
-Bấm **"Khôi phục mặc định"** để đặt lại toàn bộ về cấu hình ban đầu.
 
 Bấm **"Xuất SPSS (.sav)"** để xuất ngay file với cấu hình đã thiết lập.
 

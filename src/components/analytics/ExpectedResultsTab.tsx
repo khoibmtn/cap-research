@@ -1463,7 +1463,7 @@ function Table323({ patients }: { patients: Patient[] }) {
 
     const data = useMemo(() => {
         const tuVong = patients.filter(p => p.ketCuc?.tuVong);
-        const song = patients.filter(p => !p.ketCuc?.tuVong && (p.ketCuc?.tienTrienTotXuatVien || p.ketCuc?.xinVe));
+        const song = patients.filter(p => !p.ketCuc?.tuVong && (p.ketCuc?.tienTrienTotXuatVien || p.ketCuc?.xinVe || p.ketCuc?.chuyenTuyen || p.ketCuc?.tinhTrangRaVien === 'Chuyển tuyến'));
         const thoMay = patients.filter(p => p.ketCuc?.thoMay || p.ketCuc?.dienBienDieuTri?.includes('Thở máy'));
         const khongThoMay = patients.filter(p => !(p.ketCuc?.thoMay || p.ketCuc?.dienBienDieuTri?.includes('Thở máy')));
         const socNK = patients.filter(p => p.ketCuc?.socNhiemKhuan || p.ketCuc?.dienBienDieuTri?.includes('Sốc nhiễm khuẩn'));

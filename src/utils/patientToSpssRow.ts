@@ -346,6 +346,10 @@ export function patientToSpssRow(patient: Patient, slots: SpssSlotConfig): SpssR
     row['kc_tu_vong'] = bClinical(kc.tuVong);
     row['kc_xin_ve'] = bClinical(kc.xinVe);
     row['kc_tien_trien_tot'] = b(kc.tienTrienTotXuatVien);
+    const isChuyenTuyen = !!(kc.chuyenTuyen || kc.tinhTrangRaVien === 'Chuyển tuyến');
+    const isKetCucNang = !!(kc.tuVong || kc.xinVe || isChuyenTuyen || kc.tinhTrangRaVien === 'Tử vong' || kc.tinhTrangRaVien === 'Xin về' || kc.tinhTrangRaVien === 'Chuyển tuyến');
+    row['kc_chuyen_tuyen'] = bClinical(isChuyenTuyen);
+    row['kc_ket_cuc_nang'] = bClinical(isKetCucNang);
     row['kc_ngay_dieu_tri'] = n(kc.tongSoNgayDieuTri);
     row['kc_ngay_bat_dau_ks'] = s(kc.ngayBatDauKhangSinh);
     row['kc_ngay_ket_thuc_ks'] = s(kc.ngayKetThucKhangSinh);

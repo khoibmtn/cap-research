@@ -99,10 +99,12 @@ export function exportPatientsToExcel(patients: Patient[]) {
             'CURB-65 B (BP)': p.curb65?.chiTiet?.b === true ? 1 : p.curb65?.chiTiet?.b === false ? 0 : '',
             'CURB-65 65 (Age)': p.curb65?.chiTiet?.age65 === true ? 1 : p.curb65?.chiTiet?.age65 === false ? 0 : '',
             // Kết cục
+            'Tình trạng ra viện': p.ketCuc.tinhTrangRaVien || '',
             'Tử vong': p.ketCuc.tuVong ? 'Có' : 'Không',
             'Xin về': p.ketCuc.xinVe ? 'Có' : 'Không',
             'Thở máy': p.ketCuc.thoMay ? 'Có' : 'Không',
             'Tiến triển tốt xuất viện': p.ketCuc.tienTrienTotXuatVien ? 'Có' : 'Không',
+            'Chuyển tuyến': (p.ketCuc.chuyenTuyen || p.ketCuc.tinhTrangRaVien === 'Chuyển tuyến') ? 'Có' : 'Không',
             'Tổng số ngày điều trị': p.ketCuc.tongSoNgayDieuTri,
             'Ngày bắt đầu KS': p.ketCuc.ngayBatDauKhangSinh,
             'Ngày kết thúc KS': p.ketCuc.ngayKetThucKhangSinh,

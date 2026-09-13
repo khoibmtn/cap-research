@@ -20,10 +20,17 @@ import { SPSS_VAR_GROUP_LABELS } from '../types/spssTypes';
 
 import { buildDefaultSpssConfig } from '../utils/spssDefaultConfig';
 import {
+    BANC_FIELDS, BANC_SECTIONS, DEFAULT_BANC_VISIBILITY,
+    type BancFieldVisibility
+} from '../data/bancFields';
+import { getBancVisibility, saveBancVisibility } from '../services/bancConfigService';
+import PrintResearchRecord from '../components/print/PrintResearchRecord';
+import { usePrintRecord } from '../hooks/usePrintRecord';
+import {
     Upload, Download, Info, Plus, Trash2, Pencil, Check, X,
     ShieldAlert, MapPin, Stethoscope, Bug, Printer, HardDrive,
-    Loader2, Eye, RotateCcw, FileSpreadsheet, ChevronUp, Search, Settings2, Pill,
-    Database, Tag, CircleCheck,
+    Loader2, Eye, RotateCcw, RefreshCw, FileSpreadsheet, ChevronUp, ChevronDown, Search, Settings2, Pill,
+    Database, Tag, CircleCheck, Sliders,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -180,7 +187,17 @@ function loadListLocal(key: string, defaults: string[]): string[] {
     const raw = localStorage.getItem(key);
     if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+            if (key === 'cap_tinh_trang_ra_vien') {
+                let list = parsed.filter((x: string) => x !== 'Chuyển tuyến trên' && x !== 'Chuyển tuyến dưới');
+                if (!list.includes('Chuyển tuyến')) {
+                    list.push('Chuyển tuyến');
+                    localStorage.setItem(key, JSON.stringify(list));
+                }
+                return list;
+            }
+            return parsed;
+        }
     }
     localStorage.setItem(key, JSON.stringify(defaults));
     return [...defaults];
@@ -192,7 +209,7 @@ const TABS = [
     { key: 'lamsang', label: 'Lâm sàng', icon: Stethoscope },
     { key: 'vikhuan', label: 'Vi khuẩn', icon: Bug },
     { key: 'thuoc', label: 'Thuốc', icon: Pill },
-    { key: 'inbanc', label: 'In BANC', icon: Printer },
+    { key: 'inbanc', label: 'BANC', icon: Printer },
     { key: 'spss', label: 'SPSS Variables', icon: Database },
     { key: 'backup', label: 'Backup', icon: HardDrive },
 ] as const;
@@ -334,6 +351,35 @@ function SpssSettingsTab({ profiles, activeProfileId, loading, patients, onChang
     // Sync slots from config on mount
     useEffect(() => { if (config?.slotConfig) setSlots(config.slotConfig); }, [config?.slotConfig]);
 
+    // Auto-sync missing vars if detected in active profile (e.g. kc_chuyen_tuyen, kc_ket_cuc_nang)
+    useEffect(() => {
+        if (!config?.vars) return;
+        const defaultVars = buildDefaultSpssConfig().vars;
+        const currentNames = new Set(config.vars.map(v => v.name));
+        const missing = defaultVars.filter(d => !currentNames.has(d.name));
+        if (missing.length > 0) {
+            const updated = [...config.vars];
+            for (const defVar of missing) {
+                const defIdx = defaultVars.findIndex(d => d.name === defVar.name);
+                let insertIdx = -1;
+                for (let i = defIdx - 1; i >= 0; i--) {
+                    const prevName = defaultVars[i].name;
+                    const foundIdx = updated.findIndex(v => v.name === prevName);
+                    if (foundIdx !== -1) {
+                        insertIdx = foundIdx + 1;
+                        break;
+                    }
+                }
+                if (insertIdx !== -1) {
+                    updated.splice(insertIdx, 0, defVar);
+                } else {
+                    updated.push(defVar);
+                }
+            }
+            onUpdateActiveProfile({ ...config, vars: updated });
+        }
+    }, [config?.vars?.length]);
+
     const vars = config?.vars || [];
 
     // Filter non-template vars for display (templates shown as group summary)
@@ -431,6 +477,64 @@ function SpssSettingsTab({ profiles, activeProfileId, loading, patients, onChang
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <button
+                            type="button"
+                            onClick={() => {
+                                if (!config) return;
+                                const defaultVars = buildDefaultSpssConfig().vars;
+                                const existingNames = new Set(vars.map(v => v.name));
+                                const updated = [...vars];
+                                let addedCount = 0;
+                                for (const defVar of defaultVars) {
+                                    if (!existingNames.has(defVar.name)) {
+                                        const defIdx = defaultVars.findIndex(d => d.name === defVar.name);
+                                        let insertIdx = -1;
+                                        for (let i = defIdx - 1; i >= 0; i--) {
+                                            const prevName = defaultVars[i].name;
+                                            const foundIdx = updated.findIndex(v => v.name === prevName);
+                                            if (foundIdx !== -1) {
+                                                insertIdx = foundIdx + 1;
+                                                break;
+                                            }
+                                        }
+                                        if (insertIdx !== -1) {
+                                            updated.splice(insertIdx, 0, defVar);
+                                        } else {
+                                            updated.push(defVar);
+                                        }
+                                        existingNames.add(defVar.name);
+                                        addedCount++;
+                                    }
+                                }
+                                if (addedCount > 0) {
+                                    onUpdateActiveProfile({ ...config, vars: updated });
+                                    toast.success(`Đã bổ sung ${addedCount} biến mới từ mặc định (bao gồm Chuyển tuyến)!`);
+                                } else {
+                                    toast.success('Cấu hình hiện tại đã có đầy đủ toàn bộ biến mặc định của hệ thống!');
+                                }
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 transition-colors"
+                            title="Kiểm tra và nạp bổ sung các biến chuẩn mới nhất (như Chuyển tuyến) vào profile này"
+                        >
+                            <RotateCcw className="w-4 h-4 text-gray-500" />
+                            Đồng bộ biến mới
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (!config) return;
+                                if (window.confirm('Khôi phục toàn bộ danh sách biến của profile này về cấu hình chuẩn mặc định của hệ thống? Tất cả biến và nhãn sẽ được đưa về giá trị gốc.')) {
+                                    const defConfig = buildDefaultSpssConfig(config.slotConfig);
+                                    onUpdateActiveProfile({ ...config, vars: defConfig.vars });
+                                    toast.success('Đã khôi phục toàn bộ biến về chuẩn mặc định!');
+                                }
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+                            title="Khôi phục toàn bộ danh sách biến về cấu hình chuẩn mặc định"
+                        >
+                            <RefreshCw className="w-4 h-4 text-amber-600" />
+                            Khôi phục chuẩn mặc định
+                        </button>
+                        <button
                             onClick={onExport}
                             disabled={loading || patients.filter(p => !p.disabled).length === 0}
                             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -487,7 +591,7 @@ function SpssSettingsTab({ profiles, activeProfileId, loading, patients, onChang
                             const ct = slots.ct * 5;
                             const vk = slots.viKhuan * (2 + slots.khangSinhPerVK * 2);
                             const thuoc = slots.thuoc * 6;
-                            const fixed = 12 + 12 + 25 + 31 + 3 + 4 + 1 + 20 + 2 + 8 + 11;
+                            const fixed = vars.filter(v => !v.isSlotTemplate).length;
                             return fixed + xq + ct + vk + thuoc;
                         })()
                     } biến
@@ -683,6 +787,7 @@ const CLINICAL_VAR_PREFIXES = [
     'psi_na_mau130', 'psi_glucose250', 'psi_pao2_60', 'psi_tran_dich_mp',
     'curb_c', 'curb_u', 'curb_r', 'curb_b', 'curb_age65',
     'kc_tho_may', 'kc_soc_nk', 'kc_loc_mau', 'kc_tu_vong', 'kc_xin_ve',
+    'kc_chuyen_tuyen', 'kc_ket_cuc_nang',
 ];
 
 function migrateSpssConfigEncoding(config: SpssVarConfig): SpssVarConfig {
@@ -696,7 +801,7 @@ function migrateSpssConfigEncoding(config: SpssVarConfig): SpssVarConfig {
     };
     const VL_VITRI = { 0: 'Phải', 1: 'Trái', 2: 'Hai bên' };
 
-    const updatedVars = config.vars.map((v) => {
+    let updatedVars = config.vars.map((v) => {
         // Migrate _ben Text → _vitri Numeric
         if (BEN_TO_VITRI[v.name]) {
             needsMigration = true;
@@ -730,15 +835,217 @@ function migrateSpssConfigEncoding(config: SpssVarConfig): SpssVarConfig {
         return v;
     });
 
+    // Auto-merge any missing variables from buildDefaultSpssConfig (e.g. kc_chuyen_tuyen, kc_ket_cuc_nang)
+    const defaultVars = buildDefaultSpssConfig().vars;
+    const existingNames = new Set(updatedVars.map(v => v.name));
+
+    for (const defVar of defaultVars) {
+        if (!existingNames.has(defVar.name)) {
+            needsMigration = true;
+            const defIdx = defaultVars.findIndex(d => d.name === defVar.name);
+            let insertIdx = -1;
+            for (let i = defIdx - 1; i >= 0; i--) {
+                const prevName = defaultVars[i].name;
+                const foundIdx = updatedVars.findIndex(v => v.name === prevName);
+                if (foundIdx !== -1) {
+                    insertIdx = foundIdx + 1;
+                    break;
+                }
+            }
+            if (insertIdx !== -1) {
+                updatedVars.splice(insertIdx, 0, defVar);
+            } else {
+                updatedVars.push(defVar);
+            }
+            existingNames.add(defVar.name);
+        }
+    }
+
     if (!needsMigration) return config;
     return { ...config, vars: updatedVars };
 }
+
+// ─── Demo Sample Patient for BANC Preview ────────────────────────────
+const sampleBancPatient: import('../types/patient').Patient = {
+    id: 'sample-preview-001',
+    maBenhNhanNghienCuu: 'BN-DEMO-001',
+    maBenhAnNoiTru: 'BA-2026-089',
+    createdAt: null,
+    updatedAt: null,
+    hanhChinh: {
+        hoTen: 'NGUYỄN VĂN AN',
+        tuoi: 68,
+        gioiTinh: 'nam',
+        ngheNghiep: 'Hưu trí',
+        diaChiXaPhuong: 'Phường 5, TP. Mỹ Tho',
+        diaChiTinhThanh: 'Tiền Giang',
+        noiO: 'thanh_thi',
+        ngayVaoVien: '01/09/2026',
+        ngayRaVien: '10/09/2026',
+        ghiChu: 'Bệnh nhân chuyển từ tuyến trước với chẩn đoán Viêm phổi cộng đồng nặng.',
+    },
+    tienSu: {
+        daiThaoDuong: true,
+        tangHuyetAp: true,
+        viemDaDay: true,
+        viemGanMan: false,
+        benhThanMan: false,
+        gut: false,
+        ungThu: false,
+        suyTimUHuyet: false,
+        benhMachMauNao: false,
+        khac: 'Rối loạn lipid máu 5 năm',
+        hutThuocLa: true,
+        soBaoNam: 25,
+        thuocDaDung: [
+            { id: '1', tenGoc: 'Amlodipine', tenThuoc: 'Amlor 5mg', lieuLuong: '5mg', tongLieu: '1 viên/ngày', duongDung: 'Uống', thoiGianDung: 365 },
+            { id: '2', tenGoc: 'Metformin', tenThuoc: 'Glucophage 850mg', lieuLuong: '850mg', tongLieu: '2 viên/ngày', duongDung: 'Uống', thoiGianDung: 730 },
+        ],
+    },
+    lamSang: {
+        thoiDiemTrieuChung: '28/08/2026',
+        mach: 104,
+        huyetAp: '135/85',
+        nhietDo: 38.8,
+        nhipTho: 28,
+        spO2: 92,
+        bmi: 22.5,
+        diemGlasgow: 15,
+        hoKhan: false,
+        hoMau: false,
+        hoKhacDom: true,
+        domTinh: ['đục'],
+        domMauSac: 'Vàng đục',
+        dauNguc: true,
+        khoTho: true,
+        ranAm: true,
+        ranNo: true,
+        ranRit: false,
+        ranNgay: false,
+        hoiChungTDMP: { co: false, ben: '' },
+        hoiChungDongDac: { co: true, ben: 'Phải' },
+        hoiChungTKMP: { co: false, ben: '' },
+    },
+    xetNghiem: {
+        wbc: 15.6,
+        neutrophil: 84.2,
+        lymphocyte: 9.6,
+        rbc: 4.2,
+        hemoglobin: 12.8,
+        hct: 38.5,
+        plt: 245,
+        ure: 9.4,
+        creatinin: 118,
+        ast: 34,
+        alt: 28,
+        ggt: 45,
+        glucose: 8.6,
+        protein: 68,
+        albumin: 34.5,
+        crp: 72.4,
+        procalcitonin: 2.8,
+        na: 136,
+        k: 4.1,
+        cl: 101,
+        ph: 7.38,
+        saO2: 93,
+        paCO2: 38,
+        hcO3: 23.4,
+        be: -1.2,
+        biomarkerBarcode: 'BM-2026-089',
+        sTREM1: 185.5,
+        tIMP1: 220.0,
+        il6: 48.2,
+        il10: 12.4,
+        il17: 8.6,
+    },
+    chiSoTinhToan: {
+        nlr: 8.77,
+        plr: 25.5,
+        car: 2.1,
+    },
+    hinhAnh: {
+        xquangTonThuong: [
+            { id: '1', viTri: '1/2 dưới', ben: 'phải', hinhThai: 'Đông đặc phế nang', dien: 'rộng', thoiDiem: 'Trước điều trị' }
+        ],
+        ctTonThuong: [
+            { id: '1', thuy: 'thuỳ dưới', ben: 'phải', hinhThai: 'Đông đặc kèm hình kính mờ', dien: 'rộng', thoiDiem: 'Trước điều trị' }
+        ],
+        xquangTranDichMangPhoi: false,
+        xquangTranKhiMangPhoi: false,
+        ctTranDichMangPhoi: false,
+        ctTranKhiMangPhoi: false,
+    },
+    viKhuan: [
+        {
+            id: '1',
+            tenViKhuan: 'Streptococcus pneumoniae',
+            coKhong: true,
+            khangSinhDo: [
+                { tenKhangSinh: 'Amoxicillin/Clavulanate', mucDo: 'S' },
+                { tenKhangSinh: 'Ceftriaxone', mucDo: 'S' },
+                { tenKhangSinh: 'Levofloxacin', mucDo: 'S' },
+                { tenKhangSinh: 'Azithromycin', mucDo: 'R' },
+            ],
+        },
+    ],
+    psi: {
+        criteria: {
+            tuoiDiem: 68,
+            gioiTinhNu: false,
+            nhaDuongLao: false,
+            ungThu: false,
+            benhGan: false,
+            suyTimUHuyet: false,
+            benhMachMauNao: false,
+            benhThan: false,
+            thayDoiTriGiac: false,
+            tanSoTho30: false,
+            huyetApTamThu90: false,
+            thanNhiet3540: false,
+            mach125: false,
+            ph735: false,
+            bun30: false,
+            hematocrit30: false,
+            naMau130: false,
+            glucoseMau250: false,
+            paO2_60: false,
+            tranDichMangPhoi: false,
+        },
+        tongDiem: 88,
+        phanTang: 'Class III',
+    },
+    curb65: {
+        confusion: false,
+        confusionAsked: true,
+        tongDiem: 2,
+        phanNhom: 'Trung bình (2)',
+        chiTiet: { c: false, u: true, r: false, b: false, age65: true },
+        duDuLieu: true,
+    },
+    ketCuc: {
+        thoMay: false,
+        socNhiemKhuan: false,
+        locMau: false,
+        soNgayLocMau: null,
+        dienBienDieuTri: [],
+        tinhTrangRaVien: 'Tiến triển tốt',
+        tuVong: false,
+        xinVe: false,
+        tienTrienTotXuatVien: true,
+        chuyenTuyen: false,
+        tongSoNgayDieuTri: 9,
+        ngayBatDauKhangSinh: '01/09/2026',
+        ngayKetThucKhangSinh: '08/09/2026',
+    },
+};
 
 // ─── Settings Page ───────────────────────────────────────────────────
 export default function SettingsPage() {
     const { role } = useAuth();
     const isAdvisor = role === 'advisor';
     const [activeTab, setActiveTab] = useState<TabKey>('hanhchinh');
+    const { printPatients } = usePrintRecord();
 
     // Hành chính tab
     const [addresses, setAddresses] = useState<AddressEntry[]>([]);
@@ -772,8 +1079,16 @@ export default function SettingsPage() {
     const [usedDrugGroup1, setUsedDrugGroup1] = useState<Set<string>>(new Set());
     const [usedDrugGeneric, setUsedDrugGeneric] = useState<Set<string>>(new Set());
 
-    // In BANC tab
+    // BANC tab
+    const [bancSubTab, setBancSubTab] = useState<'xuat' | 'in'>('xuat');
+    const [bancVisibility, setBancVisibility] = useState<BancFieldVisibility>(DEFAULT_BANC_VISIBILITY);
+    const [bancSearchTerm, setBancSearchTerm] = useState('');
+    const [expandedBancSections, setExpandedBancSections] = useState<Record<string, boolean>>({});
+    const [expandedBoxIds, setExpandedBoxIds] = useState<Record<string, boolean>>({});
     const [printSettings, setPrintSettings] = useState<PrintSettings>(DEFAULT_PRINT_SETTINGS);
+    const [showBancPreview, setShowBancPreview] = useState(false);
+    const [previewPatientIndex, setPreviewPatientIndex] = useState<number>(-1);
+    const [previewZoom, setPreviewZoom] = useState<number>(100);
 
     // SPSS tab
     const [spssProfiles, setSpssProfiles] = useState<SpssProfile[]>([]);
@@ -811,8 +1126,16 @@ export default function SettingsPage() {
         listKeys.forEach(({ key, setter, defaults }) => {
             settingsService.getList(key).then((items) => {
                 if (items && items.length > 0) {
-                    setter(items);
-                    localStorage.setItem(key, JSON.stringify(items));
+                    let sanitized = items;
+                    if (key === 'cap_tinh_trang_ra_vien') {
+                        sanitized = items.filter((x: string) => x !== 'Chuyển tuyến trên' && x !== 'Chuyển tuyến dưới');
+                        if (!sanitized.includes('Chuyển tuyến')) {
+                            sanitized.push('Chuyển tuyến');
+                            settingsService.saveList(key, sanitized).catch(() => { });
+                        }
+                    }
+                    setter(sanitized);
+                    localStorage.setItem(key, JSON.stringify(sanitized));
                 } else {
                     // Fallback to localStorage or defaults
                     const local = loadListLocal(key, defaults);
@@ -905,6 +1228,11 @@ export default function SettingsPage() {
                 try { setPrintSettings({ ...DEFAULT_PRINT_SETTINGS, ...JSON.parse(storedPrint) }); } catch { /* ignore */ }
             }
         });
+
+        // BANC field visibility
+        getBancVisibility().then((vis) => {
+            setBancVisibility(vis);
+        }).catch(() => { /* use default */ });
 
         // Clinical settings (Glasgow threshold)
         settingsService.getClinicalSettings().then((data) => {
@@ -1080,6 +1408,90 @@ export default function SettingsPage() {
         const num = parseFloat(value);
         if (isNaN(num) || num < 0) return;
         updatePrint({ margins: { ...printSettings.margins, [side]: num } });
+    };
+
+    // ─── BANC Visibility Handlers ─────────────────────────
+    const handleToggleBancField = (fieldKey: string, value: boolean) => {
+        const next = { ...bancVisibility, [fieldKey]: value };
+        const fieldDef = BANC_FIELDS.find(f => f.key === fieldKey);
+        if (fieldDef?.subFields) {
+            for (const sub of fieldDef.subFields) {
+                next[sub.key] = value;
+            }
+        }
+        setBancVisibility(next);
+        saveBancVisibility(next);
+    };
+
+    const handleToggleBancSubField = (parentKey: string, subKey: string, value: boolean) => {
+        const next = { ...bancVisibility, [subKey]: value };
+        const fieldDef = BANC_FIELDS.find(f => f.key === parentKey);
+        if (fieldDef?.subFields) {
+            // Tự động đồng bộ với nhóm cha: nếu có ít nhất 1 biến con bật thì nhóm cha bật; nếu tất cả tắt thì nhóm cha tắt
+            const anySubEnabled = fieldDef.subFields.some(sub => (sub.key === subKey ? value : next[sub.key] !== false));
+            next[parentKey] = anySubEnabled;
+        }
+        setBancVisibility(next);
+        saveBancVisibility(next);
+    };
+
+    const toggleExpandBox = (fieldKey: string) => {
+        setExpandedBoxIds(prev => ({
+            ...prev,
+            [fieldKey]: !prev[fieldKey]
+        }));
+    };
+
+    const handleToggleAllBanc = (value: boolean) => {
+        const next: BancFieldVisibility = {};
+        for (const f of BANC_FIELDS) {
+            next[f.key] = value;
+            if (f.subFields) {
+                for (const sub of f.subFields) {
+                    next[sub.key] = value;
+                }
+            }
+        }
+        setBancVisibility(next);
+        saveBancVisibility(next)
+            .then(() => toast.success(value ? 'Đã bật tất cả các biến BANC' : 'Đã tắt tất cả các biến BANC'));
+    };
+
+    const handleToggleSectionBanc = (sectionId: string, value: boolean) => {
+        const next = { ...bancVisibility };
+        for (const f of BANC_FIELDS) {
+            if (f.section === sectionId) {
+                next[f.key] = value;
+                if (f.subFields) {
+                    for (const sub of f.subFields) {
+                        next[sub.key] = value;
+                    }
+                }
+            }
+        }
+        setBancVisibility(next);
+        saveBancVisibility(next);
+    };
+
+    const handleResetBancDefault = () => {
+        setBancVisibility(DEFAULT_BANC_VISIBILITY);
+        saveBancVisibility(DEFAULT_BANC_VISIBILITY)
+            .then(() => toast.success('Đã khôi phục cài đặt mặc định hiển thị BANC'));
+    };
+
+    const toggleExpandSection = (sectionKey: string) => {
+        setExpandedBancSections(prev => ({
+            ...prev,
+            [sectionKey]: !prev[sectionKey]
+        }));
+    };
+
+    const handleExpandAllSections = (expand: boolean) => {
+        const next: Record<string, boolean> = {};
+        for (const sec of BANC_SECTIONS) {
+            next[sec.key] = expand;
+        }
+        setExpandedBancSections(next);
     };
 
     // ─── EMPTY sets for lists that don't track "used" ─────
@@ -1300,118 +1712,491 @@ export default function SettingsPage() {
                 />
             )}
 
-            {/* ══════════════ TAB 5: In BANC ══════════════ */}
+            {/* ══════════════ TAB 5: BANC (Xuất BANC & In BANC) ══════════════ */}
             {activeTab === 'inbanc' && (
                 <div className="space-y-6">
-                    <div className="bg-white rounded-xl border border-gray-200 p-5">
-                        <h3 className="font-heading font-semibold text-gray-900 mb-4">Thiết lập trang in</h3>
+                    {/* Subtab Navigation Bar */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
+                        <div className="flex items-center gap-2 bg-gray-100/90 p-1 rounded-lg">
+                            <button
+                                type="button"
+                                onClick={() => setBancSubTab('xuat')}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                                    bancSubTab === 'xuat'
+                                        ? 'bg-white text-primary-700 shadow-sm font-semibold'
+                                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                                }`}
+                            >
+                                <FileSpreadsheet className="w-4 h-4 text-primary-600" />
+                                Xuất BANC (Tùy chỉnh biến)
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setBancSubTab('in')}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                                    bancSubTab === 'in'
+                                        ? 'bg-white text-primary-700 shadow-sm font-semibold'
+                                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                                }`}
+                            >
+                                <Printer className="w-4 h-4 text-primary-600" />
+                                In BANC (Cấu hình trang & Ký)
+                            </button>
+                        </div>
+                        <div className="text-xs text-gray-500 px-2">
+                            {bancSubTab === 'xuat'
+                                ? 'Tùy chọn ẩn/hiện từng biến trên Bệnh án nghiên cứu'
+                                : 'Thiết lập định dạng khổ giấy, căn lề và tiêu đề ký'
+                            }
+                        </div>
+                    </div>
 
-                        {/* Paper size */}
-                        <div className="mb-5">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Cỡ giấy</label>
-                            <div className="flex gap-3">
-                                {(['A4', 'A5', 'Letter'] as const).map((s) => (
-                                    <label key={s} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 cursor-pointer transition-colors text-sm font-medium ${printSettings.paperSize === s
-                                        ? 'border-primary-500 bg-primary-50 text-primary-700'
-                                        : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                                        }`}>
-                                        <input type="radio" name="paperSize" value={s}
-                                            checked={printSettings.paperSize === s}
-                                            onChange={() => updatePrint({ paperSize: s })}
-                                            className="sr-only" />
-                                        {s}
+                    {/* Subtab 1: Xuất BANC (Toggle visibility of fields) */}
+                    {bancSubTab === 'xuat' && (
+                        <div className="space-y-6">
+                            {/* Toolbar */}
+                            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-4">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div>
+                                        <h3 className="font-heading font-semibold text-gray-900 flex items-center gap-2">
+                                            <Sliders className="w-5 h-5 text-primary-600" />
+                                            Cấu hình biến hiển thị trên Bệnh án nghiên cứu (BANC)
+                                        </h3>
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            Tắt các biến không mong muốn xuất hiện khi In hoặc Xuất bản PDF Bệnh án nghiên cứu. Biến bị tắt sẽ ẩn hoàn toàn.
+                                        </p>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowBancPreview(true)}
+                                            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-300 transition-colors shadow-2xs"
+                                            title="Xem trước hình dạng mẫu Bệnh án nghiên cứu thực tế kèm cấu hình trang in"
+                                        >
+                                            <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                                            Xem trước
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleToggleAllBanc(true)}
+                                            className="px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg border border-primary-200 transition-colors"
+                                        >
+                                            Bật tất cả
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleToggleAllBanc(false)}
+                                            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg border border-gray-200 transition-colors"
+                                        >
+                                            Tắt tất cả
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleResetBancDefault}
+                                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors"
+                                            title="Khôi phục toàn bộ về mặc định ban đầu"
+                                        >
+                                            <RotateCcw className="w-3.5 h-3.5" />
+                                            Mặc định
+                                        </button>
+                                        <div className="h-4 w-px bg-gray-200 hidden sm:block mx-1" />
+                                        <button
+                                            type="button"
+                                            onClick={() => handleExpandAllSections(true)}
+                                            className="px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 rounded-lg border border-gray-200 transition-colors shadow-2xs"
+                                            title="Mở rộng tất cả các nhóm biến để xem chi tiết"
+                                        >
+                                            Mở rộng tất cả
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleExpandAllSections(false)}
+                                            className="px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 rounded-lg border border-gray-200 transition-colors shadow-2xs"
+                                            title="Thu gọn tất cả các nhóm biến"
+                                        >
+                                            Thu gọn tất cả
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-gray-100">
+                                    <div className="relative flex-1 max-w-md">
+                                        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                        <input
+                                            type="text"
+                                            value={bancSearchTerm}
+                                            onChange={(e) => setBancSearchTerm(e.target.value)}
+                                            placeholder="Tìm kiếm biến BANC theo tên hoặc mã..."
+                                            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                    <div className="text-xs text-gray-600 font-medium">
+                                        Hiển thị:{' '}
+                                        <span className="font-bold text-primary-700">
+                                            {BANC_FIELDS.filter(f => bancVisibility[f.key] !== false).length}
+                                        </span>{' '}
+                                        / {BANC_FIELDS.length} biến
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Section list */}
+                            <div className="space-y-4">
+                                {BANC_SECTIONS.map((section) => {
+                                    const fields = BANC_FIELDS.filter(
+                                        (f) =>
+                                            f.section === section.key &&
+                                            (!bancSearchTerm.trim() ||
+                                                f.label.toLowerCase().includes(bancSearchTerm.toLowerCase().trim()) ||
+                                                f.key.toLowerCase().includes(bancSearchTerm.toLowerCase().trim()) ||
+                                                f.subFields?.some(s =>
+                                                    s.label.toLowerCase().includes(bancSearchTerm.toLowerCase().trim()) ||
+                                                    s.key.toLowerCase().includes(bancSearchTerm.toLowerCase().trim())
+                                                ))
+                                    );
+
+                                    if (fields.length === 0) return null;
+
+                                    const allSectionFields = BANC_FIELDS.filter((f) => f.section === section.key);
+                                    const visibleInSection = allSectionFields.filter((f) => bancVisibility[f.key] !== false).length;
+                                    const isAllSectionVisible = visibleInSection === allSectionFields.length;
+                                    const isExpanded = !!bancSearchTerm.trim() || !!expandedBancSections[section.key];
+
+                                    return (
+                                        <div key={section.key} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden transition-all">
+                                            {/* Section Header */}
+                                            <div
+                                                onClick={() => toggleExpandSection(section.key)}
+                                                className="bg-gray-50/80 hover:bg-gray-100/70 px-4 sm:px-5 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3 cursor-pointer select-none transition-colors"
+                                            >
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                    <div className="w-6 h-6 rounded-md bg-white border border-gray-200 flex items-center justify-center text-gray-500 shrink-0 shadow-2xs">
+                                                        <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                                                    </div>
+                                                    <span className="font-heading font-semibold text-gray-900 text-sm">
+                                                        {section.name}
+                                                    </span>
+                                                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium shrink-0 ${
+                                                        isAllSectionVisible
+                                                            ? 'bg-emerald-100 text-emerald-800'
+                                                            : visibleInSection > 0
+                                                            ? 'bg-amber-100 text-amber-800'
+                                                            : 'bg-gray-200 text-gray-600'
+                                                    }`}>
+                                                        {visibleInSection}/{allSectionFields.length}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                    {/* Toggle cả nhóm mục lớn */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleToggleSectionBanc(section.key, !isAllSectionVisible)}
+                                                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
+                                                            isAllSectionVisible
+                                                                ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-300'
+                                                                : visibleInSection > 0
+                                                                ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-300'
+                                                                : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300'
+                                                        }`}
+                                                        title={isAllSectionVisible ? 'Tắt toàn bộ biến trong nhóm này' : 'Bật toàn bộ biến trong nhóm này'}
+                                                    >
+                                                        {isAllSectionVisible ? 'Tắt cả nhóm' : 'Bật cả nhóm'}
+                                                    </button>
+
+                                                    {/* Nút Expand để hiển thị các biến bên trong */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleExpandSection(section.key)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors shadow-2xs"
+                                                        title={isExpanded ? 'Thu gọn danh sách' : 'Mở rộng hiển thị các biến'}
+                                                    >
+                                                        <span>{isExpanded ? 'Thu gọn' : 'Mở rộng'}</span>
+                                                        <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Fields Grid (Chỉ hiển thị khi section được mở rộng) */}
+                                            {isExpanded && (
+                                                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 bg-white border-t border-gray-50 animate-in fade-in duration-150">
+                                                    {fields.map((field) => {
+                                                        const hasSubFields = !!field.subFields && field.subFields.length > 0;
+                                                        const isParentChecked = bancVisibility[field.key] !== false;
+
+                                                        // Biến đơn không có biến con
+                                                        if (!hasSubFields) {
+                                                            return (
+                                                                <label
+                                                                    key={field.key}
+                                                                    className={`flex items-start justify-between gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                                                                        isParentChecked
+                                                                            ? 'bg-emerald-50/20 border-emerald-200 hover:border-emerald-300'
+                                                                            : 'bg-gray-50/50 border-gray-200 text-gray-400 hover:border-gray-300'
+                                                                    }`}
+                                                                >
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <div className={`text-xs font-medium leading-snug ${isParentChecked ? 'text-gray-900' : 'text-gray-400 line-through'}`}>
+                                                                            {field.label}
+                                                                        </div>
+                                                                        <div className="text-[11px] text-gray-400 font-mono mt-0.5">
+                                                                            {field.key}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="relative inline-flex items-center shrink-0 mt-0.5">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isParentChecked}
+                                                                            onChange={(e) => handleToggleBancField(field.key, e.target.checked)}
+                                                                            className="sr-only peer"
+                                                                        />
+                                                                        <div className="w-8 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-emerald-600"></div>
+                                                                    </div>
+                                                                </label>
+                                                            );
+                                                        }
+
+                                                        // Hộp nhóm biến đa thành phần (composite variable box) có nút Expand và Toggle nhóm
+                                                        const totalSubs = field.subFields!.length;
+                                                        const activeSubs = field.subFields!.filter(s => bancVisibility[s.key] !== false && isParentChecked).length;
+                                                        const isSearchMatchSub = !!bancSearchTerm.trim() && (field.subFields?.some(s =>
+                                                            s.label.toLowerCase().includes(bancSearchTerm.toLowerCase().trim()) ||
+                                                            s.key.toLowerCase().includes(bancSearchTerm.toLowerCase().trim())
+                                                        ) ?? false);
+                                                        const isBoxExpanded = isSearchMatchSub || !!expandedBoxIds[field.key];
+
+                                                        return (
+                                                            <div
+                                                                key={field.key}
+                                                                className={`rounded-xl border transition-all ${
+                                                                    isBoxExpanded
+                                                                        ? 'col-span-1 sm:col-span-2 lg:col-span-3 ring-1 ring-emerald-500/20 shadow-md'
+                                                                        : 'col-span-1 shadow-2xs'
+                                                                } ${
+                                                                    isParentChecked
+                                                                        ? 'bg-emerald-50/15 border-emerald-300'
+                                                                        : 'bg-gray-50/60 border-gray-200 opacity-90'
+                                                                }`}
+                                                            >
+                                                                {/* Hộp Header: Tên nhóm biến + Badge + Nút Expand + Toggle cả nhóm */}
+                                                                <div className="p-3 flex items-center justify-between gap-3">
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                                            <span className={`text-xs font-semibold ${isParentChecked ? 'text-gray-900' : 'text-gray-500'}`}>
+                                                                                {field.label}
+                                                                            </span>
+                                                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${
+                                                                                !isParentChecked || activeSubs === 0
+                                                                                    ? 'bg-gray-200 text-gray-600'
+                                                                                    : activeSubs === totalSubs
+                                                                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                                                                    : 'bg-amber-100 text-amber-800 border border-amber-200'
+                                                                            }`}>
+                                                                                {isParentChecked ? `${activeSubs}/${totalSubs} biến con` : 'Đang tắt nhóm'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="text-[11px] text-gray-400 font-mono mt-0.5">
+                                                                            {field.key}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-2 shrink-0">
+                                                                        {/* Nút Expand để bung các biến bên trong cho user bật tắt tùy chỉnh */}
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => toggleExpandBox(field.key)}
+                                                                            className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border transition-all ${
+                                                                                isBoxExpanded
+                                                                                    ? 'bg-emerald-100/80 text-emerald-800 border-emerald-300 hover:bg-emerald-200/70'
+                                                                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-gray-900 shadow-2xs'
+                                                                            }`}
+                                                                            title={isBoxExpanded ? 'Thu gọn danh sách biến con' : 'Mở rộng hiển thị từng biến bên trong để bật/tắt'}
+                                                                        >
+                                                                            <span>{isBoxExpanded ? 'Thu gọn' : 'Chi tiết'}</span>
+                                                                            <ChevronDown className={`w-3.5 h-3.5 text-current transition-transform duration-200 ${isBoxExpanded ? 'rotate-180' : ''}`} />
+                                                                        </button>
+
+                                                                        {/* Toggle cả nhóm biến */}
+                                                                        <label className="relative inline-flex items-center cursor-pointer" title={isParentChecked ? 'Tắt toàn bộ nhóm biến này' : 'Bật toàn bộ nhóm biến này'}>
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={isParentChecked}
+                                                                                onChange={(e) => handleToggleBancField(field.key, e.target.checked)}
+                                                                                className="sr-only peer"
+                                                                            />
+                                                                            <div className="w-8 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-emerald-600"></div>
+                                                                        </label>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Panel biến con bên trong khi bấm Expand */}
+                                                                {isBoxExpanded && (
+                                                                    <div className="px-3 pb-3 pt-2 border-t border-gray-100 bg-white/90 rounded-b-xl animate-in fade-in duration-150">
+                                                                        <div className="text-[11px] font-medium text-gray-500 mb-2 flex items-center justify-between">
+                                                                            <span>Bật/tắt tùy chỉnh từng biến bên trong nhóm:</span>
+                                                                            <span className="text-gray-400 text-[10px]">Tự động đồng bộ với cả nhóm</span>
+                                                                        </div>
+                                                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                                                            {field.subFields!.map((sub) => {
+                                                                                const isSubChecked = bancVisibility[sub.key] !== false && isParentChecked;
+                                                                                return (
+                                                                                    <label
+                                                                                        key={sub.key}
+                                                                                        className={`flex items-center justify-between gap-2.5 px-3 py-2 rounded-lg border text-xs cursor-pointer transition-all ${
+                                                                                            isSubChecked
+                                                                                                ? 'bg-emerald-50/50 border-emerald-200 text-gray-900 shadow-2xs hover:border-emerald-300'
+                                                                                                : 'bg-gray-50/60 border-gray-200 text-gray-400 hover:border-gray-300'
+                                                                                        }`}
+                                                                                    >
+                                                                                        <div className="min-w-0 flex-1">
+                                                                                            <div className={`font-medium truncate ${!isSubChecked ? 'line-through text-gray-400' : 'text-gray-800'}`} title={sub.label}>
+                                                                                                {sub.label}
+                                                                                            </div>
+                                                                                            <div className="text-[10px] text-gray-400 font-mono truncate">
+                                                                                                {sub.key}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div className="relative inline-flex items-center shrink-0">
+                                                                                            <input
+                                                                                                type="checkbox"
+                                                                                                checked={isSubChecked}
+                                                                                                onChange={(e) => handleToggleBancSubField(field.key, sub.key, e.target.checked)}
+                                                                                                className="sr-only peer"
+                                                                                            />
+                                                                                            <div className="w-7 h-3.5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
+                                                                                        </div>
+                                                                                    </label>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+
+                                {/* Tùy chọn hiển thị phân tầng PSI */}
+                                <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 shadow-2xs">
+                                    <h4 className="font-heading font-semibold text-gray-900 text-sm mb-3">Tùy chọn hiển thị nâng cao</h4>
+                                    <label className="flex items-start gap-3 cursor-pointer">
+                                        <input type="checkbox" checked={printSettings.showPsiLevel}
+                                            onChange={(e) => updatePrint({ showPsiLevel: e.target.checked })}
+                                            className="w-4 h-4 mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                                        <div>
+                                            <span className="text-sm font-medium text-gray-800">Hiển thị phân tầng PSI (mức độ nặng)</span>
+                                            <p className="text-xs text-gray-500 mt-0.5">Mặc định trên BANC chỉ in tổng điểm PSI. Bật để hiển thị thêm mức độ phân tầng (Class I → V).</p>
+                                        </div>
                                     </label>
-                                ))}
+                                </div>
                             </div>
                         </div>
+                    )}
 
-                        {/* Margins */}
-                        <div className="mb-5">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Căn lề (cm)</label>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                {([
-                                    { key: 'top' as const, label: 'Trên' },
-                                    { key: 'left' as const, label: 'Trái' },
-                                    { key: 'right' as const, label: 'Phải' },
-                                    { key: 'bottom' as const, label: 'Dưới' },
-                                ]).map(({ key, label }) => (
-                                    <div key={key}>
-                                        <label className="block text-xs text-gray-500 mb-1">{label}</label>
-                                        <input type="number" step="0.1" min="0" max="5"
-                                            value={printSettings.margins[key]}
-                                            onChange={(e) => updateMargin(key, e.target.value)}
+                    {/* Subtab 2: In BANC (Cấu hình trang in hiện hữu) */}
+                    {bancSubTab === 'in' && (
+                        <div className="space-y-6">
+                            <div className="bg-white rounded-xl border border-gray-200 p-5">
+                                <h3 className="font-heading font-semibold text-gray-900 mb-4">Thiết lập trang in</h3>
+
+                                {/* Paper size */}
+                                <div className="mb-5">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cỡ giấy</label>
+                                    <div className="flex gap-3">
+                                        {(['A4', 'A5', 'Letter'] as const).map((s) => (
+                                            <label key={s} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 cursor-pointer transition-colors text-sm font-medium ${printSettings.paperSize === s
+                                                ? 'border-primary-500 bg-primary-50 text-primary-700'
+                                                : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                                                }`}>
+                                                <input type="radio" name="paperSize" value={s}
+                                                    checked={printSettings.paperSize === s}
+                                                    onChange={() => updatePrint({ paperSize: s })}
+                                                    className="sr-only" />
+                                                {s}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Margins */}
+                                <div className="mb-5">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Căn lề (cm)</label>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                        {([
+                                            { key: 'top' as const, label: 'Trên' },
+                                            { key: 'left' as const, label: 'Trái' },
+                                            { key: 'right' as const, label: 'Phải' },
+                                            { key: 'bottom' as const, label: 'Dưới' },
+                                        ]).map(({ key, label }) => (
+                                            <div key={key}>
+                                                <label className="block text-xs text-gray-500 mb-1">{label}</label>
+                                                <input type="number" step="0.1" min="0" max="5"
+                                                    value={printSettings.margins[key]}
+                                                    onChange={(e) => updateMargin(key, e.target.value)}
+                                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Font size */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Cỡ chữ (px)</label>
+                                    <input type="number" step="1" min="8" max="20"
+                                        value={printSettings.fontSize}
+                                        onChange={(e) => updatePrint({ fontSize: Number(e.target.value) || 13 })}
+                                        className="w-32 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                                    <p className="text-xs text-gray-500 mt-1">Mặc định: 13px</p>
+                                </div>
+                            </div>
+
+                            {/* Titles */}
+                            <div className="bg-white rounded-xl border border-gray-200 p-5">
+                                <h3 className="font-heading font-semibold text-gray-900 mb-4">Tiêu đề trang in</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Dòng 1</label>
+                                        <input type="text" value={printSettings.titleLine1}
+                                            onChange={(e) => updatePrint({ titleLine1: e.target.value })}
+                                            placeholder="Ví dụ: BỘ Y TẾ / SỞ Y TẾ..."
                                             className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
                                     </div>
-                                ))}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Dòng 2</label>
+                                        <input type="text" value={printSettings.titleLine2}
+                                            onChange={(e) => updatePrint({ titleLine2: e.target.value })}
+                                            placeholder="Ví dụ: BỆNH VIỆN..."
+                                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Sign titles */}
+                            <div className="bg-white rounded-xl border border-gray-200 p-5">
+                                <h3 className="font-heading font-semibold text-gray-900 mb-4">Tiêu đề ký</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Bên trái</label>
+                                        <input type="text" value={printSettings.signLeft}
+                                            onChange={(e) => updatePrint({ signLeft: e.target.value })}
+                                            placeholder="Ví dụ: TRƯỞNG KHOA"
+                                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Bên phải</label>
+                                        <input type="text" value={printSettings.signRight}
+                                            onChange={(e) => updatePrint({ signRight: e.target.value })}
+                                            placeholder="Ví dụ: BÁC SĨ ĐIỀU TRỊ"
+                                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                                    </div>
+                                </div>
                             </div>
                         </div>
-
-                        {/* Font size */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Cỡ chữ (px)</label>
-                            <input type="number" step="1" min="8" max="20"
-                                value={printSettings.fontSize}
-                                onChange={(e) => updatePrint({ fontSize: Number(e.target.value) || 13 })}
-                                className="w-32 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-                            <p className="text-xs text-gray-500 mt-1">Mặc định: 13px</p>
-                        </div>
-                    </div>
-
-                    {/* Titles */}
-                    <div className="bg-white rounded-xl border border-gray-200 p-5">
-                        <h3 className="font-heading font-semibold text-gray-900 mb-4">Tiêu đề trang in</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Dòng 1</label>
-                                <input type="text" value={printSettings.titleLine1}
-                                    onChange={(e) => updatePrint({ titleLine1: e.target.value })}
-                                    placeholder="Ví dụ: BỘ Y TẾ / SỞ Y TẾ..."
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Dòng 2</label>
-                                <input type="text" value={printSettings.titleLine2}
-                                    onChange={(e) => updatePrint({ titleLine2: e.target.value })}
-                                    placeholder="Ví dụ: BỆNH VIỆN..."
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Sign titles */}
-                    <div className="bg-white rounded-xl border border-gray-200 p-5">
-                        <h3 className="font-heading font-semibold text-gray-900 mb-4">Tiêu đề ký</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Bên trái</label>
-                                <input type="text" value={printSettings.signLeft}
-                                    onChange={(e) => updatePrint({ signLeft: e.target.value })}
-                                    placeholder="Ví dụ: TRƯỞNG KHOA"
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Bên phải</label>
-                                <input type="text" value={printSettings.signRight}
-                                    onChange={(e) => updatePrint({ signRight: e.target.value })}
-                                    placeholder="Ví dụ: BÁC SĨ ĐIỀU TRỊ"
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* PSI options */}
-                    <div className="bg-white rounded-xl border border-gray-200 p-5">
-                        <h3 className="font-heading font-semibold text-gray-900 mb-4">Tuỳ chọn nội dung in</h3>
-                        <label className="flex items-center gap-3 cursor-pointer">
-                            <input type="checkbox" checked={printSettings.showPsiLevel}
-                                onChange={(e) => updatePrint({ showPsiLevel: e.target.checked })}
-                                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-                            <div>
-                                <span className="text-sm font-medium text-gray-800">Hiển thị phân tầng PSI (mức độ nặng)</span>
-                                <p className="text-xs text-gray-500">Mặc định chỉ in tổng điểm. Bật để in thêm mức độ phân tầng.</p>
-                            </div>
-                        </label>
-                    </div>
+                    )}
                 </div>
             )}
             {/* ════════════ TAB 6: SPSS Variables ════════════ */}
@@ -1512,6 +2297,110 @@ export default function SettingsPage() {
                 />
             )}
             </div>{/* end advisor read-only wrapper */}
+
+            {/* ─── BANC Preview Modal ─── */}
+            {showBancPreview && (
+                <div className="fixed inset-0 z-50 flex flex-col bg-slate-900/90 backdrop-blur-xs animate-in fade-in duration-200">
+                    {/* Header Toolbar */}
+                    <div className="bg-slate-900 border-b border-slate-700/80 px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white shrink-0 shadow-md">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 rounded-lg bg-emerald-600/30 border border-emerald-500/40 flex items-center justify-center shrink-0">
+                                <Eye className="w-5 h-5 text-emerald-400" />
+                            </div>
+                            <div>
+                                <h3 className="font-heading font-semibold text-sm sm:text-base text-white flex items-center gap-2">
+                                    Xem trước Bệnh án nghiên cứu (BANC)
+                                </h3>
+                                <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-slate-400">
+                                    <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-slate-300">Khổ: {printSettings.paperSize}</span>
+                                    <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-slate-300">Lề: T{printSettings.margins.top} · D{printSettings.margins.bottom} · Tr{printSettings.margins.left} · P{printSettings.margins.right} cm</span>
+                                    <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-slate-300">Cỡ chữ: {printSettings.fontSize}px</span>
+                                    <span className="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-slate-300">PSI: {printSettings.showPsiLevel ? 'Phân tầng Class I-V' : 'Chỉ điểm'}</span>
+                                    <span className="bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700/60 text-emerald-300 font-medium">
+                                        Hiển thị: {BANC_FIELDS.filter(f => bancVisibility[f.key] !== false).length}/{BANC_FIELDS.length} biến
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 shrink-0">
+                            {/* Zoom control */}
+                            <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1.5 rounded-lg border border-slate-700">
+                                <span className="text-[11px] text-slate-400 font-medium">Thu phóng:</span>
+                                <select
+                                    value={previewZoom}
+                                    onChange={(e) => setPreviewZoom(Number(e.target.value))}
+                                    className="text-xs font-semibold bg-slate-900 text-slate-200 border-none rounded px-2 py-0.5 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                                >
+                                    <option value={80}>80%</option>
+                                    <option value={90}>90%</option>
+                                    <option value={100}>100% (A4 chuẩn)</option>
+                                    <option value={115}>115%</option>
+                                    <option value={125}>125%</option>
+                                    <option value={150}>150%</option>
+                                </select>
+                            </div>
+
+                            <div className="relative">
+                                <select
+                                    value={previewPatientIndex}
+                                    onChange={(e) => setPreviewPatientIndex(parseInt(e.target.value))}
+                                    className="text-xs font-medium bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none max-w-[220px] sm:max-w-xs truncate"
+                                >
+                                    <option value={-1}>📋 Mẫu chuẩn (Đầy đủ biến dữ liệu demo)</option>
+                                    {allPatients.map((p, idx) => (
+                                        <option key={p.id || idx} value={idx}>
+                                            👤 {p.hanhChinh?.hoTen || 'Chưa đặt tên'} ({p.maBenhAnNoiTru || p.maBenhNhanNghienCuu || `BN ${idx + 1}`})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const target = previewPatientIndex === -1 ? sampleBancPatient : (allPatients[previewPatientIndex] || sampleBancPatient);
+                                    printPatients([target]);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm transition-colors"
+                                title="Mở hộp thoại In / Xuất bản PDF của trình duyệt"
+                            >
+                                <Printer className="w-3.5 h-3.5" />
+                                In / Xuất PDF
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setShowBancPreview(false)}
+                                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                                title="Đóng xem trước"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Sheet Canvas with Page Container */}
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-950/85">
+                        <div
+                            className="banc-preview-sheet mx-auto w-full max-w-[210mm] min-h-[297mm] h-auto bg-white text-black shadow-2xl rounded-sm transition-all box-border my-2"
+                            style={{
+                                padding: `${printSettings.margins.top}cm ${printSettings.margins.right}cm ${printSettings.margins.bottom}cm ${printSettings.margins.left}cm`,
+                                fontSize: `${printSettings.fontSize}px`,
+                                zoom: previewZoom !== 100 ? `${previewZoom}%` : undefined,
+                            }}
+                        >
+                            <PrintResearchRecord
+                                patients={[previewPatientIndex === -1 ? sampleBancPatient : (allPatients[previewPatientIndex] || sampleBancPatient)]}
+                                settings={{
+                                    ...printSettings,
+                                    fieldVisibility: bancVisibility,
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -2677,7 +3566,6 @@ function BackupTab({
                     onCancel={() => setRestoreTarget(null)}
                 />
             )}
-
         </div>
     );
 }
