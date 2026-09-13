@@ -295,7 +295,7 @@ export const BANC_FIELDS: BancField[] = [
         subFields: [
             { key: 'kc_khangSinh_ngayBatDau', label: 'Ngày bắt đầu kháng sinh' },
             { key: 'kc_khangSinh_ngayKetThuc', label: 'Ngày kết thúc kháng sinh' },
-            { key: 'kc_khangSinh_soNgay', label: 'Tổng số ngày điều trị' },
+            { key: 'kc_khangSinh_soNgay', label: 'Số ngày sử dụng KS' },
         ],
     },
     { key: 'kc_soNgayDieuTri', label: 'Tổng số ngày điều trị nội trú', section: 'ketCuc', sectionName: 'F. Kết cục điều trị', defaultVisible: true },

@@ -553,9 +553,15 @@ function PatientRecord({ patient: p, settings }: { patient: Patient; settings: P
                     {isVis('kc_khangSinh') && (
                         <div style={{ marginTop: 6 }}>
                             Sử dụng kháng sinh:
-                            {isVis('kc_khangSinh_ngayBatDau', 'kc_khangSinh') && ` từ ngày ${dotFill(formatDate(kc.ngayBatDauKhangSinh))}`}
-                            {isVis('kc_khangSinh_ngayKetThuc', 'kc_khangSinh') && ` đến ngày: ${dotFill(formatDate(kc.ngayKetThucKhangSinh))}`}
-                            {isVis('kc_khangSinh_soNgay', 'kc_khangSinh') && ` (${dotFill(soNgayKS)} ngày)`}
+                            {isVis('kc_khangSinh_ngayBatDau', 'kc_khangSinh') && (
+                                <span> từ ngày {dotFill(formatDate(kc.ngayBatDauKhangSinh))}</span>
+                            )}
+                            {isVis('kc_khangSinh_ngayKetThuc', 'kc_khangSinh') && (
+                                <span> đến ngày: {dotFill(formatDate(kc.ngayKetThucKhangSinh))}</span>
+                            )}
+                            {isVis('kc_khangSinh_soNgay', 'kc_khangSinh') && (
+                                <span> ({dotFill(soNgayKS)} ngày)</span>
+                            )}
                         </div>
                     )}
                     {isVis('kc_soNgayDieuTri') && <div>Tổng số ngày điều trị: {dotFill(soNgayDieuTri)}</div>}
