@@ -18,6 +18,7 @@ import {
     Bookmark, Star, Trash2, Save, Copy, Check, Sparkles, Pencil
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 import {
     type AnalysisTemplate,
     getTemplates, saveTemplate, deleteTemplate, setDefaultTemplate, renameTemplate,
@@ -94,6 +95,8 @@ const ADDITIONAL_VARIABLES: CategoricalVar[] = [
 // ====================================================================
 
 export default function CrosstabTab({ patients }: { patients: Patient[] }) {
+    const { role } = useAuth();
+    const isAdvisor = role === 'advisor';
     const [activeVarIds, setActiveVarIds] = useState<string[]>(DEFAULT_VARIABLES.map(v => v.id));
     const [rowVarId, setRowVarId] = useState<string>('');
     const [colVarId, setColVarId] = useState<string>('');
@@ -552,6 +555,7 @@ export default function CrosstabTab({ patients }: { patients: Patient[] }) {
                                     <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                                     Mặc định
                                 </button>
+                                {!isAdvisor && (
                                 <button
                                     type="button"
                                     onClick={() => handleDeleteTemplate(selectedTemplateId)}
@@ -560,6 +564,7 @@ export default function CrosstabTab({ patients }: { patients: Patient[] }) {
                                 >
                                     <Trash2 className="w-3.5 h-3.5" />
                                 </button>
+                                )}
                             </div>
                         )}
                     </div>

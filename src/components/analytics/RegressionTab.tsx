@@ -19,6 +19,7 @@ import {
     Bookmark, Star, Trash2, Save, Pencil
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 import {
     type AnalysisTemplate,
     getTemplates, saveTemplate, deleteTemplate, setDefaultTemplate, renameTemplate,
@@ -717,6 +718,8 @@ type AnalysisMode = 'univariate' | 'multivariate';
 type Result = LinearRegressionResult | LogisticRegressionResult | { error: string } | null;
 
 export default function RegressionTab({ patients }: { patients: Patient[] }) {
+    const { role } = useAuth();
+    const isAdvisor = role === 'advisor';
     const [regType, setRegType] = useState<RegressionType>('logistic');
     const [mode, setMode] = useState<AnalysisMode>('multivariate');
     const [depVarId, setDepVarId] = useState<string[]>([]);
@@ -1026,6 +1029,7 @@ export default function RegressionTab({ patients }: { patients: Patient[] }) {
                                     <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                                     Mặc định
                                 </button>
+                                {!isAdvisor && (
                                 <button
                                     type="button"
                                     onClick={() => handleDeleteTemplate(selectedTemplateId)}
@@ -1034,6 +1038,7 @@ export default function RegressionTab({ patients }: { patients: Patient[] }) {
                                 >
                                     <Trash2 className="w-3.5 h-3.5" />
                                 </button>
+                                )}
                             </div>
                         )}
                     </div>

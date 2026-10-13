@@ -797,7 +797,7 @@ export default function DashboardPage() {
                     })()}
                 </div>
                 <div className="flex gap-1.5">
-                    {selectedIds.size > 0 && (
+                    {!isAdvisor && selectedIds.size > 0 && (
                         <div className="relative group">
                             <button
                                 onClick={handlePrintBatch}
@@ -833,6 +833,9 @@ export default function DashboardPage() {
                     </div>
                     )}
 
+                    {/* Excel + SPSS export — hide for advisor */}
+                    {!isAdvisor && (
+                    <>
                     {/* Excel export — green X file icon */}
                     <div className="relative group">
                         <button
@@ -871,6 +874,8 @@ export default function DashboardPage() {
                             Xuất SPSS (.sav)
                         </span>
                     </div>
+                    </>
+                    )}
                     {/* Add patient — hide for advisor */}
                     {!isAdvisor && (
                     <div className="relative group">
@@ -1279,6 +1284,7 @@ export default function DashboardPage() {
                                                                 <Edit className="w-4 h-4" />
                                                             </button>
                                                             )}
+                                                            {!isAdvisor && (
                                                             <button
                                                                 onClick={() => handlePrintSingle(p)}
                                                                 className="p-1.5 rounded-lg text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
@@ -1286,6 +1292,7 @@ export default function DashboardPage() {
                                                             >
                                                                 <Printer className="w-4 h-4" />
                                                             </button>
+                                                            )}
                                                             {!isAdvisor && (
                                                             <button
                                                                 onClick={() => handleDelete(p.id, p.hanhChinh.hoTen)}

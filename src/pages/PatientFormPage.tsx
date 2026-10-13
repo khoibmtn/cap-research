@@ -562,6 +562,8 @@ export default function PatientFormPage() {
                     </h1>
                     {readOnly && isEdit && (
                         <div className="flex items-center gap-2">
+                            {!isAdvisor && (
+                            <>
                             <button
                                 onClick={handlePrint}
                                 className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
@@ -570,8 +572,6 @@ export default function PatientFormPage() {
                                 <Printer className="w-4 h-4" />
                                 In BANC
                             </button>
-                            {!isAdvisor && (
-                            <>
                             <button
                                 onClick={() => navigate(`/patient/${id}/edit`)}
                                 className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 transition-colors shadow-sm"
@@ -673,16 +673,13 @@ export default function PatientFormPage() {
                 </div>
             </div>
 
-            {/* Read-only / Advisor Banner */}
-            {readOnly && (
+            {/* Read-only banner (admin only) */}
+            {readOnly && !isAdvisor && (
                 <div className="mb-4 px-4 py-2.5 bg-sky-50 border border-sky-200 rounded-xl flex items-center justify-between text-xs text-sky-800 shadow-2xs">
                     <div className="flex items-center gap-2">
                         <Eye className="w-4 h-4 text-sky-600 shrink-0" />
                         <span>
-                            {isAdvisor
-                                ? 'Chế độ xem cố vấn (Advisor): Hồ sơ chỉ đọc, các trường thông tin không thể chỉnh sửa.'
-                                : 'Chế độ xem chi tiết: Nhấn "Chỉnh sửa" ở thanh công cụ phía trên nếu bạn muốn cập nhật dữ liệu.'
-                            }
+                            Chế độ xem chi tiết: Nhấn "Chỉnh sửa" ở thanh công cụ phía trên nếu bạn muốn cập nhật dữ liệu.
                         </span>
                     </div>
                     <span className="text-[11px] font-semibold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-md shrink-0">

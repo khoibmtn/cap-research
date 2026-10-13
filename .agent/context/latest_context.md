@@ -1,32 +1,39 @@
 # Session Context Snapshot
-**Saved:** 2026-09-13T21:18:00+07:00
-**Branch:** main
-**Last Commit:** 316961f merge: fix [object Object] in antibiotic dates on BANC print preview
+**Saved:** 2026-10-13T18:43:00+07:00
+**Branch:** session/20261013 (merged into main)
+**Last Commit:** (see git log — "feat(auth): restrict advisor permissions")
 
 ## What Was Done This Session
-1. **Khắc Phục Lỗi Hiển Thị Ngày Sử Dụng Kháng Sinh Trên BANC Print/Preview:**
-   - Phát hiện nguyên nhân hiển thị `[object Object]` tại dòng *Sử dụng kháng sinh: từ ngày [object Object] đến ngày: [object Object] ([object Object] ngày)* trong `PrintResearchRecord.tsx`.
-   - Nguyên nhân: Hàm `dotFill(...)` trả về React Element JSX `<span className="print-field-value">...</span>`, khi bị nội suy trong template string dấu backtick (`` ` từ ngày ${dotFill(...)}` ``) bị JavaScript ép kiểu thành chuỗi `"[object Object]"`.
-   - Xử lý: Chuyển toàn bộ các biểu thức sang JSX elements (`<span> từ ngày {dotFill(formatDate(kc.ngayBatDauKhangSinh))}</span>`), giữ nguyên khả năng render đường kẻ chấm và hiển thị đúng ngày tháng, số ngày KS.
-2. **Chuẩn Hóa Nhãn Biến Con BANC:**
-   - Trong `bancFields.ts`, đổi nhãn hiển thị của `kc_khangSinh_soNgay` từ `"Tổng số ngày điều trị"` thành `"Số ngày sử dụng KS"` để tránh nhầm lẫn với biến `"Tổng số ngày điều trị nội trú"`.
-3. **Kiểm Tra & Triển Khai:**
-   - TypeScript build (`npm run build`) và ESLint kiểm tra không có lỗi.
-   - Đã commit, hợp nhất vào `main`, push lên GitHub và deploy lên Firebase Hosting thành công.
+1. **Brainstorm quản lý tài khoản + phân quyền (KHÔNG triển khai):**
+   - Đã phân tích 3 phương án (Firestore-only / Cloud Functions / Hybrid). User quyết định **không bổ sung tính năng** này.
+   - Ghi chú: Firebase client SDK không thể list/disable/reset password user khác → cần Cloud Functions (gói Blaze) nếu làm sau này.
+2. **Thu hẹp quyền tài khoản Advisor (chỉ ẩn trên UI):**
+   - Ẩn page **Cài đặt**: lọc khỏi sidebar (`AppLayout.tsx`) + bọc route `/settings` bằng `AdminRoute` (`App.tsx`).
+   - Ẩn nút **Xuất Excel** và **Xuất SPSS (.sav)** trên Dashboard.
+   - **Không in BANC**: ẩn nút in hàng loạt, nút in từng dòng (Dashboard) và nút "In BANC" (PatientFormPage).
+   - Bỏ toàn bộ banner "Chế độ xem cố vấn (Advisor)… / Chỉ đọc" khi advisor xem hồ sơ. Gỡ banner + wrapper read-only advisor chết trong `SettingsPage.tsx`.
+   - Tab **Bảng chéo** và **Hồi quy** (Thống kê): advisor không thấy nút **xóa mẫu phân tích** (vẫn thêm / đổi tên / cập nhật / đặt mặc định được).
+3. Cập nhật `instruction.md` mô tả quyền Advisor mới.
 
 ## Work In Progress
-- Tất cả các tính năng và sửa lỗi trong phiên đã hoàn thành 100%, bản build production đã live trên Firebase Hosting.
+- Không còn việc dang dở.
 
 ## Key Files Modified
-- `src/components/print/PrintResearchRecord.tsx`: Sửa lỗi template string interpolation `dotFill` gây ra `[object Object]`.
-- `src/data/bancFields.ts`: Cập nhật nhãn biến con `kc_khangSinh_soNgay` thành `"Số ngày sử dụng KS"`.
+- `src/App.tsx`: `/settings` bọc `AdminRoute`.
+- `src/components/layout/AppLayout.tsx`: ẩn mục Cài đặt với advisor.
+- `src/pages/DashboardPage.tsx`: ẩn Excel/SPSS/in BANC với advisor.
+- `src/pages/PatientFormPage.tsx`: ẩn "In BANC" + banner chỉ đọc với advisor.
+- `src/pages/SettingsPage.tsx`: xóa logic `isAdvisor` (không còn reachable).
+- `src/components/analytics/CrosstabTab.tsx`, `RegressionTab.tsx`: ẩn nút xóa mẫu với advisor (`useAuth`).
+- `instruction.md`: cập nhật quyền Advisor.
 
 ## Environment Notes
 - Node: v25.2.1
 - Firebase project: cap-research-app
 - Target: Firebase Hosting (https://cap-research-app.web.app)
-- Last deploy: 2026-09-13 21:15:26
+- Last deploy: 2026-10-13
 
 ## Important Context for Next Session
-- BANC print preview và xuất PDF hoạt động hoàn toàn chính xác với mọi tùy chọn bật/tắt nhóm và biến con.
-- Bộ quy tắc Firestore (`firestore.rules`) và tính năng lưu mẫu phân tích 2 chiều (`templateService.ts`) đã hoạt động ổn định trên production.
+- Vai trò vẫn gán cứng trong `AuthContext.tsx` (`ROLE_MAP`): chỉ `admin@capresearch.com` là admin, mọi email khác = advisor.
+- **Hạn chế advisor chỉ ở UI.** `firestore.rules` vẫn cho mọi user đã đăng nhập read/write toàn bộ — nếu cần bảo mật thật phải siết rules theo email/role.
+- Lint có sẵn lỗi cũ (no-explicit-any, unused vars) trong một số file — không do phiên này gây ra.
