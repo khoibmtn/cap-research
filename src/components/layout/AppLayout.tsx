@@ -113,8 +113,8 @@ export default function AppLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [showPwModal, setShowPwModal] = useState(false);
 
-    // All nav items visible for all roles (Settings is read-only for advisor)
-    const navItems = NAV_ITEMS;
+    // Settings is admin-only
+    const navItems = role === 'advisor' ? NAV_ITEMS.filter(item => item.to !== '/settings') : NAV_ITEMS;
 
     const handleLogout = async () => {
         await logout();

@@ -19,11 +19,11 @@ Mở trình duyệt web (Chrome, Safari, Edge đều được), truy cập vào 
 
 Có 2 loại tài khoản:
 - **Admin** (`admin@capresearch.com`): Toàn quyền — thêm, sửa, xóa bệnh nhân và quản lý cài đặt.
-- **Advisor** (`advisor@capresearch.com`): Chế độ chỉ xem — có thể xem tất cả dữ liệu, thống kê, phân tích và cài đặt. Khi xem hồ sơ bệnh nhân, giao diện hiển thị thanh thông báo chỉ đọc nhã nhặn; các trường thông tin được bảo vệ nhưng vẫn cho phép chọn văn bản, sao chép dữ liệu và cuộn trang thuận tiện.
+- **Advisor** (`advisor@capresearch.com`): Chế độ chỉ xem — có thể xem danh sách bệnh nhân, chi tiết hồ sơ và trang Thống kê. Tài khoản Advisor **không** thấy trang Cài đặt, **không** có nút xuất Excel / SPSS, **không** in được BANC, và không thêm, sửa, xóa bệnh nhân. Trong trang Thống kê (tab Bảng chéo và Hồi quy), Advisor được thêm, đổi tên, cập nhật và đặt mặc định mẫu phân tích, nhưng **không** xóa được mẫu.
 
 > **Mẹo:** Khi nhập email, gõ "admin" hoặc "advisor" rồi nhấn Tab — phần mềm tự động điền đầy đủ email.
 
-Sau khi vào, bạn sẽ thấy thanh menu bên trái với 4 mục chính: **Danh sách nghiên cứu**, **Thống kê**, và **Cài đặt**. Góc dưới trái hiển thị tài khoản đang đăng nhập và vai trò (Admin/Advisor).
+Sau khi vào, bạn sẽ thấy thanh menu bên trái với các mục chính: **Danh sách nghiên cứu**, **Thống kê**, và **Cài đặt** (chỉ Admin). Góc dưới trái hiển thị tài khoản đang đăng nhập và vai trò (Admin/Advisor).
 
 Trên điện thoại, bấm vào biểu tượng ☰ ở góc trái để mở menu.
 
