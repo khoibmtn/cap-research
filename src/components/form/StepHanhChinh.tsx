@@ -81,21 +81,37 @@ interface Props {
 export default function StepHanhChinh({ data, onChange, existingCodes, currentPatientId }: Props) {
     const hc = data.hanhChinh;
 
-    // Load configurable lists from localStorage
-    const ngheNghiepList = useMemo(() => {
+    // Load configurable lists from Firestore, fallback to localStorage then defaults
+    const [ngheNghiepList, setNgheNghiepList] = useState<string[]>(() => {
         try {
             const raw = localStorage.getItem('cap_nghe_nghiep');
             if (raw) { const p = JSON.parse(raw); if (Array.isArray(p) && p.length > 0) return p; }
         } catch { /* ignore */ }
         return NGHE_NGHIEP_OPTIONS;
-    }, []);
+    });
 
-    const noiOList = useMemo(() => {
+    const [noiOList, setNoiOList] = useState<string[]>(() => {
         try {
             const raw = localStorage.getItem('cap_noi_o');
             if (raw) { const p = JSON.parse(raw); if (Array.isArray(p) && p.length > 0) return p; }
         } catch { /* ignore */ }
         return DEFAULT_NOI_O;
+    });
+
+    useEffect(() => {
+        settingsService.getList('cap_nghe_nghiep').then((items) => {
+            if (items && items.length > 0) {
+                setNgheNghiepList(items);
+                localStorage.setItem('cap_nghe_nghiep', JSON.stringify(items));
+            }
+        }).catch(() => { /* use initial state */ });
+
+        settingsService.getList('cap_noi_o').then((items) => {
+            if (items && items.length > 0) {
+                setNoiOList(items);
+                localStorage.setItem('cap_noi_o', JSON.stringify(items));
+            }
+        }).catch(() => { /* use initial state */ });
     }, []);
 
     const update = (field: keyof HanhChinh, value: string | number | null) => {

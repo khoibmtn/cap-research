@@ -8,9 +8,13 @@ interface Props {
     khongMocViKhuan: boolean;
     onChange: (data: ViKhuan[]) => void;
     onKhongMocChange: (value: boolean) => void;
+    bacteriaList?: string[];
+    antibioticsList?: string[];
 }
 
-export default function StepViKhuan({ data, khongMocViKhuan, onChange, onKhongMocChange }: Props) {
+export default function StepViKhuan({ data, khongMocViKhuan, onChange, onKhongMocChange, bacteriaList, antibioticsList }: Props) {
+    const availableBacteria = bacteriaList && bacteriaList.length > 0 ? bacteriaList : DEFAULT_BACTERIA;
+    const availableAntibiotics = antibioticsList && antibioticsList.length > 0 ? antibioticsList : DEFAULT_ANTIBIOTICS;
     // Default: all bacteria with coKhong=true start expanded
     const defaultExpanded = useMemo(() => new Set(data.filter(v => v.coKhong).map(v => v.id)), []);
     const [expandedIds, setExpandedIds] = useState<Set<string>>(defaultExpanded);
@@ -18,12 +22,12 @@ export default function StepViKhuan({ data, khongMocViKhuan, onChange, onKhongMo
     const addBacteria = () => {
         if (khongMocViKhuan) return;
         const usedNames = data.map((v) => v.tenViKhuan);
-        const available = DEFAULT_BACTERIA.filter((b) => !usedNames.includes(b));
+        const available = availableBacteria.filter((b) => !usedNames.includes(b));
         const newVk: ViKhuan = {
             id: crypto.randomUUID(),
             tenViKhuan: available[0] || '',
             coKhong: false,
-            khangSinhDo: DEFAULT_ANTIBIOTICS.map((ks) => ({ tenKhangSinh: ks, mucDo: '' as const })),
+            khangSinhDo: availableAntibiotics.map((ks) => ({ tenKhangSinh: ks, mucDo: '' as const })),
         };
         onChange([...data, newVk]);
         setExpandedIds(prev => new Set(prev).add(newVk.id));
@@ -121,7 +125,7 @@ export default function StepViKhuan({ data, khongMocViKhuan, onChange, onKhongMo
                                     onChange={(e) => updateBacteria(vk.id, 'tenViKhuan', e.target.value)}
                                     className="flex-1 px-2 py-1 rounded border border-gray-200 text-sm font-medium bg-white">
                                     <option value="">-- Chọn vi khuẩn --</option>
-                                    {DEFAULT_BACTERIA.filter((b) =>
+                                    {availableBacteria.filter((b) =>
                                         b === vk.tenViKhuan || !data.some((other) => other.id !== vk.id && other.tenViKhuan === b)
                                     ).map((b) => <option key={b} value={b}>{b}</option>)}
                                 </select>

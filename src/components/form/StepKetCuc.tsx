@@ -1,6 +1,7 @@
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { KetCuc } from '../../types/patient';
 import { DEFAULT_DIEN_BIEN_DIEU_TRI, DEFAULT_TINH_TRANG_RA_VIEN } from '../../data/formOptions';
+import { settingsService } from '../../services/settingsService';
 import DateInput from '../ui/DateInput';
 import toast from 'react-hot-toast';
 
@@ -31,33 +32,47 @@ export default function StepKetCuc({ data, ngayVaoVien, ngayRaVien, onChange }: 
         onChange({ ...data, [field]: value });
     };
 
-    // Load configurable lists from localStorage
-    const dienBienList = useMemo(() => {
+    // Load configurable lists from Firestore, fallback to localStorage then defaults
+    const [dienBienList, setDienBienList] = useState<string[]>(() => {
         try {
             const raw = localStorage.getItem('cap_dien_bien_dieu_tri');
             if (raw) { const p = JSON.parse(raw); if (Array.isArray(p) && p.length > 0) return p as string[]; }
         } catch { /* ignore */ }
         return DEFAULT_DIEN_BIEN_DIEU_TRI;
-    }, []);
+    });
 
-    const tinhTrangList = useMemo(() => {
-        let list: string[] = [...DEFAULT_TINH_TRANG_RA_VIEN];
+    const sanitizeTinhTrang = (list: string[]) => {
+        let result = list.filter(item => item !== 'Chuyển tuyến trên' && item !== 'Chuyển tuyến dưới');
+        if (!result.includes('Chuyển tuyến')) result.push('Chuyển tuyến');
+        return result;
+    };
+
+    const [tinhTrangList, setTinhTrangList] = useState<string[]>(() => {
         try {
             const raw = localStorage.getItem('cap_tinh_trang_ra_vien');
             if (raw) {
                 const p = JSON.parse(raw);
-                if (Array.isArray(p) && p.length > 0) list = p as string[];
+                if (Array.isArray(p) && p.length > 0) return sanitizeTinhTrang(p as string[]);
             }
         } catch { /* ignore */ }
-        // Migration: loại bỏ các tùy chọn cũ và đảm bảo có 'Chuyển tuyến'
-        list = list.filter(item => item !== 'Chuyển tuyến trên' && item !== 'Chuyển tuyến dưới');
-        if (!list.includes('Chuyển tuyến')) {
-            list.push('Chuyển tuyến');
-        }
-        try {
-            localStorage.setItem('cap_tinh_trang_ra_vien', JSON.stringify(list));
-        } catch { /* ignore */ }
-        return list;
+        return sanitizeTinhTrang(DEFAULT_TINH_TRANG_RA_VIEN);
+    });
+
+    useEffect(() => {
+        settingsService.getList('cap_dien_bien_dieu_tri').then((items) => {
+            if (items && items.length > 0) {
+                setDienBienList(items);
+                localStorage.setItem('cap_dien_bien_dieu_tri', JSON.stringify(items));
+            }
+        }).catch(() => { /* use initial state */ });
+
+        settingsService.getList('cap_tinh_trang_ra_vien').then((items) => {
+            if (items && items.length > 0) {
+                const sanitized = sanitizeTinhTrang(items);
+                setTinhTrangList(sanitized);
+                localStorage.setItem('cap_tinh_trang_ra_vien', JSON.stringify(sanitized));
+            }
+        }).catch(() => { /* use initial state */ });
     }, []);
 
     // Auto-calculate total days

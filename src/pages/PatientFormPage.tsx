@@ -9,6 +9,7 @@ import { usePSICalculator } from '../hooks/usePSICalculator';
 import { useCURB65Calculator } from '../hooks/useCURB65Calculator';
 import type { Patient, DrugGenericName } from '../types/patient';
 import { createDefaultPatient } from '../types/patient';
+import { DEFAULT_BACTERIA, DEFAULT_ANTIBIOTICS } from '../data/formOptions';
 import { usePrintRecord } from '../hooks/usePrintRecord';
 import { useEnterToNextField } from '../hooks/useEnterToNextField';
 import StepHanhChinh from '../components/form/StepHanhChinh';
@@ -62,6 +63,10 @@ export default function PatientFormPage() {
     const [drugGenericNames, setDrugGenericNames] = useState<DrugGenericName[]>([]);
     // Glasgow confusion threshold from clinical settings
     const [glasgowThreshold, setGlasgowThreshold] = useState(13);
+    // Bacteria list from settings (Firestore)
+    const [bacteriaList, setBacteriaList] = useState<string[]>(DEFAULT_BACTERIA);
+    // Antibiotics list from settings (Firestore)
+    const [antibioticsList, setAntibioticsList] = useState<string[]>(DEFAULT_ANTIBIOTICS);
 
     // Kích hoạt tính năng Enter để chuyển ô
     useEnterToNextField();
@@ -232,6 +237,56 @@ export default function PatientFormPage() {
         settingsService.getClinicalSettings().then((settings) => {
             if (settings?.glasgowThreshold) setGlasgowThreshold(settings.glasgowThreshold);
         }).catch(() => { /* use default 13 */ });
+    }, []);
+
+    // Load bacteria list from settings
+    useEffect(() => {
+        settingsService.getList('cap_bacteria').then((items) => {
+            if (items && items.length > 0) {
+                setBacteriaList(items);
+            } else {
+                const raw = localStorage.getItem('cap_bacteria');
+                if (raw) {
+                    try {
+                        const parsed = JSON.parse(raw);
+                        if (Array.isArray(parsed) && parsed.length > 0) setBacteriaList(parsed);
+                    } catch { /* ignore */ }
+                }
+            }
+        }).catch(() => {
+            const raw = localStorage.getItem('cap_bacteria');
+            if (raw) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed) && parsed.length > 0) setBacteriaList(parsed);
+                } catch { /* ignore */ }
+            }
+        });
+    }, []);
+
+    // Load antibiotics list from settings
+    useEffect(() => {
+        settingsService.getList('cap_antibiotics').then((items) => {
+            if (items && items.length > 0) {
+                setAntibioticsList(items);
+            } else {
+                const raw = localStorage.getItem('cap_antibiotics');
+                if (raw) {
+                    try {
+                        const parsed = JSON.parse(raw);
+                        if (Array.isArray(parsed) && parsed.length > 0) setAntibioticsList(parsed);
+                    } catch { /* ignore */ }
+                }
+            }
+        }).catch(() => {
+            const raw = localStorage.getItem('cap_antibiotics');
+            if (raw) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed) && parsed.length > 0) setAntibioticsList(parsed);
+                } catch { /* ignore */ }
+            }
+        });
     }, []);
 
     // Track dirty state (for both new and edit modes)
@@ -513,7 +568,7 @@ export default function PatientFormPage() {
             }
             case 3: return <StepXetNghiem data={formData.xetNghiem} indices={indices} onChange={(v) => updateField('xetNghiem', v)} />;
             case 4: return <StepHinhAnh data={formData.hinhAnh} onChange={(v) => updateField('hinhAnh', v)} />;
-            case 5: return <StepViKhuan data={formData.viKhuan} khongMocViKhuan={formData.khongMocViKhuan ?? false} onChange={(v) => updateField('viKhuan', v)} onKhongMocChange={(v) => updateField('khongMocViKhuan', v)} />;
+            case 5: return <StepViKhuan data={formData.viKhuan} khongMocViKhuan={formData.khongMocViKhuan ?? false} onChange={(v) => updateField('viKhuan', v)} onKhongMocChange={(v) => updateField('khongMocViKhuan', v)} bacteriaList={bacteriaList} antibioticsList={antibioticsList} />;
             case 6: return (
                 <div className="space-y-8">
                     <StepCURB65
